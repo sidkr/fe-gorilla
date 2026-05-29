@@ -240,9 +240,9 @@ const quickActions = [
     <section class="dash-split dash-split-60-40">
       <div class="dash-section">
         <SectionEyebrow>Recent campaigns</SectionEyebrow>
-        <Card padding="none">
-          <AppRecentCampaignsTable v-if="recentCampaigns.length" :campaigns="recentCampaigns" />
-          <p v-else class="dash-empty">No campaigns sent yet. Your sent campaigns will show up here.</p>
+        <AppRecentCampaignsTable v-if="recentCampaigns.length" :campaigns="recentCampaigns" />
+        <Card v-else>
+          <p class="dash-empty">No campaigns sent yet. Your sent campaigns will show up here.</p>
         </Card>
       </div>
       <AppActivityFeed v-if="activityEvents.length" :events="activityEvents" />

@@ -30,7 +30,9 @@ defineProps({
   border: 1px solid var(--color-rule);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
-  overflow: hidden;
+  /* Scroll wide tables horizontally on narrow viewports instead of clipping
+     columns; the radius still clips the corners. */
+  overflow-x: auto;
 }
 
 table {

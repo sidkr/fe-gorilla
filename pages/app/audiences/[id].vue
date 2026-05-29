@@ -590,93 +590,77 @@ const drawerCustomFields = computed(() => {
           {{ formMode === "add" ? "Add contact" : "Edit contact" }}
         </h2>
         <form @submit.prevent="submitForm">
-          <label class="ad-field">
-            <span class="ad-field-label">Email</span>
-            <input v-model="form.email" class="ad-input" type="email" placeholder="name@example.com" autofocus />
-          </label>
+          <FormField label="Email" class="ad-field">
+            <TextInput v-model="form.email" type="email" placeholder="name@example.com" />
+          </FormField>
           <div class="ad-field-row">
-            <label class="ad-field">
-              <span class="ad-field-label">First name</span>
-              <input v-model="form.firstName" class="ad-input" type="text" />
-            </label>
-            <label class="ad-field">
-              <span class="ad-field-label">Last name</span>
-              <input v-model="form.lastName" class="ad-input" type="text" />
-            </label>
+            <FormField label="First name" class="ad-field">
+              <TextInput v-model="form.firstName" type="text" />
+            </FormField>
+            <FormField label="Last name" class="ad-field">
+              <TextInput v-model="form.lastName" type="text" />
+            </FormField>
           </div>
-          <label class="ad-field">
-            <span class="ad-field-label">Status</span>
-            <select v-model="form.status" class="ad-input">
+          <FormField label="Status" class="ad-field">
+            <SelectInput v-model="form.status">
               <option value="subscribed">Subscribed</option>
               <option value="unsubscribed">Unsubscribed</option>
               <option value="pending">Pending</option>
               <option value="cleaned">Cleaned</option>
-            </select>
-          </label>
+            </SelectInput>
+          </FormField>
 
           <div class="ad-field-row">
-            <label class="ad-field">
-              <span class="ad-field-label">Company</span>
-              <input v-model="form.company" class="ad-input" type="text" />
-            </label>
-            <label class="ad-field">
-              <span class="ad-field-label">Phone</span>
-              <input v-model="form.phone" class="ad-input" type="tel" />
-            </label>
+            <FormField label="Company" class="ad-field">
+              <TextInput v-model="form.company" type="text" />
+            </FormField>
+            <FormField label="Phone" class="ad-field">
+              <TextInput v-model="form.phone" type="tel" />
+            </FormField>
           </div>
           <div class="ad-field-row">
-            <label class="ad-field">
-              <span class="ad-field-label">City</span>
-              <input v-model="form.city" class="ad-input" type="text" />
-            </label>
-            <label class="ad-field">
-              <span class="ad-field-label">Country</span>
-              <input v-model="form.country" class="ad-input" type="text" />
-            </label>
+            <FormField label="City" class="ad-field">
+              <TextInput v-model="form.city" type="text" />
+            </FormField>
+            <FormField label="Country" class="ad-field">
+              <TextInput v-model="form.country" type="text" />
+            </FormField>
           </div>
-          <label class="ad-field">
-            <span class="ad-field-label">Timezone</span>
-            <input v-model="form.timezone" class="ad-input" type="text" placeholder="e.g. Europe/Berlin" />
-          </label>
-          <label class="ad-field">
-            <span class="ad-field-label">Tags <span class="ad-field-opt">(comma separated)</span></span>
-            <input v-model="tagsText" class="ad-input" type="text" placeholder="vip, beta, newsletter" />
-          </label>
+          <FormField label="Timezone" class="ad-field">
+            <TextInput v-model="form.timezone" type="text" placeholder="e.g. Europe/Berlin" />
+          </FormField>
+          <FormField label="Tags" hint="(comma separated)" class="ad-field">
+            <TextInput v-model="tagsText" type="text" placeholder="vip, beta, newsletter" />
+          </FormField>
 
           <!-- Dynamic custom-field section, generated from the org registry. -->
           <template v-if="customFields.length">
             <h3 class="ad-form-subhead">Custom fields</h3>
-            <label v-for="f in customFields" :key="f.id" class="ad-field">
-              <span class="ad-field-label">
-                {{ f.label }}
-                <span v-if="f.required" class="ad-field-req" aria-hidden="true">*</span>
-              </span>
-
-              <template v-if="f.type === 'boolean'">
-                <span class="ad-check-inline">
-                  <input v-model="customForm[f.key]" type="checkbox" />
-                  <span class="ad-field-opt">Yes</span>
-                </span>
-              </template>
-              <select v-else-if="f.type === 'enum'" v-model="customForm[f.key]" class="ad-input">
+            <FormField
+              v-for="f in customFields"
+              :key="f.id"
+              :label="f.label"
+              :required="f.required"
+              class="ad-field"
+            >
+              <Checkbox v-if="f.type === 'boolean'" v-model="customForm[f.key]">Yes</Checkbox>
+              <SelectInput v-else-if="f.type === 'enum'" v-model="customForm[f.key]">
                 <option value="">—</option>
                 <option v-for="opt in f.enumValues" :key="opt" :value="opt">{{ opt }}</option>
-              </select>
-              <input
+              </SelectInput>
+              <TextInput
                 v-else-if="f.type === 'number'"
                 v-model="customForm[f.key]"
-                class="ad-input"
                 type="number"
                 step="any"
               />
-              <input
+              <TextInput
                 v-else-if="f.type === 'date'"
                 v-model="customForm[f.key]"
-                class="ad-input"
                 type="date"
               />
-              <input v-else v-model="customForm[f.key]" class="ad-input" type="text" />
-            </label>
+              <TextInput v-else v-model="customForm[f.key]" type="text" />
+            </FormField>
           </template>
 
           <p v-if="formError" class="ad-modal-error">
@@ -691,10 +675,10 @@ const drawerCustomFields = computed(() => {
             </button>
           </p>
           <div class="ad-modal-actions">
-            <button type="button" class="ad-btn ad-btn--ghost" :disabled="saving" @click="closeForm">Cancel</button>
-            <button type="submit" class="ad-btn ad-btn--primary" :disabled="saving">
+            <Button variant="ghost" :disabled="saving" @click="closeForm">Cancel</Button>
+            <Button type="submit" variant="primary" :loading="saving">
               {{ saving ? "Saving…" : formMode === "add" ? "Add contact" : "Save changes" }}
-            </button>
+            </Button>
           </div>
         </form>
       </div>
@@ -765,10 +749,10 @@ const drawerCustomFields = computed(() => {
           </template>
 
           <div class="ad-drawer-actions">
-            <button type="button" class="ad-btn ad-btn--ghost" @click="openEdit(drawerContact)">Edit</button>
-            <button type="button" class="ad-btn ad-btn--ghost ad-btn--danger" @click="removeContact(drawerContact)">
+            <Button variant="ghost" size="sm" @click="openEdit(drawerContact)">Edit</Button>
+            <Button variant="danger" size="sm" @click="removeContact(drawerContact)">
               Remove
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -830,54 +814,10 @@ const drawerCustomFields = computed(() => {
 }
 .ad-lede { margin: 0; font-family: var(--font-body); font-size: var(--text-sm); color: var(--color-ink-soft); }
 
-.ad-cta {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-3) var(--space-5);
-  background: var(--btn-primary-bg);
-  color: var(--btn-primary-fg);
-  font-family: var(--font-body);
-  font-size: var(--text-sm);
-  font-weight: 600;
-  border: none;
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-sm);
-  cursor: pointer;
-  white-space: nowrap;
-  transition: background-color var(--dur-base) var(--ease-out);
-}
-.ad-cta:hover { background: var(--btn-primary-hover); }
-.ad-cta:focus-visible { outline: none; box-shadow: var(--shadow-pop-glow); }
-
 /* Toolbar */
 .ad-toolbar { display: flex; gap: var(--space-3); align-items: center; flex-wrap: wrap; }
-.ad-search {
-  width: 100%;
-  max-width: 280px;
-  padding: var(--space-2) var(--space-3);
-  min-height: var(--field-height);
-  border: 1px solid var(--field-border);
-  border-radius: var(--radius-sm);
-  background: var(--field-bg);
-  color: var(--field-text);
-  font-family: var(--font-body);
-  font-size: var(--text-sm);
-  outline: none;
-}
-.ad-search:focus-visible { border-color: var(--field-border-focus); box-shadow: var(--shadow-pop-glow); }
-.ad-filter {
-  padding: var(--space-2) var(--space-3);
-  min-height: var(--field-height);
-  border: 1px solid var(--field-border);
-  border-radius: var(--radius-sm);
-  background: var(--field-bg);
-  color: var(--field-text);
-  font-family: var(--font-body);
-  font-size: var(--text-sm);
-  outline: none;
-}
-.ad-filter:focus-visible { border-color: var(--field-border-focus); box-shadow: var(--shadow-pop-glow); }
+.ad-search { width: 100%; max-width: 280px; }
+.ad-filter { min-width: 160px; }
 .ad-toolbar-spacer { flex: 1 1 auto; }
 .ad-toolbar-link {
   font-family: var(--font-body); font-size: var(--text-sm); font-weight: 600;
@@ -905,38 +845,7 @@ const drawerCustomFields = computed(() => {
   background: none; border: none; color: var(--link-color);
   font: inherit; font-weight: 600; cursor: pointer; text-decoration: underline;
 }
-.ad-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--space-3);
-  padding: var(--space-7) var(--space-6);
-  background: var(--color-surface);
-  border: 1px dashed var(--color-rule-strong);
-  border-radius: var(--radius-lg);
-}
-.ad-empty-title { margin: 0; font-family: var(--font-display); font-size: var(--text-xl); font-weight: 700; color: var(--color-ink); }
-.ad-empty-lede { margin: 0 0 var(--space-2); font-family: var(--font-body); font-size: var(--text-sm); color: var(--color-ink-soft); }
-
 /* Table */
-.ad-table-wrap {
-  background: var(--color-surface);
-  border: 1px solid var(--color-rule);
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-}
-.ad-table { width: 100%; border-collapse: collapse; font-family: var(--font-body); font-size: var(--text-sm); }
-.ad-table thead th {
-  text-align: left;
-  padding: var(--space-3) var(--space-4);
-  font-size: var(--text-xs);
-  font-weight: 600;
-  letter-spacing: var(--tracking-wider);
-  text-transform: uppercase;
-  color: var(--color-ink-dim);
-  border-bottom: 1px solid var(--color-rule);
-  background: var(--color-surface-sunk);
-}
 .ad-th-actions { width: 1%; }
 .ad-th-check { width: 1%; }
 .ad-td-check { width: 1%; }
@@ -957,12 +866,6 @@ const drawerCustomFields = computed(() => {
   border: 1px solid var(--color-rule);
   border-radius: var(--radius-pill);
 }
-.ad-table td {
-  padding: var(--space-3) var(--space-4);
-  border-bottom: 1px solid var(--color-rule);
-  color: var(--color-ink);
-}
-.ad-table tbody tr:last-child td { border-bottom: none; }
 .ad-td-email { font-weight: 500; }
 .ad-td-date { color: var(--color-ink-soft); font-variant-numeric: tabular-nums; }
 .ad-td-actions { white-space: nowrap; text-align: right; }
@@ -1001,24 +904,6 @@ const drawerCustomFields = computed(() => {
 .ad-pager-info { font-family: var(--font-body); font-size: var(--text-xs); color: var(--color-ink-dim); }
 .ad-pager-btns { display: flex; gap: var(--space-2); }
 
-/* Buttons */
-.ad-btn {
-  padding: var(--space-2) var(--space-4);
-  border-radius: var(--radius-md);
-  font-family: var(--font-body);
-  font-size: var(--text-sm);
-  font-weight: 600;
-  cursor: pointer;
-  border: 1px solid transparent;
-  transition: background-color var(--dur-base) var(--ease-out);
-}
-.ad-btn:disabled { opacity: 0.5; cursor: default; }
-.ad-btn--primary { background: var(--btn-primary-bg); color: var(--btn-primary-fg); }
-.ad-btn--primary:not(:disabled):hover { background: var(--btn-primary-hover); }
-.ad-btn--ghost { background: var(--color-surface); color: var(--color-ink-soft); border-color: var(--color-rule); }
-.ad-btn--ghost:not(:disabled):hover { background: var(--color-surface-sunk); }
-.ad-btn--danger { color: var(--color-danger); }
-
 /* Modal */
 .ad-modal-backdrop {
   position: fixed; inset: 0; z-index: var(--z-modal);
@@ -1037,30 +922,13 @@ const drawerCustomFields = computed(() => {
   box-shadow: var(--shadow-lg);
 }
 .ad-modal-title { margin: 0 0 var(--space-5); font-family: var(--font-display); font-size: var(--text-xl); font-weight: 700; color: var(--color-ink); }
-.ad-field { display: flex; flex-direction: column; gap: var(--space-2); margin-bottom: var(--space-4); }
+.ad-field { margin-bottom: var(--space-4); }
 .ad-field-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); }
-.ad-field-label { font-family: var(--font-body); font-size: var(--text-sm); font-weight: 600; color: var(--color-ink); }
-.ad-field-opt { font-weight: 400; color: var(--color-ink-dim); }
-.ad-field-req { color: var(--color-danger); margin-left: 2px; }
 .ad-form-subhead {
   margin: var(--space-2) 0 var(--space-3);
   font-family: var(--font-body); font-size: var(--text-xs); font-weight: 600;
   letter-spacing: var(--tracking-wider); text-transform: uppercase; color: var(--color-ink-dim);
 }
-.ad-check-inline { display: inline-flex; align-items: center; gap: var(--space-2); min-height: var(--field-height); }
-.ad-input {
-  width: 100%;
-  padding: var(--space-2) var(--space-3);
-  min-height: var(--field-height);
-  border: 1px solid var(--field-border);
-  border-radius: var(--radius-sm);
-  background: var(--field-bg);
-  color: var(--field-text);
-  font-family: var(--font-body);
-  font-size: var(--text-sm);
-  outline: none;
-}
-.ad-input:focus-visible { border-color: var(--field-border-focus); box-shadow: var(--shadow-pop-glow); }
 .ad-modal-error { margin: 0 0 var(--space-3); font-family: var(--font-body); font-size: var(--text-sm); color: var(--color-danger); }
 .ad-modal-actions { display: flex; justify-content: flex-end; gap: var(--space-3); margin-top: var(--space-5); }
 

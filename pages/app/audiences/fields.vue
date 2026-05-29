@@ -175,12 +175,14 @@ const isEnum = computed(() => form.type === "enum");
           in segment rules, and as merge-tags in the editor.
         </p>
       </div>
-      <button type="button" class="cf-cta" @click="openCreate">
-        <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
-          <path d="M7 2.5 V11.5 M2.5 7 H11.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
-        </svg>
-        <span>New field</span>
-      </button>
+      <Button variant="primary" @click="openCreate">
+        <template #leading>
+          <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+            <path d="M7 2.5 V11.5 M2.5 7 H11.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+          </svg>
+        </template>
+        New field
+      </Button>
     </header>
 
     <p v-if="loading" class="cf-state">Loading fields…</p>
@@ -195,51 +197,49 @@ const isEnum = computed(() => form.type === "enum");
         Add a field like "Plan tier" or "Signup source" to capture more about
         your contacts.
       </p>
-      <button type="button" class="cf-cta" @click="openCreate">
-        <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
-          <path d="M7 2.5 V11.5 M2.5 7 H11.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
-        </svg>
-        <span>New field</span>
-      </button>
+      <Button variant="primary" @click="openCreate">
+        <template #leading>
+          <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+            <path d="M7 2.5 V11.5 M2.5 7 H11.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+          </svg>
+        </template>
+        New field
+      </Button>
     </div>
 
-    <div v-else class="cf-table-wrap">
-      <table class="cf-table">
-        <thead>
-          <tr>
-            <th>Label</th>
-            <th>Key</th>
-            <th>Type</th>
-            <th>Required</th>
-            <th class="cf-th-actions"><span class="sr-only">Actions</span></th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="f in fields" :key="f.id">
-            <td class="cf-td-label">{{ f.label }}</td>
-            <td><code class="cf-key">{{ f.key }}</code></td>
-            <td>
-              <span class="cf-type">{{ TYPE_LABELS[f.type] || f.type }}</span>
-              <span v-if="f.type === 'enum' && f.enumValues.length" class="cf-enum-vals">
-                {{ f.enumValues.join(", ") }}
-              </span>
-            </td>
-            <td>{{ f.required ? "Yes" : "—" }}</td>
-            <td class="cf-td-actions">
-              <button type="button" class="cf-link" @click="openEdit(f)">Edit</button>
-              <button
-                type="button"
-                class="cf-link cf-link--danger"
-                :disabled="deletingId === f.id"
-                @click="removeField(f)"
-              >
-                {{ deletingId === f.id ? "Deleting…" : "Delete" }}
-              </button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+    <TableShell v-else>
+      <template #head>
+        <th>Label</th>
+        <th>Key</th>
+        <th>Type</th>
+        <th>Required</th>
+        <th class="cf-th-actions"><span class="sr-only">Actions</span></th>
+      </template>
+      <template #body>
+        <tr v-for="f in fields" :key="f.id">
+          <td class="cf-td-label">{{ f.label }}</td>
+          <td><code class="cf-key">{{ f.key }}</code></td>
+          <td>
+            <span class="cf-type">{{ TYPE_LABELS[f.type] || f.type }}</span>
+            <span v-if="f.type === 'enum' && f.enumValues.length" class="cf-enum-vals">
+              {{ f.enumValues.join(", ") }}
+            </span>
+          </td>
+          <td>{{ f.required ? "Yes" : "—" }}</td>
+          <td class="cf-td-actions">
+            <button type="button" class="cf-link" @click="openEdit(f)">Edit</button>
+            <button
+              type="button"
+              class="cf-link cf-link--danger"
+              :disabled="deletingId === f.id"
+              @click="removeField(f)"
+            >
+              {{ deletingId === f.id ? "Deleting…" : "Delete" }}
+            </button>
+          </td>
+        </tr>
+      </template>
+    </TableShell>
 
     <!-- Create / edit modal -->
     <div v-if="showForm" class="cf-modal-backdrop" @mousedown.self="closeForm">
@@ -248,37 +248,34 @@ const isEnum = computed(() => form.type === "enum");
           {{ mode === "create" ? "New custom field" : "Edit field" }}
         </h2>
         <form @submit.prevent="submitForm">
-          <label class="cf-field">
-            <span class="cf-field-label">Label</span>
-            <input v-model="form.label" class="cf-input" type="text" maxlength="80" placeholder="e.g. Plan tier" autofocus />
-          </label>
+          <FormField label="Label" class="cf-field">
+            <TextInput v-model="form.label" type="text" placeholder="e.g. Plan tier" />
+          </FormField>
 
-          <label class="cf-field">
-            <span class="cf-field-label">
-              Type
-              <span v-if="mode === 'edit'" class="cf-field-opt">(can't change after creation)</span>
-            </span>
-            <select v-model="form.type" class="cf-input" :disabled="mode === 'edit'">
+          <FormField
+            label="Type"
+            :hint="mode === 'edit' ? `(can't change after creation)` : ''"
+            class="cf-field"
+          >
+            <SelectInput v-model="form.type" :disabled="mode === 'edit'">
               <option v-for="t in FIELD_TYPES" :key="t" :value="t">{{ TYPE_LABELS[t] }}</option>
-            </select>
-          </label>
+            </SelectInput>
+          </FormField>
 
-          <label v-if="isEnum" class="cf-field">
-            <span class="cf-field-label">Choices <span class="cf-field-opt">(one per line)</span></span>
-            <textarea v-model="form.enumValuesText" class="cf-input cf-textarea" rows="4" placeholder="free&#10;pro&#10;enterprise"></textarea>
-          </label>
+          <FormField v-if="isEnum" label="Choices" hint="(one per line)" class="cf-field">
+            <TextArea v-model="form.enumValuesText" :rows="4" placeholder="free&#10;pro&#10;enterprise" />
+          </FormField>
 
-          <label class="cf-checkbox">
-            <input v-model="form.required" type="checkbox" />
-            <span>Required when adding a contact</span>
-          </label>
+          <div class="cf-checkbox">
+            <Checkbox v-model="form.required">Required when adding a contact</Checkbox>
+          </div>
 
           <p v-if="formError" class="cf-modal-error">{{ formError }}</p>
           <div class="cf-modal-actions">
-            <button type="button" class="cf-btn cf-btn--ghost" :disabled="saving" @click="closeForm">Cancel</button>
-            <button type="submit" class="cf-btn cf-btn--primary" :disabled="saving">
+            <Button variant="ghost" :disabled="saving" @click="closeForm">Cancel</Button>
+            <Button type="submit" variant="primary" :loading="saving">
               {{ saving ? "Saving…" : mode === "create" ? "Create field" : "Save changes" }}
-            </button>
+            </Button>
           </div>
         </form>
       </div>
@@ -312,18 +309,6 @@ const isEnum = computed(() => form.type === "enum");
 }
 .cf-lede { margin: 0; font-family: var(--font-body); font-size: var(--text-sm); color: var(--color-ink-soft); max-width: 56ch; }
 
-.cf-cta {
-  display: inline-flex; align-items: center; gap: var(--space-2);
-  padding: var(--space-3) var(--space-5);
-  background: var(--btn-primary-bg); color: var(--btn-primary-fg);
-  font-family: var(--font-body); font-size: var(--text-sm); font-weight: 600;
-  border: none; border-radius: var(--radius-md); box-shadow: var(--shadow-sm);
-  cursor: pointer; white-space: nowrap;
-  transition: background-color var(--dur-base) var(--ease-out);
-}
-.cf-cta:hover { background: var(--btn-primary-hover); }
-.cf-cta:focus-visible { outline: none; box-shadow: var(--shadow-pop-glow); }
-
 .cf-state { margin: 0; font-family: var(--font-body); font-size: var(--text-sm); color: var(--color-ink-soft); }
 .cf-state--error { color: var(--color-danger); }
 .cf-retry {
@@ -340,20 +325,7 @@ const isEnum = computed(() => form.type === "enum");
 .cf-empty-title { margin: 0; font-family: var(--font-display); font-size: var(--text-xl); font-weight: 700; color: var(--color-ink); }
 .cf-empty-lede { margin: 0 0 var(--space-2); font-family: var(--font-body); font-size: var(--text-sm); color: var(--color-ink-soft); }
 
-.cf-table-wrap {
-  background: var(--color-surface); border: 1px solid var(--color-rule);
-  border-radius: var(--radius-lg); overflow: hidden;
-}
-.cf-table { width: 100%; border-collapse: collapse; font-family: var(--font-body); font-size: var(--text-sm); }
-.cf-table thead th {
-  text-align: left; padding: var(--space-3) var(--space-4);
-  font-size: var(--text-xs); font-weight: 600; letter-spacing: var(--tracking-wider);
-  text-transform: uppercase; color: var(--color-ink-dim);
-  border-bottom: 1px solid var(--color-rule); background: var(--color-surface-sunk);
-}
 .cf-th-actions { width: 1%; }
-.cf-table td { padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--color-rule); color: var(--color-ink); vertical-align: top; }
-.cf-table tbody tr:last-child td { border-bottom: none; }
 .cf-td-label { font-weight: 600; }
 .cf-key { font-family: var(--font-mono, monospace); font-size: var(--text-xs); color: var(--color-ink-soft); background: var(--color-surface-sunk); padding: 2px 6px; border-radius: var(--radius-sm); }
 .cf-type { display: inline-block; }
@@ -376,30 +348,8 @@ const isEnum = computed(() => form.type === "enum");
   border-radius: var(--radius-lg); box-shadow: var(--shadow-lg);
 }
 .cf-modal-title { margin: 0 0 var(--space-5); font-family: var(--font-display); font-size: var(--text-xl); font-weight: 700; color: var(--color-ink); }
-.cf-field { display: flex; flex-direction: column; gap: var(--space-2); margin-bottom: var(--space-4); }
-.cf-field-label { font-family: var(--font-body); font-size: var(--text-sm); font-weight: 600; color: var(--color-ink); }
-.cf-field-opt { font-weight: 400; color: var(--color-ink-dim); }
-.cf-input {
-  width: 100%; padding: var(--space-2) var(--space-3); min-height: var(--field-height);
-  border: 1px solid var(--field-border); border-radius: var(--radius-sm);
-  background: var(--field-bg); color: var(--field-text);
-  font-family: var(--font-body); font-size: var(--text-sm); outline: none;
-}
-.cf-input:focus-visible { border-color: var(--field-border-focus); box-shadow: var(--shadow-pop-glow); }
-.cf-input:disabled { opacity: 0.6; }
-.cf-textarea { min-height: auto; resize: vertical; line-height: var(--leading-normal, 1.5); }
-.cf-checkbox { display: flex; align-items: center; gap: var(--space-2); font-family: var(--font-body); font-size: var(--text-sm); color: var(--color-ink); margin-bottom: var(--space-2); cursor: pointer; }
+.cf-field { margin-bottom: var(--space-4); }
+.cf-checkbox { margin-bottom: var(--space-2); }
 .cf-modal-error { margin: var(--space-2) 0 0; font-family: var(--font-body); font-size: var(--text-sm); color: var(--color-danger); }
 .cf-modal-actions { display: flex; justify-content: flex-end; gap: var(--space-3); margin-top: var(--space-5); }
-.cf-btn {
-  padding: var(--space-2) var(--space-5); border-radius: var(--radius-md);
-  font-family: var(--font-body); font-size: var(--text-sm); font-weight: 600;
-  cursor: pointer; border: 1px solid transparent;
-  transition: background-color var(--dur-base) var(--ease-out);
-}
-.cf-btn:disabled { opacity: 0.6; cursor: default; }
-.cf-btn--primary { background: var(--btn-primary-bg); color: var(--btn-primary-fg); }
-.cf-btn--primary:not(:disabled):hover { background: var(--btn-primary-hover); }
-.cf-btn--ghost { background: transparent; color: var(--color-ink-soft); border-color: var(--color-rule); }
-.cf-btn--ghost:not(:disabled):hover { background: var(--color-surface-sunk); }
 </style>

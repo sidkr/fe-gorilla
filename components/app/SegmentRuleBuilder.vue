@@ -187,10 +187,10 @@ const grouped = computed(() => ({
         <span class="rb-joiner rb-joiner-where" v-else>WHERE</span>
 
         <!-- field -->
-        <select
-          class="rb-input rb-field"
-          :value="c.field"
-          @change="onFieldChange(idx, ($event.target as HTMLSelectElement).value)"
+        <SelectInput
+          class="rb-field"
+          :model-value="c.field"
+          @update:model-value="onFieldChange(idx, String($event))"
         >
           <optgroup label="Standard fields">
             <option v-for="f in grouped.std" :key="f.field" :value="f.field">{{ f.label }}</option>
@@ -205,16 +205,16 @@ const grouped = computed(() => ({
               :value="`customFields.${cf.key}`"
             >{{ cf.label }}</option>
           </optgroup>
-        </select>
+        </SelectInput>
 
         <!-- operator -->
-        <select
-          class="rb-input rb-operator"
-          :value="c.operator"
-          @change="onOperatorChange(idx, ($event.target as HTMLSelectElement).value)"
+        <SelectInput
+          class="rb-operator"
+          :model-value="c.operator"
+          @update:model-value="onOperatorChange(idx, String($event))"
         >
           <option v-for="o in operatorsFor(c.field)" :key="o.value" :value="o.value">{{ o.label }}</option>
-        </select>
+        </SelectInput>
 
         <!-- value: typed by field type + operator -->
         <template v-if="isUnary(c.operator)">
@@ -222,104 +222,102 @@ const grouped = computed(() => ({
         </template>
 
         <!-- enum → select -->
-        <select
+        <SelectInput
           v-else-if="ruleTypeFor(c.field) === 'enum' && !isList(c.operator)"
-          class="rb-input rb-value"
-          :value="asString(c.value)"
-          @change="patchCondition(idx, { value: ($event.target as HTMLSelectElement).value })"
+          class="rb-value"
+          :model-value="asString(c.value)"
+          @update:model-value="patchCondition(idx, { value: $event })"
         >
           <option value="" disabled>Choose…</option>
           <option v-for="ev in enumValuesFor(c.field)" :key="ev" :value="ev">{{ ev }}</option>
-        </select>
+        </SelectInput>
 
         <!-- boolean → toggle -->
-        <select
+        <SelectInput
           v-else-if="ruleTypeFor(c.field) === 'boolean'"
-          class="rb-input rb-value"
-          :value="c.value === true ? 'true' : 'false'"
-          @change="patchCondition(idx, { value: ($event.target as HTMLSelectElement).value === 'true' })"
+          class="rb-value"
+          :model-value="c.value === true ? 'true' : 'false'"
+          @update:model-value="patchCondition(idx, { value: $event === 'true' })"
         >
           <option value="true">True</option>
           <option value="false">False</option>
-        </select>
+        </SelectInput>
 
         <!-- last_n_days → number -->
-        <input
+        <TextInput
           v-else-if="c.operator === 'last_n_days'"
-          class="rb-input rb-value rb-value-num"
+          class="rb-value rb-value-num"
           type="number"
-          min="1"
           placeholder="days"
-          :value="asString(c.value)"
-          @input="patchCondition(idx, { value: Number(($event.target as HTMLInputElement).value) })"
+          :model-value="asString(c.value)"
+          @update:model-value="patchCondition(idx, { value: Number($event) })"
         />
 
         <!-- date before/after → date input -->
-        <input
+        <TextInput
           v-else-if="ruleTypeFor(c.field) === 'date' && (c.operator === 'before' || c.operator === 'after')"
-          class="rb-input rb-value"
+          class="rb-value"
           type="date"
-          :value="asString(c.value).slice(0, 10)"
-          @input="patchCondition(idx, { value: ($event.target as HTMLInputElement).value })"
+          :model-value="asString(c.value).slice(0, 10)"
+          @update:model-value="patchCondition(idx, { value: $event })"
         />
 
         <!-- date between → two date inputs -->
         <template v-else-if="ruleTypeFor(c.field) === 'date' && c.operator === 'between'">
-          <input
-            class="rb-input rb-value rb-value-half"
+          <TextInput
+            class="rb-value rb-value-half"
             type="date"
-            :value="betweenValue(c.value, 0).slice(0, 10)"
-            @input="setBetween(idx, 0, ($event.target as HTMLInputElement).value)"
+            :model-value="betweenValue(c.value, 0).slice(0, 10)"
+            @update:model-value="setBetween(idx, 0, String($event))"
           />
           <span class="rb-and">and</span>
-          <input
-            class="rb-input rb-value rb-value-half"
+          <TextInput
+            class="rb-value rb-value-half"
             type="date"
-            :value="betweenValue(c.value, 1).slice(0, 10)"
-            @input="setBetween(idx, 1, ($event.target as HTMLInputElement).value)"
+            :model-value="betweenValue(c.value, 1).slice(0, 10)"
+            @update:model-value="setBetween(idx, 1, String($event))"
           />
         </template>
 
         <!-- in / not_in → comma list -->
-        <input
+        <TextInput
           v-else-if="isList(c.operator)"
-          class="rb-input rb-value"
+          class="rb-value"
           type="text"
           placeholder="value, value, …"
-          :value="listToText(c.value)"
-          @input="textToList(idx, ($event.target as HTMLInputElement).value)"
+          :model-value="listToText(c.value)"
+          @update:model-value="textToList(idx, String($event))"
         />
 
         <!-- number → number input -->
-        <input
+        <TextInput
           v-else-if="ruleTypeFor(c.field) === 'number'"
-          class="rb-input rb-value rb-value-num"
+          class="rb-value rb-value-num"
           type="number"
           placeholder="0"
-          :value="asString(c.value)"
-          @input="patchCondition(idx, { value: Number(($event.target as HTMLInputElement).value) })"
+          :model-value="asString(c.value)"
+          @update:model-value="patchCondition(idx, { value: Number($event) })"
         />
 
         <!-- default text -->
-        <input
+        <TextInput
           v-else
-          class="rb-input rb-value"
+          class="rb-value"
           type="text"
           placeholder="value"
-          :value="asString(c.value)"
-          @input="patchCondition(idx, { value: ($event.target as HTMLInputElement).value })"
+          :model-value="asString(c.value)"
+          @update:model-value="patchCondition(idx, { value: $event })"
         />
 
-        <button
-          type="button"
+        <Button
           class="rb-remove"
+          variant="subtle"
+          size="sm"
           aria-label="Remove condition"
           @click="removeCondition(idx)"
         >
-          <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
-            <path d="M3.5 3.5 L10.5 10.5 M10.5 3.5 L3.5 10.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
-          </svg>
-        </button>
+          <Icon name="trash" :size="14" />
+        </Button>
       </li>
     </ul>
 
@@ -327,12 +325,16 @@ const grouped = computed(() => ({
       No conditions yet — this segment matches every contact. Add a condition to narrow it.
     </p>
 
-    <button type="button" class="rb-add" @click="addCondition">
-      <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
-        <path d="M7 2.5 V11.5 M2.5 7 H11.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
-      </svg>
-      <span>Add condition</span>
-    </button>
+    <div class="rb-add-row">
+      <Button variant="ghost" size="sm" @click="addCondition">
+        <template #leading>
+          <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+            <path d="M7 2.5 V11.5 M2.5 7 H11.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+          </svg>
+        </template>
+        Add condition
+      </Button>
+    </div>
   </div>
 </template>
 
@@ -407,24 +409,11 @@ const grouped = computed(() => ({
   color: var(--color-ink-dim);
 }
 
-.rb-input {
-  font-family: var(--font-body);
-  font-size: var(--text-sm);
-  color: var(--color-ink);
-  background: var(--color-surface);
-  border: 1px solid var(--color-rule);
-  border-radius: var(--radius-md);
-  padding: var(--space-2) var(--space-3);
-  height: 36px;
-  box-sizing: border-box;
-}
-.rb-input:focus-visible {
-  outline: none;
-  border-color: var(--color-pop);
-  box-shadow: 0 0 0 3px var(--color-pop-glow);
-}
-.rb-field { min-width: 160px; }
-.rb-operator { min-width: 130px; }
+/* Sizing for the shared field components inside a condition row. The
+   field/select/input look (border/focus/height) comes from <TextInput> /
+   <SelectInput>; these classes only control how each one flexes in the row. */
+.rb-field { flex: 0 1 180px; }
+.rb-operator { flex: 0 1 150px; }
 .rb-value { flex: 1 1 160px; min-width: 120px; }
 .rb-value-num { flex: 0 0 110px; }
 .rb-value-half { flex: 0 0 150px; }
@@ -440,21 +429,6 @@ const grouped = computed(() => ({
 
 .rb-remove {
   flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border: 1px solid transparent;
-  border-radius: var(--radius-md);
-  background: transparent;
-  color: var(--color-ink-dim);
-  cursor: pointer;
-  transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
-}
-.rb-remove:hover {
-  background: var(--color-danger-bg);
-  color: var(--color-danger);
 }
 
 .rb-empty {
@@ -465,25 +439,7 @@ const grouped = computed(() => ({
   color: var(--color-ink-dim);
 }
 
-.rb-add {
-  align-self: flex-start;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
+.rb-add-row {
   margin-left: 64px;
-  padding: var(--space-2) var(--space-4);
-  font-family: var(--font-body);
-  font-size: var(--text-sm);
-  font-weight: 600;
-  color: var(--color-pop);
-  background: var(--color-surface);
-  border: 1px dashed var(--color-rule);
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  transition: border-color var(--dur-fast) var(--ease-out), background-color var(--dur-fast) var(--ease-out);
-}
-.rb-add:hover {
-  border-color: var(--color-pop);
-  background: var(--color-surface-2);
 }
 </style>

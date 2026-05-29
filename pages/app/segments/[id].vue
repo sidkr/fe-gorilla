@@ -161,12 +161,10 @@ const fmtCount = (n: number) => new Intl.NumberFormat("en-US").format(n);
         <div class="se-main">
           <!-- name + type -->
           <section class="se-card">
-            <label class="se-label" for="seg-name">Segment name</label>
-            <input
-              id="seg-name"
+            <span class="se-label">Segment name</span>
+            <TextInput
               v-model="name"
-              class="se-name-input"
-              type="text"
+              size="md"
               placeholder="e.g. Engaged gmail subscribers"
             />
 
@@ -191,10 +189,7 @@ const fmtCount = (n: number) => new Intl.NumberFormat("en-US").format(n);
 
           <!-- rule builder -->
           <section class="se-card">
-            <div class="se-eyebrow">
-              <span class="se-eyebrow-dot" aria-hidden="true"></span>
-              <span>Conditions</span>
-            </div>
+            <SectionEyebrow>Conditions</SectionEyebrow>
             <AppSegmentRuleBuilder v-model="rules" :custom-fields="customFields" />
           </section>
 
@@ -203,10 +198,7 @@ const fmtCount = (n: number) => new Intl.NumberFormat("en-US").format(n);
 
         <!-- right: live preview -->
         <aside class="se-preview">
-          <div class="se-eyebrow">
-            <span class="se-eyebrow-dot" aria-hidden="true"></span>
-            <span>Live preview</span>
-          </div>
+          <SectionEyebrow>Live preview</SectionEyebrow>
           <div class="se-card se-preview-card">
             <div class="se-count">
               <span v-if="previewing" class="se-count-num se-count-dim">…</span>
@@ -275,33 +267,6 @@ const fmtCount = (n: number) => new Intl.NumberFormat("en-US").format(n);
   gap: var(--space-3);
 }
 
-.se-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-3) var(--space-5);
-  font-family: var(--font-body);
-  font-size: var(--text-sm);
-  font-weight: 600;
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  border: 1px solid transparent;
-  transition: background-color var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out);
-}
-.se-btn-primary {
-  background: var(--btn-primary-bg);
-  color: var(--btn-primary-fg);
-  box-shadow: var(--shadow-sm);
-}
-.se-btn-primary:hover:not(:disabled) { background: var(--btn-primary-hover); box-shadow: var(--shadow-md); }
-.se-btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
-.se-btn-ghost {
-  background: var(--color-surface);
-  color: var(--color-ink-soft);
-  border-color: var(--color-rule);
-}
-.se-btn-ghost:hover { background: var(--color-surface-2); }
-
 /* layout */
 .se-grid {
   display: grid;
@@ -337,22 +302,6 @@ const fmtCount = (n: number) => new Intl.NumberFormat("en-US").format(n);
   text-transform: uppercase;
   color: var(--color-ink-dim);
 }
-.se-name-input {
-  font-family: var(--font-display);
-  font-size: var(--text-lg);
-  font-weight: 600;
-  color: var(--color-ink);
-  background: var(--color-surface);
-  border: 1px solid var(--color-rule);
-  border-radius: var(--radius-md);
-  padding: var(--space-3) var(--space-4);
-}
-.se-name-input:focus-visible {
-  outline: none;
-  border-color: var(--color-pop);
-  box-shadow: 0 0 0 3px var(--color-pop-glow);
-}
-
 .se-kind {
   display: flex;
   flex-direction: column;
@@ -376,26 +325,6 @@ const fmtCount = (n: number) => new Intl.NumberFormat("en-US").format(n);
   font-style: normal;
   font-size: var(--text-xs);
   color: var(--color-ink-soft);
-}
-
-.se-eyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  font-family: var(--font-body);
-  font-size: var(--text-xs);
-  font-weight: 600;
-  letter-spacing: var(--tracking-wider);
-  text-transform: uppercase;
-  color: var(--color-ink-dim);
-}
-.se-eyebrow-dot {
-  display: inline-block;
-  width: var(--space-2);
-  height: var(--space-2);
-  background: var(--color-pop);
-  border-radius: var(--radius-pill);
-  box-shadow: 0 0 0 3px var(--color-pop-glow);
 }
 
 /* preview */
