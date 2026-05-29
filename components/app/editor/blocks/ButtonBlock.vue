@@ -1,8 +1,10 @@
 <script setup lang="ts">
 // ButtonBlock — CTA. The canvas renders it as a real-looking pill so
 // the user gets immediate visual feedback when adjusting bg/fg/radius.
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import BrandColorPicker from "../BrandColorPicker.vue";
+import MergeTagPicker from "../MergeTagPicker.vue";
+import { insertAtCursor } from "~/composables/app/useMergeTags";
 
 interface Props {
   mode: "render" | "inspect";
@@ -35,6 +37,13 @@ const styleVars = computed(() => ({
 function patch(k: keyof Props["blockProps"], v: unknown) {
   emit("update", { [k]: v } as Partial<Props["blockProps"]>);
 }
+
+// ── Merge-tag insertion (inspect mode) ───────────────────────────────────
+const labelInput = ref<HTMLInputElement | null>(null);
+function insertTag(token: string) {
+  const next = insertAtCursor(labelInput.value, token);
+  patch("label", next);
+}
 </script>
 
 <template>
@@ -48,15 +57,19 @@ function patch(k: keyof Props["blockProps"], v: unknown) {
   </div>
 
   <div v-else class="btn-inspect">
-    <label class="ins-row">
-      <span class="ins-label">Label</span>
+    <div class="ins-row">
+      <span class="ins-label">
+        <span>Label</span>
+        <MergeTagPicker compact @insert="insertTag" />
+      </span>
       <input
+        ref="labelInput"
         type="text"
         class="ins-input"
         :value="blockProps.label"
         @input="patch('label', ($event.target as HTMLInputElement).value)"
       />
-    </label>
+    </div>
 
     <label class="ins-row">
       <span class="ins-label">Link URL</span>

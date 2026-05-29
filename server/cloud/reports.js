@@ -17,6 +17,7 @@
 //
 // Cloud functions:
 //   getDashboardMetrics()                                   → org-wide rollup
+//   getOnboardingState()                                    → setup checklist booleans
 //   getCampaignReport({ campaignId })                       → headline counters (F-25)
 //   getCampaignLinkBreakdown({ campaignId })                → per-link clicks (F-26)
 //   getCampaignRecipients({ campaignId, page?, perPage?, filter? }) → recipients (F-26)
@@ -61,6 +62,82 @@ async function countWhere(className, build, sessionToken) {
   build(q);
   return q.count({ sessionToken });
 }
+
+// ── Onboarding state ──────────────────────────────────────────────────────────
+// Computes real completion of the first-run setup steps from org data. Every
+// step is a boolean derived from a count / field check scoped to the caller's
+// org (ACL-isolated via the session token; org pointer for explicitness).
+//
+//   senderIdentity → Organization.defaultFromEmail is a non-empty string
+//   audience       → ≥1 non-archived List
+//   contact        → ≥1 non-deleted Contact
+//   campaign       → ≥1 Campaign (any status)
+//   sent           → ≥1 Campaign with status "sent" (the send pipeline sets this)
+//
+// `complete` is the AND of all steps, so the UI can hide the checklist once the
+// org is fully set up. A fresh org returns every step false.
+async function computeOnboardingState(org, sessionToken) {
+  const fromEmail = org.get("defaultFromEmail");
+  const senderIdentity =
+    typeof fromEmail === "string" && fromEmail.trim().length > 0;
+
+  const [audienceCount, contactCount, campaignCount, sentCampaignCount] =
+    await Promise.all([
+      countWhere(
+        "List",
+        (q) => {
+          q.equalTo("organization", org);
+          q.notEqualTo("archived", true);
+        },
+        sessionToken,
+      ),
+      countWhere(
+        "Contact",
+        (q) => {
+          q.equalTo("organization", org);
+          q.notEqualTo("deleted", true);
+        },
+        sessionToken,
+      ),
+      countWhere(
+        "Campaign",
+        (q) => q.equalTo("organization", org),
+        sessionToken,
+      ),
+      countWhere(
+        "Campaign",
+        (q) => {
+          q.equalTo("organization", org);
+          q.equalTo("status", "sent");
+        },
+        sessionToken,
+      ),
+    ]);
+
+  const steps = {
+    senderIdentity,
+    audience: audienceCount > 0,
+    contact: contactCount > 0,
+    campaign: campaignCount > 0,
+    sent: sentCampaignCount > 0,
+  };
+
+  return {
+    steps,
+    complete: Object.values(steps).every(Boolean),
+  };
+}
+
+// ── getOnboardingState ────────────────────────────────────────────────────────
+// Standalone accessor for the setup checklist. Mirrors the `onboarding` block
+// returned by getDashboardMetrics so the frontend can refresh just the checklist
+// (e.g. after the user completes a step) without re-running the full rollup.
+Parse.Cloud.define("getOnboardingState", async (request) => {
+  const user = requireUser(request);
+  const st = user.getSessionToken();
+  const org = await getUserOrg(user, { useMasterKey: true });
+  return computeOnboardingState(org, st);
+});
 
 // ── getDashboardMetrics ───────────────────────────────────────────────────────
 // Org-wide rollup for the dashboard. Real counts for audiences/contacts/
@@ -151,6 +228,23 @@ Parse.Cloud.define("getDashboardMetrics", async (request) => {
     totals.unsubscribes += counter(c, "unsubscribeCount");
   }
 
+  // Setup-checklist booleans. Reuses the counts above where they overlap to
+  // avoid redundant queries (audiences/contacts/campaigns are already known).
+  const onboarding = {
+    steps: {
+      senderIdentity:
+        typeof org.get("defaultFromEmail") === "string" &&
+        org.get("defaultFromEmail").trim().length > 0,
+      audience: audiences > 0,
+      contact: totalContacts > 0,
+      campaign: totalCampaigns > 0,
+      sent: (byStatus.sent || 0) > 0,
+    },
+    get complete() {
+      return Object.values(this.steps).every(Boolean);
+    },
+  };
+
   return {
     audiences,
     contacts: { total: totalContacts, subscribed: subscribedContacts },
@@ -162,6 +256,7 @@ Parse.Cloud.define("getDashboardMetrics", async (request) => {
       bounce: rate(totals.bounces, totals.sent),
       unsubscribe: rate(totals.unsubscribes, totals.delivered),
     },
+    onboarding: { steps: onboarding.steps, complete: onboarding.complete },
   };
 });
 

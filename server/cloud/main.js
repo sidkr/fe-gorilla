@@ -17,3 +17,4 @@ require("./campaigns");
 require("./templates");
 require("./reports");
 require("./sending");
+require("./settings");

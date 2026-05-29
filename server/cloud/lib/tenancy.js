@@ -42,6 +42,7 @@ const PER_TENANT_CLASSES = [
   "EmailEvent",
   "Suppression",
   "CustomField",
+  "SenderIdentity",
 ];
 
 // The per-org members role name. One role per organization; the user(s) of that

@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 340 90" role="img" aria-label="Fe-Mail Gorilla">
+  <title>Fe-Mail Gorilla</title>
+
+  <!-- ============ LEFT ZONE: heraldic crest (x~8-92 / y~6-84) ============ -->
+  <g transform="translate(8,6) scale(1.21875)">
+    <!-- (64x64 crest scaled into a 78x78 box) -->
+
+    <!-- ===== IRON SHIELD / CREST ===== -->
+    <path d="M32 4 L56 11 V32 C56 47 45 56 32 60 C19 56 8 47 8 32 V11 Z" fill="#18181B"/>
+    <path d="M32 9 L51 14.5 V32 C51 44 42.5 51.5 32 55 C21.5 51.5 13 44 13 32 V14.5 Z" fill="#FF4E4E"/>
+    <path d="M13 32 C13 44 21.5 51.5 32 55 C42.5 51.5 51 44 51 32 V30 H13 Z" fill="#C53030"/>
+
+    <!-- ===== ARMORED GORILLA HEAD ===== -->
+    <path d="M19 25 a13 13 0 0 1 26 0 v4 a13 13 0 0 1 -26 0 Z" fill="#18181B"/>
+    <circle cx="20" cy="21" r="4.2" fill="#18181B"/>
+    <circle cx="44" cy="21" r="4.2" fill="#18181B"/>
+    <path d="M24.5 24 a7.5 7.5 0 0 1 15 0 v2.5 a7.5 7.5 0 0 1 -15 0 Z" fill="#56565E"/>
+    <rect x="26.5" y="22.5" width="3.6" height="2.4" rx="1.2" fill="#FFD93D"/>
+    <rect x="33.9" y="22.5" width="3.6" height="2.4" rx="1.2" fill="#FFD93D"/>
+    <circle cx="30" cy="29" r="1.1" fill="#18181B"/>
+    <circle cx="34" cy="29" r="1.1" fill="#18181B"/>
+
+    <!-- ===== ENVELOPE ===== -->
+    <rect x="20" y="35" width="24" height="16" rx="2.5" fill="#FFFFFF"/>
+    <path d="M20.5 36.5 L32 44 L43.5 36.5" fill="none" stroke="#18181B" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="32" y="50" font-family="Manrope, Inter, system-ui, sans-serif" font-weight="800" font-size="7" text-anchor="middle" fill="#18181B">Fe</text>
+
+    <!-- ===== ARMORED FISTS ===== -->
+    <rect x="16.5" y="40" width="6" height="9" rx="3" fill="#56565E"/>
+    <rect x="41.5" y="40" width="6" height="9" rx="3" fill="#56565E"/>
+  </g>
+
+  <!-- ============ RIGHT ZONE: concept-01 wordmark signature (from x~104) ============ -->
+  <text x="104" y="52" font-family="Manrope, Inter, system-ui, sans-serif"
+        font-weight="800" font-size="28" letter-spacing="-1.6"
+        fill="#18181B">Fe-Mail<tspan fill="#56565E"> Gorilla</tspan></text>
+
+  <!-- Industrial baseline rule under the wordmark -->
+  <rect x="104" y="61" width="220" height="3" rx="1.5" fill="#18181B"/>
+  <!-- Coral notch accent at the left start of the rule -->
+  <rect x="104" y="61" width="34" height="3" rx="1.5" fill="#FF4E4E"/>
+</svg>

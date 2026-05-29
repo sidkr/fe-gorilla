@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Fe-Mail Gorilla">
+  <title>Fe-Mail Gorilla</title>
+
+  <!-- ===== ARMORED GORILLA, standing, raising an envelope overhead ===== -->
+  <!-- Flat, geometric, app-icon quality. 4 colors: ink, ink-soft, coral, lemon. -->
+
+  <!-- Raised right arm (his right / viewer left) reaching up to the envelope -->
+  <path d="M20 32 L13 18 a4 4 0 0 1 7 -3 l9 16 Z" fill="#18181B"/>
+  <!-- Gauntlet band on raised forearm -->
+  <rect x="13.5" y="16" width="8" height="5" rx="1.5" fill="#56565E" transform="rotate(28 17.5 18.5)"/>
+  <!-- Fist gripping envelope -->
+  <circle cx="16" cy="14" r="4.5" fill="#56565E"/>
+
+  <!-- Standing legs / planted stance -->
+  <path d="M24 44 h7 v14 h-9 a2 2 0 0 1 -2 -2 v-3 Z" fill="#18181B"/>
+  <path d="M40 44 h-7 v14 h9 a2 2 0 0 0 2 -2 v-3 Z" fill="#18181B"/>
+
+  <!-- Down arm (his left, planted) -->
+  <path d="M44 30 c6 3 7 10 5 16 l-7 -1 c1 -6 -1 -11 -4 -13 Z" fill="#18181B"/>
+  <!-- Gauntlet on down arm -->
+  <rect x="42" y="42" width="9" height="5" rx="1.5" fill="#56565E"/>
+
+  <!-- Plated chest / torso mass -->
+  <path d="M22 30 c0 -7 5 -11 10 -11 c5 0 10 4 10 11 v12 c0 4 -4 6 -10 6 c-6 0 -10 -2 -10 -6 Z" fill="#18181B"/>
+  <!-- Chest armor plate (lighter) -->
+  <path d="M25 31 c0 -4 3 -7 7 -7 c4 0 7 3 7 7 v7 c0 2 -3 3 -7 3 c-4 0 -7 -1 -7 -3 Z" fill="#56565E"/>
+  <!-- Center plate seam -->
+  <rect x="31" y="25" width="2" height="16" rx="1" fill="#18181B"/>
+
+  <!-- Head / brow mass -->
+  <path d="M22 16 a10 10 0 0 1 20 0 v4 a10 10 0 0 1 -20 0 Z" fill="#18181B"/>
+  <!-- Ears -->
+  <circle cx="22" cy="13" r="3.5" fill="#18181B"/>
+  <circle cx="42" cy="13" r="3.5" fill="#18181B"/>
+  <!-- Face plate -->
+  <path d="M26 15 a6 6 0 0 1 12 0 v2 a6 6 0 0 1 -12 0 Z" fill="#56565E"/>
+  <!-- Eyes -->
+  <circle cx="29.5" cy="15" r="1.5" fill="#FFFFFF"/>
+  <circle cx="34.5" cy="15" r="1.5" fill="#FFFFFF"/>
+
+  <!-- ===== Envelope raised overhead ===== -->
+  <rect x="6" y="5" width="20" height="14" rx="2" fill="#FF4E4E"/>
+  <!-- Envelope flap -->
+  <path d="M6 7 l10 7 l10 -7" fill="none" stroke="#FFE8E8" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+  <!-- "Fe" mark on the envelope body (below the flap) -->
+  <text x="16" y="18.1" font-family="Manrope, Inter, system-ui, sans-serif"
+        font-weight="800" font-size="6" text-anchor="middle" fill="#FFFFFF">Fe</text>
+</svg>

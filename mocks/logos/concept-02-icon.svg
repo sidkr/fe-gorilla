@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" width="64" height="64">
+  <title>Fe-Mail Gorilla</title>
+
+  <!-- Pauldrons / shoulder armor plates (riveted iron) -->
+  <path d="M6 58 V46 a14 14 0 0 1 14 -14 h24 a14 14 0 0 1 14 14 V58 Z" fill="#56565E"/>
+  <!-- pauldron rivets -->
+  <circle cx="12" cy="42" r="1.6" fill="#18181B"/>
+  <circle cx="52" cy="42" r="1.6" fill="#18181B"/>
+  <!-- plate seam highlight -->
+  <path d="M20 36 h24 a10 10 0 0 1 10 10 V58 H10 V46 a10 10 0 0 1 10 -10 Z" fill="#18181B"/>
+
+  <!-- Gorilla head -->
+  <path d="M32 6
+           a18 16 0 0 1 18 16
+           v6
+           a18 17 0 0 1 -36 0
+           v-6
+           a18 16 0 0 1 18 -16 Z" fill="#18181B"/>
+
+  <!-- Ears -->
+  <circle cx="13" cy="22" r="5" fill="#18181B"/>
+  <circle cx="51" cy="22" r="5" fill="#18181B"/>
+
+  <!-- Brow ridge -->
+  <path d="M16 23 a16 6 0 0 1 32 0 v3 H16 Z" fill="#56565E"/>
+
+  <!-- Eyes -->
+  <circle cx="24" cy="24" r="2.6" fill="#FFD93D"/>
+  <circle cx="40" cy="24" r="2.6" fill="#FFD93D"/>
+
+  <!-- Muzzle / face plate (soft tint negative space) -->
+  <path d="M22 30 a10 9 0 0 0 20 0 v2 a10 11 0 0 1 -20 0 Z" fill="#56565E"/>
+
+  <!-- Envelope held at chest -->
+  <rect x="22" y="44" width="20" height="14" rx="2" fill="#FFFFFF"/>
+  <path d="M22 46 L32 53 L42 46" fill="none" stroke="#FF4E4E" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="22" y="44" width="20" height="14" rx="2" fill="none" stroke="#C53030" stroke-width="1.6"/>
+  <text x="32" y="57.2" font-family="Manrope, Inter, system-ui, sans-serif" font-weight="800" font-size="7" text-anchor="middle" fill="#18181B">Fe</text>
+
+  <!-- Hands gripping the envelope -->
+  <rect x="16" y="50" width="7" height="8" rx="2.4" fill="#18181B"/>
+  <rect x="41" y="50" width="7" height="8" rx="2.4" fill="#18181B"/>
+</svg>

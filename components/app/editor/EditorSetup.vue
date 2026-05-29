@@ -11,6 +11,8 @@ import type { SetupField, SetupValues } from "./editor-types";
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import AudienceSelector from "./AudienceSelector.vue";
 import BrandColorPicker from "./BrandColorPicker.vue";
+import MergeTagPicker from "./MergeTagPicker.vue";
+import { insertAtCursor } from "~/composables/app/useMergeTags";
 
 interface Props {
   open: boolean;
@@ -62,6 +64,17 @@ const replyToError = computed(() => {
 
 function patch<K extends keyof SetupValues>(k: K, v: SetupValues[K]) {
   emit("update", { [k]: v } as Partial<SetupValues>);
+}
+
+// ── Merge-tag insertion ──────────────────────────────────────────────────
+// Splice the token into the focused input at the caret, then push the new
+// value up through the normal patch path. Subject + preview text are the
+// two personalizable sender-metadata fields.
+function insertSubjectTag(token: string) {
+  patch("subject", insertAtCursor(subjectInput.value, token));
+}
+function insertPreheaderTag(token: string) {
+  patch("preheader", insertAtCursor(preheaderInput.value, token));
 }
 
 // ── Focus management ─────────────────────────────────────────────────────
@@ -146,8 +159,11 @@ onUnmounted(() => {
         <label class="setup-row">
           <span class="setup-row-head">
             <span class="setup-label">Subject line</span>
-            <span class="setup-counter" :class="{ 'setup-counter--over': subjectError }">
-              {{ values.subject.length }} / 150
+            <span class="setup-row-head-right">
+              <MergeTagPicker compact @insert="insertSubjectTag" />
+              <span class="setup-counter" :class="{ 'setup-counter--over': subjectError }">
+                {{ values.subject.length }} / 150
+              </span>
             </span>
           </span>
           <input
@@ -166,8 +182,11 @@ onUnmounted(() => {
         <label class="setup-row">
           <span class="setup-row-head">
             <span class="setup-label">Preview text</span>
-            <span class="setup-counter" :class="{ 'setup-counter--over': preheaderError }">
-              {{ values.preheader.length }} / 120
+            <span class="setup-row-head-right">
+              <MergeTagPicker compact @insert="insertPreheaderTag" />
+              <span class="setup-counter" :class="{ 'setup-counter--over': preheaderError }">
+                {{ values.preheader.length }} / 120
+              </span>
             </span>
           </span>
           <input
@@ -311,8 +330,15 @@ onUnmounted(() => {
 }
 .setup-row-head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
+  gap: var(--space-2);
+  min-height: 24px;
+}
+.setup-row-head-right {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
 }
 .setup-label {
   font-size: var(--text-xs);

@@ -1,0 +1,46 @@
+<script setup>
+// Fe-Mail Gorilla logo mark — the "Heraldic Crest": an armored gorilla on an
+// iron shield clutching an Fe-stamped envelope. Single source of truth for the
+// brand icon. Renders at `size` px square unless overridden by CSS (e.g. the
+// hero uses `.brand-big { width:100% }`, which wins over the width/height attrs).
+defineProps({
+  size: { type: [Number, String], default: 28 },
+});
+</script>
+
+<template>
+  <svg :width="size" :height="size" viewBox="0 0 64 64"
+       xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Fe-Mail Gorilla">
+    <title>Fe-Mail Gorilla</title>
+
+    <!-- Iron shield / crest -->
+    <path d="M32 4 L56 11 V32 C56 47 45 56 32 60 C19 56 8 47 8 32 V11 Z" fill="#18181B"/>
+    <path d="M32 9 L51 14.5 V32 C51 44 42.5 51.5 32 55 C21.5 51.5 13 44 13 32 V14.5 Z" fill="#FF4E4E"/>
+    <path d="M13 32 C13 44 21.5 51.5 32 55 C42.5 51.5 51 44 51 32 V30 H13 Z" fill="#C53030"/>
+
+    <!-- Armored gorilla head -->
+    <path d="M19 25 a13 13 0 0 1 26 0 v4 a13 13 0 0 1 -26 0 Z" fill="#18181B"/>
+    <circle cx="20" cy="21" r="4.2" fill="#18181B"/>
+    <circle cx="44" cy="21" r="4.2" fill="#18181B"/>
+    <path d="M24.5 24 a7.5 7.5 0 0 1 15 0 v2.5 a7.5 7.5 0 0 1 -15 0 Z" fill="#56565E"/>
+    <rect x="26.5" y="22.5" width="3.6" height="2.4" rx="1.2" fill="#FFD93D"/>
+    <rect x="33.9" y="22.5" width="3.6" height="2.4" rx="1.2" fill="#FFD93D"/>
+    <circle cx="30" cy="29" r="1.1" fill="#18181B"/>
+    <circle cx="34" cy="29" r="1.1" fill="#18181B"/>
+
+    <!-- Envelope clutched at center, stamped "Fe" -->
+    <rect x="20" y="35" width="24" height="16" rx="2.5" fill="#FFFFFF"/>
+    <path d="M20.5 36.5 L32 44 L43.5 36.5" fill="none" stroke="#18181B"
+          stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="32" y="50" font-family="Manrope, Inter, system-ui, sans-serif"
+          font-weight="800" font-size="7" text-anchor="middle" fill="#18181B">Fe</text>
+
+    <!-- Armored fists gripping the envelope -->
+    <rect x="16.5" y="40" width="6" height="9" rx="3" fill="#56565E"/>
+    <rect x="41.5" y="40" width="6" height="9" rx="3" fill="#56565E"/>
+  </svg>
+</template>
+
+<style scoped>
+svg { display: block; }
+</style>

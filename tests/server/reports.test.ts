@@ -23,6 +23,18 @@ interface DashboardMetrics {
     unsubscribes: number;
   };
   rates: { open: number; click: number; bounce: number; unsubscribe: number };
+  onboarding: OnboardingState;
+}
+
+interface OnboardingState {
+  steps: {
+    senderIdentity: boolean;
+    audience: boolean;
+    contact: boolean;
+    campaign: boolean;
+    sent: boolean;
+  };
+  complete: boolean;
 }
 
 describe("dashboard + reports cloud functions", () => {
@@ -49,6 +61,19 @@ describe("dashboard + reports cloud functions", () => {
 
   async function dashboard(sessionToken: string) {
     return Parse.Cloud.run("getDashboardMetrics", {}, { sessionToken }) as Promise<DashboardMetrics>;
+  }
+
+  async function onboarding(sessionToken: string) {
+    return Parse.Cloud.run("getOnboardingState", {}, { sessionToken }) as Promise<OnboardingState>;
+  }
+
+  // Set the org's defaultFromEmail via master key (simulates the user saving a
+  // sender identity in settings). We need the user's org id first.
+  async function setDefaultFromEmail(orgId: string, email: string) {
+    const Org = Parse.Object.extend("Organization");
+    const org = Org.createWithoutData(orgId);
+    org.set("defaultFromEmail", email);
+    await org.save(null, { useMasterKey: true });
   }
 
   it("requires authentication", async () => {
@@ -270,5 +295,150 @@ describe("dashboard + reports cloud functions", () => {
     expect(res.total).toBe(0);
     expect(res.page).toBe(1);
     expect(res.totalPages).toBe(1);
+  });
+
+  // ── Onboarding state ──────────────────────────────────────────────────────--
+  it("getOnboardingState requires authentication", async () => {
+    await expect(Parse.Cloud.run("getOnboardingState", {})).rejects.toMatchObject({
+      code: Parse.Error.INVALID_SESSION_TOKEN,
+    });
+  });
+
+  it("returns all-false onboarding steps for a fresh org", async () => {
+    const u = await signUp("OnboardFresh", "onboardfresh@example.com");
+    const ob = await onboarding(u.sessionToken);
+
+    expect(ob.steps).toEqual({
+      senderIdentity: false,
+      audience: false,
+      contact: false,
+      campaign: false,
+      sent: false,
+    });
+    expect(ob.complete).toBe(false);
+  });
+
+  it("flips audience/contact true after creating a List + Contact", async () => {
+    const u = await signUp("OnboardGrow", "onboardgrow@example.com");
+    const st = u.sessionToken;
+
+    let ob = await onboarding(st);
+    expect(ob.steps.audience).toBe(false);
+    expect(ob.steps.contact).toBe(false);
+
+    const List = Parse.Object.extend("List");
+    const list = new List();
+    list.set("name", "Newsletter");
+    await list.save(null, { sessionToken: st });
+
+    const Contact = Parse.Object.extend("Contact");
+    const c = new Contact();
+    c.set("email", "person@example.com");
+    c.set("status", "subscribed");
+    await c.save(null, { sessionToken: st });
+
+    ob = await onboarding(st);
+    expect(ob.steps.audience).toBe(true);
+    expect(ob.steps.contact).toBe(true);
+    // Still incomplete — sender identity / campaign / sent not done.
+    expect(ob.complete).toBe(false);
+  });
+
+  it("flips senderIdentity true once defaultFromEmail is set", async () => {
+    const u = await signUp("OnboardSender", "onboardsender@example.com");
+    const st = u.sessionToken;
+
+    expect((await onboarding(st)).steps.senderIdentity).toBe(false);
+
+    await setDefaultFromEmail(u.orgId, "hello@onboardsender.com");
+
+    expect((await onboarding(st)).steps.senderIdentity).toBe(true);
+  });
+
+  it("flips campaign true on draft, and sent only on a sent campaign", async () => {
+    const u = await signUp("OnboardCampaign", "onboardcampaign@example.com");
+    const st = u.sessionToken;
+
+    const Campaign = Parse.Object.extend("Campaign");
+    const draft = new Campaign();
+    draft.set("name", "Draft");
+    draft.set("status", "draft");
+    await draft.save(null, { sessionToken: st });
+
+    let ob = await onboarding(st);
+    expect(ob.steps.campaign).toBe(true);
+    expect(ob.steps.sent).toBe(false);
+
+    const sent = new Campaign();
+    sent.set("name", "Sent one");
+    sent.set("status", "sent");
+    await sent.save(null, { sessionToken: st });
+
+    ob = await onboarding(st);
+    expect(ob.steps.sent).toBe(true);
+  });
+
+  it("reports complete=true once every step is satisfied", async () => {
+    const u = await signUp("OnboardDone", "onboarddone@example.com");
+    const st = u.sessionToken;
+
+    await setDefaultFromEmail(u.orgId, "hi@onboarddone.com");
+
+    const List = Parse.Object.extend("List");
+    const list = new List();
+    list.set("name", "List");
+    await list.save(null, { sessionToken: st });
+
+    const Contact = Parse.Object.extend("Contact");
+    const c = new Contact();
+    c.set("email", "c@example.com");
+    c.set("status", "subscribed");
+    await c.save(null, { sessionToken: st });
+
+    const Campaign = Parse.Object.extend("Campaign");
+    const camp = new Campaign();
+    camp.set("name", "Sent");
+    camp.set("status", "sent");
+    await camp.save(null, { sessionToken: st });
+
+    const ob = await onboarding(st);
+    expect(ob.steps).toEqual({
+      senderIdentity: true,
+      audience: true,
+      contact: true,
+      campaign: true,
+      sent: true,
+    });
+    expect(ob.complete).toBe(true);
+  });
+
+  it("getDashboardMetrics carries the same onboarding block", async () => {
+    const u = await signUp("OnboardEmbed", "onboardembed@example.com");
+    const st = u.sessionToken;
+
+    const fresh = await dashboard(st);
+    expect(fresh.onboarding.complete).toBe(false);
+    expect(fresh.onboarding.steps.audience).toBe(false);
+
+    const List = Parse.Object.extend("List");
+    const list = new List();
+    list.set("name", "L");
+    await list.save(null, { sessionToken: st });
+
+    const after = await dashboard(st);
+    expect(after.onboarding.steps.audience).toBe(true);
+  });
+
+  it("isolates onboarding state per org", async () => {
+    const a = await signUp("OnboardIsoA", "onboardisoa@example.com");
+    const b = await signUp("OnboardIsoB", "onboardisob@example.com");
+
+    const List = Parse.Object.extend("List");
+    const list = new List();
+    list.set("name", "A only");
+    await list.save(null, { sessionToken: a.sessionToken });
+
+    expect((await onboarding(a.sessionToken)).steps.audience).toBe(true);
+    expect((await onboarding(b.sessionToken)).steps.audience).toBe(false);
   });
 });

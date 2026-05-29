@@ -8,8 +8,13 @@
 //
 // This is explicitly NOT the production rendering pipeline; a banner
 // inside the modal flags it.
-import { computed } from "vue";
+import { computed, ref, watch } from "vue";
 import { type Body } from "./blocks/registry";
+import {
+  SAMPLE_CONTACT,
+  resolveMergeTags,
+  useMergeTags,
+} from "~/composables/app/useMergeTags";
 
 interface Props {
   open: boolean;
@@ -19,6 +24,35 @@ interface Props {
 
 const props = defineProps<Props>();
 const emit = defineEmits<{ (e: "close"): void }>();
+
+// ── Sample-data preview ──────────────────────────────────────────────────
+// When on, merge tags ({{firstName}} etc.) are resolved against a sample
+// contact so the user sees what a real recipient would. CLIENT-SIDE only —
+// the actual per-recipient substitution happens server-side at send time.
+const useSampleData = ref(false);
+const { customFields, loaded, loadTags } = useMergeTags();
+
+// Load the custom-field defs once so {{custom.<key>}} tags resolve to a
+// typed sample value rather than a bracket placeholder. Lazy on first open.
+watch(
+  () => props.open,
+  (open) => {
+    if (open && !loaded.value) void loadTags();
+  },
+  { immediate: true },
+);
+
+// Resolve merge tags in a string when the sample-data toggle is on; pass
+// the value through untouched otherwise. Custom-field defs feed typed
+// sample values; missing/unknown tokens show as "[token]".
+function maybeResolve(s: unknown): string {
+  const text = String(s ?? "");
+  if (!useSampleData.value) return text;
+  return resolveMergeTags(text, SAMPLE_CONTACT, {
+    customFields: customFields.value,
+    missing: "placeholder",
+  });
+}
 
 function escape(s: unknown): string {
   return String(s ?? "")
@@ -35,12 +69,12 @@ function renderBlock(b: Body["blocks"][number]): string {
       const tag = `h${p.level ?? 1}`;
       return `<${tag} style="margin:0;font-family:Manrope,sans-serif;font-weight:800;text-align:${escape(
         p.align,
-      )};color:${escape(p.color)};">${escape(p.text)}</${tag}>`;
+      )};color:${escape(p.color)};">${escape(maybeResolve(p.text))}</${tag}>`;
     }
     case "paragraph": {
       return `<p style="margin:0;font-family:Inter,sans-serif;font-size:15px;line-height:1.6;text-align:${escape(
         p.align,
-      )};color:${escape(p.color)};white-space:pre-wrap;">${escape(p.html)}</p>`;
+      )};color:${escape(p.color)};white-space:pre-wrap;">${escape(maybeResolve(p.html))}</p>`;
     }
     case "image": {
       const align =
@@ -63,7 +97,7 @@ function renderBlock(b: Body["blocks"][number]): string {
       )};color:${escape(p.fg)};border-radius:${
         p.radius
       }px;font-family:Manrope,sans-serif;font-weight:600;text-decoration:none;font-size:15px;">${escape(
-        p.label,
+        maybeResolve(p.label),
       )}</a></div>`;
     }
     case "divider": {
@@ -102,20 +136,37 @@ function onBackdrop(e: MouseEvent) {
             <span class="pv-eyebrow">Preview</span>
             <h2 class="pv-title">{{ campaignName || "Untitled campaign" }}</h2>
           </div>
-          <button type="button" class="pv-close" aria-label="Close" @click="emit('close')">
-            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-              <path
-                d="M6 6l12 12M6 18L18 6"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="1.8"
-                stroke-linecap="round"
+          <div class="pv-head-actions">
+            <label class="pv-sample-toggle" :class="{ 'pv-sample-toggle--on': useSampleData }">
+              <input
+                type="checkbox"
+                class="pv-sample-checkbox"
+                :checked="useSampleData"
+                @change="useSampleData = ($event.target as HTMLInputElement).checked"
               />
-            </svg>
-          </button>
+              <span class="pv-sample-track" aria-hidden="true"><span class="pv-sample-knob"></span></span>
+              <span class="pv-sample-label">Preview with sample data</span>
+            </label>
+            <button type="button" class="pv-close" aria-label="Close" @click="emit('close')">
+              <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                <path
+                  d="M6 6l12 12M6 18L18 6"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                />
+              </svg>
+            </button>
+          </div>
         </header>
         <p class="pv-note">
-          Approximate preview rendered from the live canvas. Final cross-client rendering uses the server-side MJML compiler — that ships with the send pipeline.
+          <template v-if="useSampleData">
+            Showing a <strong>sample contact</strong> ({{ SAMPLE_CONTACT.firstName }} {{ SAMPLE_CONTACT.lastName }}). Merge tags fill in per-recipient at send time; unknown tags show as <code>[tag]</code>.
+          </template>
+          <template v-else>
+            Approximate preview rendered from the live canvas. Toggle "Preview with sample data" to resolve merge tags. Final cross-client rendering uses the server-side MJML compiler.
+          </template>
         </p>
         <div class="pv-frame-wrap">
           <iframe
@@ -188,6 +239,63 @@ function onBackdrop(e: MouseEvent) {
 }
 .pv-close:hover { background: var(--color-surface-2); color: var(--color-ink); }
 
+.pv-head-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+/* Sample-data toggle — a compact on-brand switch. */
+.pv-sample-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--color-ink-soft);
+  user-select: none;
+}
+.pv-sample-toggle--on { color: var(--color-pop); }
+.pv-sample-checkbox {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.pv-sample-track {
+  position: relative;
+  display: inline-block;
+  width: 34px;
+  height: 18px;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-sunk);
+  border: 1px solid var(--color-rule);
+  transition: background var(--dur-fast) var(--ease-out);
+}
+.pv-sample-toggle--on .pv-sample-track {
+  background: var(--color-pop);
+  border-color: var(--color-pop);
+}
+.pv-sample-knob {
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-xs);
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+.pv-sample-toggle--on .pv-sample-knob {
+  transform: translateX(16px);
+}
+.pv-sample-label { white-space: nowrap; }
+.pv-sample-checkbox:focus-visible + .pv-sample-track {
+  box-shadow: var(--shadow-pop-glow);
+}
+
 .pv-note {
   margin: 0;
   padding: var(--space-3) var(--space-5);
@@ -196,6 +304,11 @@ function onBackdrop(e: MouseEvent) {
   background: var(--color-surface-2);
   border-bottom: 1px solid var(--color-rule);
   line-height: var(--leading-snug);
+}
+.pv-note code {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  color: var(--color-ink);
 }
 
 .pv-frame-wrap {

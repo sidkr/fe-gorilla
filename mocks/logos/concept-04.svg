@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 340 90" role="img" aria-label="Fe-Mail Gorilla">
+  <title>Fe-Mail Gorilla</title>
+
+  <!-- ============================================================= -->
+  <!-- ICON ZONE  (x:8–92 / y:6–84) — armored gorilla, knuckle crouch -->
+  <!-- cradling an envelope. Scaled from the 64-grid icon.            -->
+  <!-- ============================================================= -->
+  <g transform="translate(8,6) scale(1.21875)">
+
+    <!-- ground shadow bar -->
+    <rect x="10" y="55" width="44" height="4" rx="2" fill="#FFE8E8"/>
+
+    <!-- Hunched back / shoulder mass -->
+    <path d="M18 50
+             C12 50 9 44 11 36
+             C13 24 21 17 33 17
+             C45 17 53 25 54 37
+             C55 46 51 52 44 52
+             Z" fill="#18181B"/>
+
+    <!-- Left armored arm + knuckle fist on the ground -->
+    <path d="M18 33
+             C13 35 11 44 14 50
+             C15 53 21 54 23 50
+             C24 47 23 40 24 36
+             Z" fill="#18181B"/>
+    <rect x="11" y="48" width="13" height="9" rx="3.5" fill="#18181B"/>
+    <rect x="15" y="38" width="6" height="3" rx="1.5" fill="#56565E"/>
+
+    <!-- Head / brow mass -->
+    <path d="M22 22 a11 11 0 0 1 22 0 v5 a11 11 0 0 1 -22 0 Z" fill="#18181B"/>
+    <rect x="22.5" y="20.5" width="21" height="4.5" rx="2.2" fill="#56565E"/>
+
+    <!-- Face plate / muzzle -->
+    <path d="M26 26 a7 7 0 0 1 12 0 v2 a7 7 0 0 1 -12 0 Z" fill="#56565E"/>
+
+    <!-- Eyes -->
+    <circle cx="29" cy="22.5" r="1.9" fill="#FFFFFF"/>
+    <circle cx="37" cy="22.5" r="1.9" fill="#FFFFFF"/>
+
+    <!-- Nostrils -->
+    <circle cx="31" cy="28" r="1.1" fill="#18181B"/>
+    <circle cx="35" cy="28" r="1.1" fill="#18181B"/>
+
+    <!-- Envelope cradled in the right arm -->
+    <path d="M52 36 C57 40 56 50 49 52 C44 53 38 51 38 47 C38 43 44 42 47 42 Z" fill="#18181B"/>
+    <rect x="33" y="36" width="20" height="14" rx="2.5" fill="#FFFFFF"/>
+    <rect x="33" y="36" width="20" height="14" rx="2.5" fill="none" stroke="#18181B" stroke-width="2"/>
+    <path d="M34 37.5 L43 44 L52 37.5" fill="none" stroke="#FF4E4E" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>
+    <rect x="46" y="46" width="8" height="6" rx="3" fill="#56565E"/>
+    <text x="42" y="49.2" font-family="Manrope, Inter, system-ui, sans-serif" font-weight="800" font-size="6.4" text-anchor="middle" fill="#18181B">Fe</text>
+  </g>
+
+  <!-- ============================================================= -->
+  <!-- WORDMARK ZONE  (from x:104) — concept-01 signature             -->
+  <!-- ============================================================= -->
+  <text x="104" y="52" font-family="Manrope, Inter, system-ui, sans-serif"
+        font-weight="800" font-size="28" letter-spacing="-1.6"
+        fill="#18181B">Fe-Mail<tspan fill="#56565E"> Gorilla</tspan></text>
+
+  <!-- industrial baseline rule under the wordmark -->
+  <rect x="104" y="62" width="222" height="3" rx="1.5" fill="#18181B"/>
+  <!-- coral notch accent at the left start of the rule -->
+  <rect x="104" y="62" width="34" height="3" rx="1.5" fill="#FF4E4E"/>
+</svg>

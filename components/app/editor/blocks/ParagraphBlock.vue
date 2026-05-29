@@ -10,6 +10,8 @@
 // in `html`.
 import { computed, nextTick, ref, watch } from "vue";
 import BrandColorPicker from "../BrandColorPicker.vue";
+import MergeTagPicker from "../MergeTagPicker.vue";
+import { insertAtCursor } from "~/composables/app/useMergeTags";
 
 interface Props {
   mode: "render" | "inspect";
@@ -35,6 +37,13 @@ const styleVars = computed(() => ({
 
 function patch(k: keyof Props["blockProps"], v: unknown) {
   emit("update", { [k]: v } as Partial<Props["blockProps"]>);
+}
+
+// ── Merge-tag insertion (inspect mode) ───────────────────────────────────
+const textArea = ref<HTMLTextAreaElement | null>(null);
+function insertTag(token: string) {
+  const next = insertAtCursor(textArea.value, token);
+  patch("html", next);
 }
 
 // The contenteditable element holds the DOM-side source of truth while
@@ -90,15 +99,19 @@ watch(
   </div>
 
   <div v-else class="p-inspect">
-    <label class="ins-row">
-      <span class="ins-label">Text</span>
+    <div class="ins-row">
+      <span class="ins-label">
+        <span>Text</span>
+        <MergeTagPicker compact @insert="insertTag" />
+      </span>
       <textarea
+        ref="textArea"
         class="ins-textarea"
         rows="5"
         :value="blockProps.html"
         @input="patch('html', ($event.target as HTMLTextAreaElement).value)"
       ></textarea>
-    </label>
+    </div>
 
     <div class="ins-row">
       <span class="ins-label">Align</span>

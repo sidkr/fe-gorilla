@@ -10,6 +10,8 @@
 // single-line by design.
 import { computed, nextTick, ref, watch } from "vue";
 import BrandColorPicker from "../BrandColorPicker.vue";
+import MergeTagPicker from "../MergeTagPicker.vue";
+import { insertAtCursor } from "~/composables/app/useMergeTags";
 
 interface Props {
   mode: "render" | "inspect";
@@ -42,6 +44,13 @@ const styleVars = computed(() => ({
 
 function patch(k: keyof Props["blockProps"], v: unknown) {
   emit("update", { [k]: v } as Partial<Props["blockProps"]>);
+}
+
+// ── Merge-tag insertion (inspect mode) ───────────────────────────────────
+const textInput = ref<HTMLInputElement | null>(null);
+function insertTag(token: string) {
+  const next = insertAtCursor(textInput.value, token);
+  patch("text", next);
 }
 
 // ── Inline editing (render mode) ─────────────────────────────────────────
@@ -142,15 +151,19 @@ watch(
 
   <!-- INSPECT -->
   <div v-else class="heading-inspect">
-    <label class="ins-row">
-      <span class="ins-label">Text</span>
+    <div class="ins-row">
+      <span class="ins-label">
+        <span>Text</span>
+        <MergeTagPicker compact @insert="insertTag" />
+      </span>
       <input
+        ref="textInput"
         type="text"
         class="ins-input"
         :value="blockProps.text"
         @input="patch('text', ($event.target as HTMLInputElement).value)"
       />
-    </label>
+    </div>
 
     <div class="ins-row">
       <span class="ins-label">Level</span>

@@ -16,8 +16,60 @@ const auth = useAuthStore();
 // Audiences / contacts / campaigns-by-status are real from day one; engagement
 // totals (sent/opens/clicks) are 0 until the send pipeline lands — the widgets
 // below render graceful empty states in that case.
-const { metrics, loading, error, load } = useDashboard();
+const { metrics, loading, error, load, showOnboarding, dismissOnboarding } =
+  useDashboard();
 onMounted(load);
+
+// ── Onboarding checklist ──────────────────────────────────────────────────────
+// Driven entirely by real org state (metrics.onboarding.steps). Each entry links
+// the incomplete step to the route where the user completes it. The whole card
+// hides when every step is done (showOnboarding from the composable) or the user
+// dismisses it. We render all steps (done + not), so users see progress.
+const ONBOARDING_STEPS = [
+  {
+    key: "senderIdentity",
+    label: "Set a default from-email",
+    desc: "Tell us which verified address your campaigns send from.",
+    to: "/app/settings",
+    cta: "Go to settings",
+  },
+  {
+    key: "audience",
+    label: "Create your first audience",
+    desc: "An audience is a list of people you email.",
+    to: "/app/audiences",
+    cta: "Create audience",
+  },
+  {
+    key: "contact",
+    label: "Add some contacts",
+    desc: "Import subscribers or add them by hand.",
+    to: "/app/audiences",
+    cta: "Add contacts",
+  },
+  {
+    key: "campaign",
+    label: "Build a campaign",
+    desc: "Compose an email and pick who receives it.",
+    to: "/app/campaigns/new",
+    cta: "New campaign",
+  },
+  {
+    key: "sent",
+    label: "Send your first campaign",
+    desc: "Hit send (or schedule) to reach your audience.",
+    to: "/app/campaigns/new",
+    cta: "Compose & send",
+  },
+];
+
+const onboardingSteps = computed(() => {
+  const steps = metrics.value?.onboarding?.steps || {};
+  return ONBOARDING_STEPS.map((s) => ({ ...s, done: !!steps[s.key] }));
+});
+const onboardingDoneCount = computed(
+  () => onboardingSteps.value.filter((s) => s.done).length,
+);
 
 // ── Formatters ────────────────────────────────────────────────────────────--
 function fmtNum(n) {
@@ -88,10 +140,16 @@ const recentCampaigns = [];
 const activityEvents = [];
 const topCampaigns = [];
 
+// Quick actions — every `to` is a real, existing route. New campaign and Build a
+// segment go straight to their create flows (/app/campaigns/new, the segment
+// builder at /app/segments/new which the [id] page handles as id==="new").
+// Create audience / Add contacts land on /app/audiences where the create + import
+// affordances live; Browse templates → /app/templates.
 const quickActions = [
   { to: "/app/campaigns/new", icon: "paper-plane", label: "New campaign",     desc: "Compose and send a fresh email" },
-  { to: "/app/audiences",     icon: "upload",      label: "Import contacts",  desc: "Bring in subscribers from a CSV" },
-  { to: "/app/segments",      icon: "filter",      label: "New segment",      desc: "Slice your audience by rules" },
+  { to: "/app/audiences",     icon: "upload",      label: "Create audience",  desc: "Start a new list of subscribers" },
+  { to: "/app/audiences",     icon: "upload",      label: "Add contacts",     desc: "Import subscribers from a CSV" },
+  { to: "/app/segments/new",  icon: "filter",      label: "Build a segment",  desc: "Slice your audience by rules" },
   { to: "/app/templates",     icon: "document",    label: "Browse templates", desc: "Start from a saved layout" },
 ];
 </script>
@@ -126,6 +184,40 @@ const quickActions = [
 
     <!-- Error banner (non-fatal; widgets still render their zero states) -->
     <p v-if="error" class="dash-error">{{ error }}</p>
+
+    <!-- Onboarding checklist — driven by real org state. Hidden once every step
+         is complete or the user dismisses it. -->
+    <section v-if="showOnboarding" class="onboard" aria-label="Setup checklist">
+      <div class="onboard-head">
+        <div class="onboard-head-text">
+          <h2 class="onboard-title">Finish setting up Gorilla</h2>
+          <p class="onboard-sub">
+            {{ onboardingDoneCount }} of {{ onboardingSteps.length }} steps done — knock out the rest to start sending.
+          </p>
+        </div>
+        <button type="button" class="onboard-dismiss" aria-label="Dismiss checklist" @click="dismissOnboarding">
+          <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+            <path d="M3 3 L11 11 M11 3 L3 11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+          </svg>
+        </button>
+      </div>
+
+      <ul class="onboard-list">
+        <li v-for="step in onboardingSteps" :key="step.key" class="onboard-item" :class="{ 'is-done': step.done }">
+          <span class="onboard-check" :class="{ 'is-done': step.done }" aria-hidden="true">
+            <svg v-if="step.done" width="14" height="14" viewBox="0 0 14 14">
+              <path d="M3 7.5 L6 10.5 L11 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </span>
+          <div class="onboard-item-text">
+            <div class="onboard-item-label">{{ step.label }}</div>
+            <div class="onboard-item-desc">{{ step.desc }}</div>
+          </div>
+          <span v-if="step.done" class="onboard-done-tag">Done</span>
+          <NuxtLink v-else :to="step.to" class="onboard-item-cta">{{ step.cta }}</NuxtLink>
+        </li>
+      </ul>
+    </section>
 
     <!-- 3. Audience growth + engagement donut -->
     <section class="dash-split dash-split-66-34">
@@ -306,6 +398,155 @@ const quickActions = [
   color: var(--color-danger);
   background: var(--color-danger-bg);
   border-radius: var(--radius-md);
+}
+
+/* Onboarding checklist card */
+.onboard {
+  background: var(--color-surface);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.onboard-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+.onboard-title {
+  margin: 0 0 var(--space-1);
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  font-weight: 800;
+  letter-spacing: var(--tracking-tight);
+  color: var(--color-ink);
+}
+.onboard-sub {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  color: var(--color-ink-soft);
+}
+.onboard-dismiss {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-ink-dim);
+  cursor: pointer;
+  transition: border-color var(--dur-base) var(--ease-out),
+              color var(--dur-base) var(--ease-out);
+}
+.onboard-dismiss:hover {
+  border-color: var(--color-pop);
+  color: var(--color-ink);
+}
+.onboard-dismiss:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-pop-glow);
+}
+.onboard-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.onboard-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-md);
+}
+.onboard-item.is-done {
+  border-color: transparent;
+  background: var(--color-surface-sunk);
+}
+.onboard-check {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--color-rule);
+  border-radius: var(--radius-pill);
+  color: var(--btn-primary-fg);
+}
+.onboard-check.is-done {
+  background: var(--color-pop);
+  border-color: var(--color-pop);
+}
+.onboard-item-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.onboard-item-label {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--color-ink);
+}
+.onboard-item.is-done .onboard-item-label {
+  color: var(--color-ink-soft);
+}
+.onboard-item-desc {
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  color: var(--color-ink-soft);
+  line-height: var(--leading-snug);
+}
+.onboard-item-cta {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-2) var(--space-4);
+  background: var(--btn-primary-bg);
+  color: var(--btn-primary-fg);
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background-color var(--dur-base) var(--ease-out);
+}
+.onboard-item-cta:hover {
+  background: var(--btn-primary-hover);
+}
+.onboard-item-cta:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-pop-glow);
+}
+.onboard-done-tag {
+  flex: none;
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-wider);
+  text-transform: uppercase;
+  color: var(--color-ink-dim);
+}
+@media (max-width: 520px) {
+  .onboard-item {
+    flex-wrap: wrap;
+  }
+  .onboard-item-cta,
+  .onboard-done-tag {
+    margin-left: calc(20px + var(--space-3));
+  }
 }
 
 /* Two-column rows. Stack below 960px to match the KPI breakpoint. */

@@ -127,7 +127,22 @@ async function bootstrapSchemas() {
     field(s, e, "monthlySendCap", "Number");
     field(s, e, "monthlySendCount", "Number");
     field(s, e, "timezone", "String");
+    // Physical mailing address shown in email footers (CAN-SPAM requirement).
+    field(s, e, "address", "String");
     index(s, e, "org_slug_unique", { slug: 1 });
+    s.setCLP(authOnlyCLP());
+  });
+
+  // ── SenderIdentity (per-tenant) ───────────────────────────────────────────--
+  // A verified from-name / from-email pair an org may send as. MVP verification
+  // is a stub (status flip); the real domain/email verification belongs to the
+  // send pipeline (later wave).
+  await ensureClass("SenderIdentity", (s, e) => {
+    field(s, e, "organization", "Pointer", { targetClass: "Organization" });
+    field(s, e, "fromName", "String");
+    field(s, e, "fromEmail", "String");
+    field(s, e, "status", "String"); // "pending" | "verified"
+    index(s, e, "sender_org_email", { organization: 1, fromEmail: 1 });
     s.setCLP(authOnlyCLP());
   });
 
