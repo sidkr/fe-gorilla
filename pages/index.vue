@@ -2,9 +2,9 @@
 useHead({
   title: "",  // empty so titleTemplate uses the default homepage title
   meta: [
-    { name: "description", content: "Iron-clad email marketing for senders who mean business. Design, segment, and send campaigns with 98.4% inbox placement. Free for your first 10,000 emails / month." },
-    { property: "og:title", content: "Gorilla — Email that hits like iron." },
-    { property: "og:description", content: "Iron-clad email marketing. Design, segment, and send campaigns that actually arrive." },
+    { name: "description", content: "Fe-Mail Gorilla — iron-forged email marketing for senders who mean business. Design, segment, and send campaigns with 98.4% inbox placement. Free for your first 10,000 emails / month." },
+    { property: "og:title", content: "Fe-Mail Gorilla — Email that hits like iron." },
+    { property: "og:description", content: "Fe-Mail Gorilla: iron-forged email marketing. Design, segment, and send campaigns that actually arrive." },
     { property: "og:type", content: "website" },
     { property: "og:url", content: "https://gorilla.email/" },
     { name: "twitter:card", content: "summary_large_image" },
@@ -20,8 +20,8 @@ useHead({
   <!-- ── NAV ─────────────────────────────────────────────── -->
   <nav class="nav">
     <div class="wrap nav-inner">
-      <NuxtLink to="/" class="brand" aria-label="Gorilla home">
-        <svg class="brand-mark" width="32" height="32" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Gorilla">
+      <NuxtLink to="/" class="brand" aria-label="Fe-Mail Gorilla home">
+        <svg class="brand-mark" width="32" height="32" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Fe-Mail Gorilla">
           <path d="M14 22 C14 11 21 4 32 4 C43 4 50 11 50 22 L50 36 C50 47 43 56 32 60 C21 56 14 47 14 36 Z" fill="var(--color-pop)"/>
           <path d="M14 22 L50 22 L50 28 L14 28 Z" fill="var(--color-pop-deep)"/>
           <line x1="32" y1="4" x2="32" y2="22" stroke="var(--color-ink)" stroke-width="1.4" stroke-opacity="0.32"/>
@@ -32,7 +32,7 @@ useHead({
           <rect x="36" y="33" width="9" height="2.2" rx="0.5" fill="var(--color-ink)"/>
           <path d="M22 45 L42 45 L38 53 L26 53 Z" fill="var(--color-pop-deep)"/>
         </svg>
-        <span class="brand-word">Gorilla</span>
+        <span class="brand-word">Fe-Mail Gorilla</span>
         <span class="fe26" aria-label="Iron, element 26">
           <span class="num">26</span><span class="sym">Fe</span>
         </span>
@@ -64,7 +64,7 @@ useHead({
           <span>Iron</span>
         </div>
         <h1>Email that hits like iron.</h1>
-        <p class="lede">Design, segment, and send marketing campaigns that actually arrive. 98.4% inbox placement, real-time reporting, and a visual editor your team won't fight.</p>
+        <p class="lede">Fe-Mail Gorilla is iron-forged email marketing — design, segment, and send campaigns that actually arrive. 98.4% inbox placement, real-time reporting, and a visual editor your team won't fight.</p>
         <div class="hero-cta">
           <NuxtLink to="/signup" class="btn btn-primary btn-lg">
             Sign up free
@@ -100,7 +100,7 @@ useHead({
           </g>
         </svg>
         <div class="mark-wrap">
-          <svg class="brand-big" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Gorilla">
+          <svg class="brand-big" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Fe-Mail Gorilla">
             <path d="M14 22 C14 11 21 4 32 4 C43 4 50 11 50 22 L50 36 C50 47 43 56 32 60 C21 56 14 47 14 36 Z" fill="var(--color-pop)"/>
             <path d="M14 22 L50 22 L50 28 L14 28 Z" fill="var(--color-pop-deep)"/>
             <line x1="32" y1="4" x2="32" y2="22" stroke="var(--color-ink)" stroke-width="1.4" stroke-opacity="0.32"/>
@@ -125,7 +125,7 @@ useHead({
         </div>
         <div class="stat">
           <div class="num">12M<span class="accent">+</span></div>
-          <div class="label">Emails sent through Gorilla this week</div>
+          <div class="label">Emails sent through Fe-Mail Gorilla this week</div>
         </div>
         <div class="stat">
           <div class="num">3.2<span class="accent">s</span></div>
@@ -236,7 +236,7 @@ useHead({
     <div class="wrap testimonial-wrap">
       <div class="testimonial">
         <span class="qmark" aria-hidden="true">“</span>
-        <blockquote>We moved off Mailchimp in a weekend. Gorilla feels like it was built by people who actually send email.</blockquote>
+        <blockquote>We moved off Mailchimp in a weekend. Fe-Mail Gorilla feels like it was forged by people who actually send email.</blockquote>
         <cite><strong>Alex K.</strong> · Head of Growth, Folkways</cite>
       </div>
 
@@ -282,7 +282,7 @@ useHead({
       <div class="footer-grid">
         <div class="footer-brand">
           <a href="#" class="brand">
-            <svg class="brand-mark" width="28" height="28" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Gorilla">
+            <svg class="brand-mark" width="28" height="28" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Fe-Mail Gorilla">
               <path d="M14 22 C14 11 21 4 32 4 C43 4 50 11 50 22 L50 36 C50 47 43 56 32 60 C21 56 14 47 14 36 Z" fill="var(--color-pop)"/>
               <path d="M14 22 L50 22 L50 28 L14 28 Z" fill="var(--color-pop-deep)"/>
               <line x1="32" y1="4" x2="32" y2="22" stroke="var(--color-ink)" stroke-width="1.4" stroke-opacity="0.32"/>
@@ -293,9 +293,9 @@ useHead({
               <rect x="36" y="33" width="9" height="2.2" rx="0.5" fill="var(--color-ink)"/>
               <path d="M22 45 L42 45 L38 53 L26 53 Z" fill="var(--color-pop-deep)"/>
             </svg>
-            <span class="brand-word">Gorilla</span>
+            <span class="brand-word">Fe-Mail Gorilla</span>
           </a>
-          <p class="blurb">Iron-clad email marketing for teams that want their campaigns to actually arrive.</p>
+          <p class="blurb">Fe-Mail Gorilla — iron-forged email marketing for teams that want their campaigns to actually arrive.</p>
         </div>
         <div class="footer-col">
           <h4>Product</h4>
@@ -339,7 +339,7 @@ useHead({
         </div>
       </div>
       <div class="footer-bottom">
-        <span class="meta">© 2026 Gorilla · Forged for email</span>
+        <span class="meta">© 2026 Fe-Mail Gorilla · Forged for email</span>
         <span class="fe26" aria-label="Iron, element 26">
           <span class="num">26</span><span class="sym">Fe</span><span class="name">Iron</span>
         </span>

@@ -47,18 +47,26 @@ http.createServer((req, res) => {
     return;
   }
 
-  fs.readFile(file, (err, data) => {
-    if (err) {
-      res.writeHead(404, { 'Content-Type': 'text/plain' });
-      res.end('Not found: ' + url);
-      return;
-    }
-    const ext = path.extname(file).toLowerCase();
-    res.writeHead(200, {
-      'Content-Type':  MIME[ext] || 'application/octet-stream',
-      'Cache-Control': 'no-cache',
+  const serve = (filePath) => {
+    fs.readFile(filePath, (err, data) => {
+      if (err) {
+        res.writeHead(404, { 'Content-Type': 'text/plain' });
+        res.end('Not found: ' + url);
+        return;
+      }
+      const ext = path.extname(filePath).toLowerCase();
+      res.writeHead(200, {
+        'Content-Type':  MIME[ext] || 'application/octet-stream',
+        'Cache-Control': 'no-cache',
+      });
+      res.end(data);
     });
-    res.end(data);
+  };
+
+  // Directory request (e.g. /mocks/logos or /mocks/logos/) → serve its index.html
+  // so any child mock folder is reachable without naming the file explicitly.
+  fs.stat(file, (err, stats) => {
+    serve(!err && stats.isDirectory() ? path.join(file, 'index.html') : file);
   });
 }).listen(PORT, '127.0.0.1', () => {
   console.log('\n  Gorilla mocks  →  http://localhost:' + PORT + '/\n');

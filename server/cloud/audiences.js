@@ -12,7 +12,9 @@
 //   createAudience({ name, description? })            → { id, name, contactCount }
 //   listAudiences()                                   → [{ id, name, description, contactCount, createdAt }, ...]
 //   getAudience({ id })                               → { id, name, description, contactCount, createdAt }
+//   updateAudience({ id, patch:{name?,description?} })→ { id, name, ... } (rename / edit)
 //   archiveAudience({ id })                           → { ok } (soft: sets archived=true)
+//   deleteAudience({ id })                            → { ok } (hard; guarded: only when contactCount === 0)
 //   resolveAudienceRecipients({ id, excludeSuppressed? }) → [{ id, email, firstName, lastName }, ...]
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -109,6 +111,49 @@ Parse.Cloud.define("getAudience", async (request) => {
   return audienceToJSON(list);
 });
 
+// ── updateAudience ────────────────────────────────────────────────────────────
+// Rename / edit description. Same name validation as create. Session-scoped.
+Parse.Cloud.define("updateAudience", async (request) => {
+  const user = requireUser(request);
+  const p = request.params || {};
+  const id = p.id;
+  const patch = p.patch || {};
+  if (!id) {
+    throw new Parse.Error(Parse.Error.OTHER_CAUSE, "Audience id is required.");
+  }
+
+  const q = new Parse.Query("List");
+  let list;
+  try {
+    list = await q.get(id, { sessionToken: user.getSessionToken() });
+  } catch (err) {
+    throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, "Audience not found.");
+  }
+
+  if (patch.name != null) {
+    const trimmed = String(patch.name).trim();
+    if (!trimmed) {
+      throw new Parse.Error(
+        Parse.Error.OTHER_CAUSE,
+        "Audience name is required.",
+      );
+    }
+    if (trimmed.length > MAX_NAME_LEN) {
+      throw new Parse.Error(
+        Parse.Error.OTHER_CAUSE,
+        `Audience name must be ${MAX_NAME_LEN} characters or fewer.`,
+      );
+    }
+    list.set("name", trimmed);
+  }
+  if (patch.description != null) {
+    list.set("description", String(patch.description).trim());
+  }
+
+  await list.save(null, { sessionToken: user.getSessionToken() });
+  return audienceToJSON(list);
+});
+
 // ── archiveAudience ───────────────────────────────────────────────────────────
 // Soft-archive: hides the list from the default listing. We do NOT hard-delete
 // (Features F-05 only allows hard delete when contactCount === 0; archiving is
@@ -129,6 +174,46 @@ Parse.Cloud.define("archiveAudience", async (request) => {
   }
   list.set("archived", true);
   await list.save(null, { sessionToken: user.getSessionToken() });
+  return { ok: true };
+});
+
+// ── deleteAudience ────────────────────────────────────────────────────────────
+// Hard delete, GUARDED: only permitted when the list has no live contacts
+// (matching the F-05 archive-vs-delete semantics — archive is the always-safe
+// action; delete is allowed only for an empty list). We recompute the live count
+// from Contact rows rather than trusting the denormalized field so a stale count
+// can't enable an unsafe delete. Returns { ok } or throws if non-empty.
+Parse.Cloud.define("deleteAudience", async (request) => {
+  const user = requireUser(request);
+  const id = request.params && request.params.id;
+  if (!id) {
+    throw new Parse.Error(Parse.Error.OTHER_CAUSE, "Audience id is required.");
+  }
+  const org = await getUserOrg(user, { useMasterKey: true });
+  const sessionToken = user.getSessionToken();
+
+  const q = new Parse.Query("List");
+  let list;
+  try {
+    list = await q.get(id, { sessionToken });
+  } catch (err) {
+    throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, "Audience not found.");
+  }
+
+  // Live (non-deleted) membership count — authoritative for the guard.
+  const cq = new Parse.Query("Contact");
+  cq.equalTo("organization", org);
+  cq.equalTo("lists", id);
+  cq.notEqualTo("deleted", true);
+  const live = await cq.count({ useMasterKey: true });
+  if (live > 0) {
+    throw new Parse.Error(
+      Parse.Error.OTHER_CAUSE,
+      "This audience still has contacts. Remove them or archive the audience instead.",
+    );
+  }
+
+  await list.destroy({ sessionToken });
   return { ok: true };
 });
 

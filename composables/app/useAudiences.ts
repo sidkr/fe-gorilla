@@ -34,8 +34,19 @@ export function useAudiences() {
     return runCloud<Audience>("createAudience", { name, description });
   }
 
+  function updateAudience(
+    id: string,
+    patch: { name?: string; description?: string },
+  ) {
+    return runCloud<Audience>("updateAudience", { id, patch });
+  }
+
   function archiveAudience(id: string) {
     return runCloud<{ ok: boolean }>("archiveAudience", { id });
+  }
+
+  function deleteAudience(id: string) {
+    return runCloud<{ ok: boolean }>("deleteAudience", { id });
   }
 
   function resolveAudienceRecipients(id: string, excludeSuppressed = true) {
@@ -49,7 +60,9 @@ export function useAudiences() {
     listAudiences,
     getAudience,
     createAudience,
+    updateAudience,
     archiveAudience,
+    deleteAudience,
     resolveAudienceRecipients,
   };
 }

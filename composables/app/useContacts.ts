@@ -8,12 +8,25 @@ export type ContactStatus =
   | "cleaned"
   | "pending";
 
+export interface ContactConsent {
+  source?: string;
+  capturedAt?: string;
+  [k: string]: unknown;
+}
+
 export interface Contact {
   id: string;
   email: string;
   firstName: string;
   lastName: string;
   status: ContactStatus;
+  company: string;
+  phone: string;
+  city: string;
+  country: string;
+  timezone: string;
+  tags: string[];
+  consent: ContactConsent | null;
   customFields: Record<string, unknown>;
   lists: string[];
   deleted: boolean;
@@ -33,6 +46,13 @@ export interface ContactInput {
   firstName?: string;
   lastName?: string;
   status?: ContactStatus;
+  company?: string;
+  phone?: string;
+  city?: string;
+  country?: string;
+  timezone?: string;
+  tags?: string[];
+  consent?: ContactConsent | null;
   customFields?: Record<string, unknown>;
 }
 
@@ -41,6 +61,13 @@ export interface ContactPatch {
   firstName?: string;
   lastName?: string;
   status?: ContactStatus;
+  company?: string;
+  phone?: string;
+  city?: string;
+  country?: string;
+  timezone?: string;
+  tags?: string[];
+  consent?: ContactConsent | null;
   customFields?: Record<string, unknown>;
   lists?: string[];
 }
@@ -53,6 +80,8 @@ export function useContacts() {
     page?: number;
     perPage?: number;
     search?: string;
+    status?: ContactStatus;
+    tag?: string;
   }) {
     return runCloud<ContactPage>("listContacts", params);
   }
@@ -76,6 +105,24 @@ export function useContacts() {
     return runCloud<{ ok: boolean }>("deleteContact", { id });
   }
 
+  function bulkDeleteContacts(ids: string[]) {
+    return runCloud<{ ok: boolean; deleted: number }>("bulkDeleteContacts", {
+      ids,
+    });
+  }
+
+  function bulkTagContacts(
+    ids: string[],
+    tag: string,
+    action: "add" | "remove" = "add",
+  ) {
+    return runCloud<{ ok: boolean; updated: number }>("bulkTagContacts", {
+      ids,
+      tag,
+      action,
+    });
+  }
+
   function deleteContactData(email: string) {
     return runCloud<{ ok: boolean; removed: number }>("deleteContactData", {
       email,
@@ -88,6 +135,8 @@ export function useContacts() {
     addContactsBulk,
     updateContact,
     deleteContact,
+    bulkDeleteContacts,
+    bulkTagContacts,
     deleteContactData,
   };
 }

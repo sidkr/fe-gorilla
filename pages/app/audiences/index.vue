@@ -13,7 +13,8 @@ definePageMeta({
 
 useHead({ title: "Audiences" });
 
-const { listAudiences, createAudience } = useAudiences();
+const { listAudiences, createAudience, updateAudience, deleteAudience } =
+  useAudiences();
 
 const audiences = ref([]);
 const loading = ref(true);
@@ -95,6 +96,70 @@ async function submitCreate() {
     creating.value = false;
   }
 }
+
+// ── Rename modal ───────────────────────────────────────────────────────────────
+const showRename = ref(false);
+const renameTarget = ref(null);
+const renameName = ref("");
+const renameDescription = ref("");
+const renaming = ref(false);
+const renameError = ref("");
+
+function openRename(a) {
+  renameTarget.value = a;
+  renameName.value = a.name;
+  renameDescription.value = a.description || "";
+  renameError.value = "";
+  showRename.value = true;
+}
+function closeRename() {
+  if (renaming.value) return;
+  showRename.value = false;
+}
+async function submitRename() {
+  const name = renameName.value.trim();
+  if (!name) {
+    renameError.value = "Name is required.";
+    return;
+  }
+  renaming.value = true;
+  renameError.value = "";
+  try {
+    const updated = await updateAudience(renameTarget.value.id, {
+      name,
+      description: renameDescription.value.trim(),
+    });
+    audiences.value = audiences.value.map((x) =>
+      x.id === updated.id ? { ...x, ...updated } : x,
+    );
+    showRename.value = false;
+  } catch (err) {
+    renameError.value = err?.message || "Could not rename audience.";
+  } finally {
+    renaming.value = false;
+  }
+}
+
+// ── Delete (guarded: only when empty) ─────────────────────────────────────────
+const deletingId = ref(null);
+async function removeAudience(a) {
+  if ((a.contactCount || 0) > 0) {
+    window.alert(
+      "This audience still has contacts. Remove them first, or it can only be archived.",
+    );
+    return;
+  }
+  if (!confirm(`Delete the "${a.name}" audience? This cannot be undone.`)) return;
+  deletingId.value = a.id;
+  try {
+    await deleteAudience(a.id);
+    audiences.value = audiences.value.filter((x) => x.id !== a.id);
+  } catch (err) {
+    loadError.value = err?.message || "Could not delete audience.";
+  } finally {
+    deletingId.value = null;
+  }
+}
 </script>
 
 <template>
@@ -105,12 +170,20 @@ async function submitCreate() {
         <h1>Audiences</h1>
         <p class="aud-lede">Contact lists you can send campaigns to.</p>
       </div>
-      <button type="button" class="aud-cta" @click="openCreate">
-        <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
-          <path d="M7 2.5 V11.5 M2.5 7 H11.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
-        </svg>
-        <span>New audience</span>
-      </button>
+      <div class="aud-header-actions">
+        <NuxtLink to="/app/audiences/fields" class="aud-cta aud-cta--ghost">
+          <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+            <path d="M2 4h10M2 7h10M2 10h6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+          </svg>
+          <span>Manage fields</span>
+        </NuxtLink>
+        <button type="button" class="aud-cta" @click="openCreate">
+          <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+            <path d="M7 2.5 V11.5 M2.5 7 H11.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+          </svg>
+          <span>New audience</span>
+        </button>
+      </div>
     </header>
 
     <!-- 2. Summary strip -->
@@ -158,19 +231,31 @@ async function submitCreate() {
 
       <!-- Grid -->
       <div v-else class="aud-grid">
-        <AppAudienceCard
-          v-for="a in audiences"
-          :key="a.id"
-          :id="a.id"
-          :name="a.name"
-          :count="a.contactCount"
-          growth=""
-          growth-dir="neutral"
-          engagement=""
-          last-sent="—"
-          last-sent-relative="not sent yet"
-          :tag="a.archived ? 'Archived' : null"
-        />
+        <div v-for="a in audiences" :key="a.id" class="aud-cell">
+          <AppAudienceCard
+            :id="a.id"
+            :name="a.name"
+            :count="a.contactCount"
+            growth=""
+            growth-dir="neutral"
+            engagement=""
+            last-sent="—"
+            last-sent-relative="not sent yet"
+            :tag="a.archived ? 'Archived' : null"
+          />
+          <div class="aud-cell-actions">
+            <button type="button" class="aud-cell-link" @click="openRename(a)">Rename</button>
+            <button
+              type="button"
+              class="aud-cell-link aud-cell-link--danger"
+              :disabled="deletingId === a.id"
+              :title="(a.contactCount || 0) > 0 ? 'Remove all contacts before deleting' : 'Delete this audience'"
+              @click="removeAudience(a)"
+            >
+              {{ deletingId === a.id ? "Deleting…" : "Delete" }}
+            </button>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -206,6 +291,30 @@ async function submitCreate() {
             </button>
             <button type="submit" class="aud-btn aud-btn--primary" :disabled="creating">
               {{ creating ? "Creating…" : "Create audience" }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Rename modal -->
+    <div v-if="showRename" class="aud-modal-backdrop" @mousedown.self="closeRename">
+      <div class="aud-modal" role="dialog" aria-modal="true" aria-labelledby="aud-rename-title">
+        <h2 id="aud-rename-title" class="aud-modal-title">Rename audience</h2>
+        <form @submit.prevent="submitRename">
+          <label class="aud-field">
+            <span class="aud-field-label">Name</span>
+            <input v-model="renameName" class="aud-input" type="text" maxlength="80" autofocus />
+          </label>
+          <label class="aud-field">
+            <span class="aud-field-label">Description <span class="aud-field-opt">(optional)</span></span>
+            <input v-model="renameDescription" class="aud-input" type="text" />
+          </label>
+          <p v-if="renameError" class="aud-modal-error">{{ renameError }}</p>
+          <div class="aud-modal-actions">
+            <button type="button" class="aud-btn aud-btn--ghost" :disabled="renaming" @click="closeRename">Cancel</button>
+            <button type="submit" class="aud-btn aud-btn--primary" :disabled="renaming">
+              {{ renaming ? "Saving…" : "Save changes" }}
             </button>
           </div>
         </form>
@@ -275,6 +384,23 @@ async function submitCreate() {
 .aud-cta:focus-visible {
   outline: none;
   box-shadow: var(--shadow-pop-glow);
+}
+.aud-header-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+.aud-cta--ghost {
+  background: var(--color-surface);
+  color: var(--color-ink-soft);
+  border: 1px solid var(--color-rule);
+  box-shadow: none;
+}
+.aud-cta--ghost:hover {
+  background: var(--color-surface-sunk);
+  color: var(--color-ink);
+  box-shadow: none;
 }
 
 /* KPI strip — 3 cards */
@@ -373,6 +499,31 @@ async function submitCreate() {
 @media (max-width: 720px) {
   .aud-grid { grid-template-columns: 1fr; }
 }
+
+/* Per-card action row (rename / delete) — sits under each card so the card
+   itself stays a single clickable NuxtLink. */
+.aud-cell { display: flex; flex-direction: column; gap: var(--space-2); }
+.aud-cell-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-1);
+  padding: 0 var(--space-2);
+}
+.aud-cell-link {
+  background: none;
+  border: none;
+  padding: var(--space-1) var(--space-2);
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--color-ink-dim);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+.aud-cell-link:hover { color: var(--color-ink); background: var(--color-surface-sunk); }
+.aud-cell-link:disabled { opacity: 0.5; cursor: default; }
+.aud-cell-link--danger { color: var(--color-danger); }
+.aud-cell-link--danger:hover { color: var(--color-danger); }
 
 /* Modal */
 .aud-modal-backdrop {

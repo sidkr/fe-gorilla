@@ -5,8 +5,8 @@ import { useCloud } from "~/composables/app/useCloud";
 // cloud functions (server/cloud/campaigns.js). Thin wrappers over runCloud so
 // pages/components don't reach for Parse.Cloud.run directly.
 //
-//   const { listCampaigns, getCampaign, duplicateCampaign, archiveCampaign } =
-//     useCampaigns();
+//   const { listCampaigns, getCampaign, duplicateCampaign, archiveCampaign,
+//           renameCampaign, updateCampaign, deleteCampaign } = useCampaigns();
 //   const { campaigns, kpis } = await listCampaigns();
 //
 // Row shapes mirror what AppCampaignsTable + the KPI strip on
@@ -64,6 +64,18 @@ export interface CampaignDetail {
   updatedAt: string | null;
 }
 
+// Metadata fields updateCampaign accepts. Server ignores any other keys.
+export interface CampaignPatch {
+  name?: string;
+  subject?: string | null;
+  preheader?: string | null;
+  fromName?: string | null;
+  fromEmail?: string | null;
+  replyTo?: string | null;
+  audienceId?: string | null;
+  scheduledAt?: string | number | Date | null;
+}
+
 export function useCampaigns() {
   const { runCloud } = useCloud();
 
@@ -83,5 +95,37 @@ export function useCampaigns() {
     return runCloud<{ ok: boolean }>("archiveCampaign", { id });
   }
 
-  return { listCampaigns, getCampaign, duplicateCampaign, archiveCampaign };
+  function renameCampaign(id: string, name: string) {
+    return runCloud<{ ok: boolean; id: string; name: string }>(
+      "renameCampaign",
+      { id, name },
+    );
+  }
+
+  // patch ⊆ { name, subject, preheader, fromName, fromEmail, replyTo,
+  //           audienceId, scheduledAt }. Unknown keys are ignored server-side.
+  function updateCampaign(id: string, patch: CampaignPatch) {
+    return runCloud<{ ok: boolean; id: string; status: CampaignStatus }>(
+      "updateCampaign",
+      { id, patch },
+    );
+  }
+
+  // Hard-destroys a draft/scheduled/paused campaign; soft-archives a sent one
+  // (deleted === false); rejects deleting a sending one. See campaigns.js.
+  function deleteCampaign(id: string) {
+    return runCloud<{ ok: boolean; deleted: boolean }>("deleteCampaign", {
+      id,
+    });
+  }
+
+  return {
+    listCampaigns,
+    getCampaign,
+    duplicateCampaign,
+    archiveCampaign,
+    renameCampaign,
+    updateCampaign,
+    deleteCampaign,
+  };
 }

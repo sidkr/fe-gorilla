@@ -32,7 +32,7 @@ export default defineNuxtConfig({
     head: {
       htmlAttrs: { lang: "en" },
       titleTemplate: (titleChunk) =>
-        titleChunk ? `${titleChunk} · Gorilla` : "Gorilla — Email that hits like iron.",
+        titleChunk ? `${titleChunk} · Fe-Mail Gorilla` : "Fe-Mail Gorilla — Email that hits like iron.",
       meta: [
         { charset: "utf-8" },
         { name: "viewport", content: "width=device-width, initial-scale=1" },

@@ -1,5 +1,10 @@
 <script setup lang="ts">
-import { useSegments, type Segment, type SegmentRules } from "~/composables/app/useSegments";
+import {
+  useSegments,
+  type Segment,
+  type SegmentRules,
+  OPERATOR_LABELS,
+} from "~/composables/app/useSegments";
 
 definePageMeta({
   layout: "app",
@@ -8,34 +13,20 @@ definePageMeta({
 
 useHead({ title: "Segments" });
 
-const { listSegments } = useSegments();
+const router = useRouter();
+const { listSegments, duplicateSegment, deleteSegment } = useSegments();
 
 const loading = ref(true);
 const loadError = ref("");
 const rawSegments = ref<Segment[]>([]);
+const actionError = ref("");
+const busyId = ref<string | null>(null);
 
 // Render a rule tree into the compact mono string the table column shows.
 // e.g. { op:"and", conditions:[{field:"email",operator:"contains",value:"@gmail.com"}] }
 //      → "email contains \"@gmail.com\""
-const OP_LABELS: Record<string, string> = {
-  eq: "=",
-  neq: "≠",
-  contains: "contains",
-  starts_with: "starts with",
-  ends_with: "ends with",
-  is_empty: "is empty",
-  is_not_empty: "is not empty",
-  gt: ">",
-  gte: "≥",
-  lt: "<",
-  lte: "≤",
-  in: "in",
-  not_in: "not in",
-  before: "before",
-  after: "after",
-  between: "between",
-  last_n_days: "in last N days",
-};
+// Operator labels come from the shared map in useSegments (single source).
+const OP_LABELS = OPERATOR_LABELS;
 
 function summarizeCondition(c: { field: string; operator: string; value?: unknown }): string {
   const op = OP_LABELS[c.operator] || c.operator;
@@ -75,8 +66,7 @@ function formatDate(d: string | Date | null): string {
   });
 }
 
-// Map the cloud-fn shape → the row shape AppSegmentsTable expects:
-// { id, name, audience, rule, count, lastUsed }.
+// Map the cloud-fn shape → the row shape the table renders.
 const segments = computed(() =>
   rawSegments.value.map((s) => ({
     id: s.id,
@@ -84,13 +74,56 @@ const segments = computed(() =>
     audience: s.list ? s.listName || "List" : "All subscribers",
     rule: summarizeRules(s.rules),
     count: s.lastCount ?? 0,
+    kind: s.kind,
     lastUsed: formatDate(s.lastEvaluatedAt),
+    raw: s,
   })),
 );
 
+function truncate(value: string, max: number): string {
+  if (!value) return "";
+  return value.length > max ? value.slice(0, max - 1) + "…" : value;
+}
+const fmtCount = (n: number) => new Intl.NumberFormat("en-US").format(n);
+
+async function reload() {
+  rawSegments.value = await listSegments();
+}
+
+function edit(id: string) {
+  router.push(`/app/segments/${id}`);
+}
+
+async function duplicate(seg: Segment) {
+  actionError.value = "";
+  busyId.value = seg.id;
+  try {
+    await duplicateSegment(seg);
+    await reload();
+  } catch (err) {
+    actionError.value = (err as Error)?.message || "Could not duplicate.";
+  } finally {
+    busyId.value = null;
+  }
+}
+
+async function remove(seg: Segment) {
+  if (!confirm(`Delete segment "${seg.name}"? This cannot be undone.`)) return;
+  actionError.value = "";
+  busyId.value = seg.id;
+  try {
+    await deleteSegment(seg.id);
+    await reload();
+  } catch (err) {
+    actionError.value = (err as Error)?.message || "Could not delete.";
+  } finally {
+    busyId.value = null;
+  }
+}
+
 onMounted(async () => {
   try {
-    rawSegments.value = await listSegments();
+    await reload();
   } catch (err) {
     loadError.value = (err as Error)?.message || "Failed to load segments.";
   } finally {
@@ -141,13 +174,39 @@ onMounted(async () => {
         <span class="seg-eyebrow-dot" aria-hidden="true"></span>
         <span>All segments &middot; {{ segments.length }}</span>
       </div>
+      <p v-if="actionError" class="seg-state seg-state-error">{{ actionError }}</p>
       <div class="seg-card seg-card-flush">
         <p v-if="loading" class="seg-state">Loading segments…</p>
         <p v-else-if="loadError" class="seg-state seg-state-error">{{ loadError }}</p>
         <p v-else-if="segments.length === 0" class="seg-state">
           No segments yet. Create your first to slice your audience.
         </p>
-        <AppSegmentsTable v-else :segments="segments" />
+        <div v-else class="tbl">
+          <div class="tbl-row tbl-head" role="row">
+            <div class="tbl-cell tbl-name">Name</div>
+            <div class="tbl-cell tbl-type">Type</div>
+            <div class="tbl-cell tbl-rule">Rule</div>
+            <div class="tbl-cell tbl-num">Contacts</div>
+            <div class="tbl-cell tbl-last">Last used</div>
+            <div class="tbl-cell tbl-actions" aria-hidden="true"></div>
+          </div>
+          <div v-for="s in segments" :key="s.id" class="tbl-row tbl-body" role="row">
+            <NuxtLink :to="`/app/segments/${s.id}`" class="tbl-cell tbl-name tbl-link" :title="s.name">
+              {{ truncate(s.name, 30) }}
+            </NuxtLink>
+            <div class="tbl-cell tbl-type">
+              <span class="tbl-chip" :class="`tbl-chip-${s.kind}`">{{ s.kind }}</span>
+            </div>
+            <div class="tbl-cell tbl-rule" :title="s.rule">{{ truncate(s.rule, 50) }}</div>
+            <div class="tbl-cell tbl-num tabular">{{ fmtCount(s.count) }}</div>
+            <div class="tbl-cell tbl-last tabular" :class="{ 'tbl-empty': s.lastUsed === '—' }">{{ s.lastUsed }}</div>
+            <div class="tbl-cell tbl-actions">
+              <button type="button" class="tbl-act" :disabled="busyId === s.id" title="Edit" @click="edit(s.id)">Edit</button>
+              <button type="button" class="tbl-act" :disabled="busyId === s.id" title="Duplicate" @click="duplicate(s.raw)">Duplicate</button>
+              <button type="button" class="tbl-act tbl-act-danger" :disabled="busyId === s.id" title="Delete" @click="remove(s.raw)">Delete</button>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
   </div>
@@ -261,6 +320,104 @@ onMounted(async () => {
 }
 .seg-state-error {
   color: var(--color-danger, var(--color-ink));
+}
+
+/* Table (mirrors AppSegmentsTable, plus a Type chip + Actions column) */
+.tbl { display: flex; flex-direction: column; }
+.tbl-row {
+  display: grid;
+  grid-template-columns:
+    minmax(0, 1.3fr)
+    minmax(80px, 0.5fr)
+    minmax(0, 1.5fr)
+    minmax(80px, 0.5fr)
+    minmax(100px, 0.6fr)
+    minmax(200px, 0.9fr);
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  color: var(--color-ink);
+}
+.tbl-head {
+  border-bottom: 1px solid var(--color-rule);
+  padding-top: var(--space-3);
+  padding-bottom: var(--space-3);
+}
+.tbl-head .tbl-cell {
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-wider);
+  text-transform: uppercase;
+  color: var(--color-ink-dim);
+}
+.tbl-body {
+  border-bottom: 1px solid var(--color-rule);
+  transition: background-color var(--dur-fast) var(--ease-out);
+}
+.tbl-body:last-child { border-bottom: none; }
+.tbl-body:hover { background: var(--color-surface-2); }
+.tbl-cell {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-sm);
+}
+.tbl-name {
+  font-weight: 600;
+  color: var(--color-ink);
+  font-family: var(--font-display);
+  letter-spacing: var(--tracking-tight);
+}
+.tbl-link { text-decoration: none; }
+.tbl-link:hover { color: var(--color-pop); }
+.tbl-rule {
+  font-family: var(--font-mono);
+  color: var(--color-ink-soft);
+}
+.tbl-num, .tbl-last { font-family: var(--font-mono); }
+.tbl-num { color: var(--color-ink); }
+.tbl-last { color: var(--color-ink-soft); }
+.tbl-empty { color: var(--color-ink-dim); }
+.tabular { font-variant-numeric: tabular-nums; }
+.tbl-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-1) var(--space-3);
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-wide);
+  border-radius: var(--radius-pill);
+  text-transform: capitalize;
+}
+.tbl-chip-dynamic { background: var(--color-pop-glow); color: var(--color-pop); }
+.tbl-chip-static { background: var(--color-surface-2); color: var(--color-ink-soft); }
+.tbl-actions {
+  display: inline-flex;
+  gap: var(--space-2);
+  justify-content: flex-end;
+  overflow: visible;
+}
+.tbl-act {
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--color-ink-soft);
+  background: transparent;
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-md);
+  padding: var(--space-1) var(--space-3);
+  cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
+}
+.tbl-act:hover:not(:disabled) { background: var(--color-surface); border-color: var(--color-ink-dim); color: var(--color-ink); }
+.tbl-act:disabled { opacity: 0.5; cursor: not-allowed; }
+.tbl-act-danger:hover:not(:disabled) {
+  background: var(--color-danger-bg);
+  border-color: var(--color-danger);
+  color: var(--color-danger);
 }
 
 /* Explainer card */

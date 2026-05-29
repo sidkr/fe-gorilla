@@ -3,10 +3,11 @@
 // modal, inline edit, and a contact detail drawer (F-09). Contacts are loaded
 // paginated via listContacts. Activity is a graceful empty state until the send
 // pipeline exists (no CampaignSend / EmailEvent rows yet).
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onMounted, reactive, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import { useAudiences } from "~/composables/app/useAudiences";
 import { useContacts } from "~/composables/app/useContacts";
+import { useCustomFields } from "~/composables/app/useCustomFields";
 
 definePageMeta({
   layout: "app",
@@ -22,10 +23,25 @@ const {
   addContact,
   updateContact,
   deleteContact: deleteContactCloud,
+  bulkDeleteContacts,
+  bulkTagContacts,
 } = useContacts();
+const { listCustomFields } = useCustomFields();
 
 const audience = ref(null);
 const audienceError = ref("");
+
+// ── Custom-field registry (drives the dynamic form section + extra columns) ───
+const customFields = ref([]);
+async function loadCustomFields() {
+  try {
+    customFields.value = await listCustomFields();
+  } catch {
+    customFields.value = []; // form still works with std fields only
+  }
+}
+// Up to two custom fields are shown as extra table columns (compact table).
+const columnFields = computed(() => customFields.value.slice(0, 2));
 
 useHead(() => ({ title: audience.value ? audience.value.name : "Audience" }));
 
@@ -35,6 +51,8 @@ const total = ref(0);
 const page = ref(0);
 const perPage = ref(25);
 const search = ref("");
+const statusFilter = ref("");
+const tagFilter = ref("");
 const loading = ref(true);
 const listError = ref("");
 
@@ -48,6 +66,42 @@ const STATUS_LABELS = {
   cleaned: "Cleaned",
   pending: "Pending",
 };
+
+// Tag universe for the filter dropdown — derived from the currently loaded rows
+// (best-effort; a contact carrying a tag not on the current page just won't show
+// as an option until it's loaded). Cheap + good enough for the filter affordance.
+const knownTags = computed(() => {
+  const set = new Set();
+  for (const c of contacts.value) for (const t of c.tags || []) set.add(t);
+  return Array.from(set).sort();
+});
+
+// ── Row selection (bulk actions) ──────────────────────────────────────────────
+const selected = ref(new Set());
+const selectedCount = computed(() => selected.value.size);
+const allOnPageSelected = computed(
+  () =>
+    contacts.value.length > 0 &&
+    contacts.value.every((c) => selected.value.has(c.id)),
+);
+function toggleRow(id) {
+  const next = new Set(selected.value);
+  if (next.has(id)) next.delete(id);
+  else next.add(id);
+  selected.value = next;
+}
+function toggleAllOnPage() {
+  const next = new Set(selected.value);
+  if (allOnPageSelected.value) {
+    for (const c of contacts.value) next.delete(c.id);
+  } else {
+    for (const c of contacts.value) next.add(c.id);
+  }
+  selected.value = next;
+}
+function clearSelection() {
+  selected.value = new Set();
+}
 
 async function loadAudience() {
   audienceError.value = "";
@@ -67,6 +121,8 @@ async function loadContacts() {
       page: page.value,
       perPage: perPage.value,
       search: search.value.trim() || undefined,
+      status: statusFilter.value || undefined,
+      tag: tagFilter.value || undefined,
     });
     contacts.value = res.rows;
     total.value = res.total;
@@ -90,7 +146,7 @@ function formatDate(iso) {
 }
 
 onMounted(async () => {
-  await loadAudience();
+  await Promise.all([loadAudience(), loadCustomFields()]);
   await loadContacts();
 });
 
@@ -103,6 +159,23 @@ watch(search, () => {
     void loadContacts();
   }, 350);
 });
+
+// Filters re-query immediately (and reset to page 0).
+watch([statusFilter, tagFilter], () => {
+  page.value = 0;
+  void loadContacts();
+});
+
+// Display helper for a custom-field value in a table cell / drawer.
+function displayCustomValue(field, value) {
+  if (value === null || value === undefined || value === "") return "—";
+  if (field?.type === "boolean") return value ? "Yes" : "No";
+  if (field?.type === "date") {
+    const d = new Date(value);
+    return isNaN(d.getTime()) ? String(value) : formatDate(d.toISOString());
+  }
+  return String(value);
+}
 
 function goPage(delta) {
   const next = page.value + delta;
@@ -117,20 +190,55 @@ const formMode = ref("add"); // "add" | "edit"
 const formError = ref("");
 const saving = ref(false);
 const editingId = ref(null);
-const form = ref({
+const dupContactId = ref(null);
+
+const STD_STRING_FIELDS = ["company", "phone", "city", "country", "timezone"];
+
+// Reactive form covers standard + rich fields. Custom-field values live in a
+// separate keyed map so we can rebuild it from the registry each open.
+const form = reactive({
   email: "",
   firstName: "",
   lastName: "",
   status: "subscribed",
+  company: "",
+  phone: "",
+  city: "",
+  country: "",
+  timezone: "",
 });
-const dupContactId = ref(null);
+const tagsText = ref(""); // comma-separated in the input
+const customForm = reactive({}); // { [fieldKey]: value }
+
+// (Re)build the dynamic customForm map from the registry, seeding from a
+// contact's stored values when editing. Booleans default to false, others "".
+function seedCustomForm(contact) {
+  for (const k of Object.keys(customForm)) delete customForm[k];
+  const stored = contact?.customFields || {};
+  for (const f of customFields.value) {
+    const v = stored[f.key];
+    if (f.type === "boolean") customForm[f.key] = v === true;
+    else if (f.type === "date" && v) customForm[f.key] = String(v).slice(0, 10);
+    else customForm[f.key] = v == null ? "" : String(v);
+  }
+}
+
+function resetStdForm(contact) {
+  form.email = contact?.email || "";
+  form.firstName = contact?.firstName || "";
+  form.lastName = contact?.lastName || "";
+  form.status = contact?.status || "subscribed";
+  for (const f of STD_STRING_FIELDS) form[f] = contact?.[f] || "";
+  tagsText.value = (contact?.tags || []).join(", ");
+}
 
 function openAdd() {
   formMode.value = "add";
   editingId.value = null;
   dupContactId.value = null;
   formError.value = "";
-  form.value = { email: "", firstName: "", lastName: "", status: "subscribed" };
+  resetStdForm(null);
+  seedCustomForm(null);
   showForm.value = true;
 }
 function openEdit(c) {
@@ -138,12 +246,8 @@ function openEdit(c) {
   editingId.value = c.id;
   dupContactId.value = null;
   formError.value = "";
-  form.value = {
-    email: c.email,
-    firstName: c.firstName,
-    lastName: c.lastName,
-    status: c.status,
-  };
+  resetStdForm(c);
+  seedCustomForm(c);
   showForm.value = true;
 }
 function closeForm() {
@@ -151,30 +255,69 @@ function closeForm() {
   showForm.value = false;
 }
 
+// Assemble the customFields payload from the dynamic form. Empty values are
+// omitted (server treats absent / "" as no-value); the server cleans + coerces.
+function collectCustomFields() {
+  const out = {};
+  for (const f of customFields.value) {
+    const v = customForm[f.key];
+    if (f.type === "boolean") {
+      out[f.key] = v === true;
+    } else if (v !== "" && v !== null && v !== undefined) {
+      out[f.key] = v;
+    }
+  }
+  return out;
+}
+
+function parseTags(text) {
+  return text
+    .split(",")
+    .map((t) => t.trim())
+    .filter((t) => t.length > 0);
+}
+
 async function submitForm() {
-  const email = form.value.email.trim();
+  const email = form.email.trim();
   if (!email) {
     formError.value = "Email is required.";
     return;
   }
+  // Client-side required-field check for custom fields.
+  for (const f of customFields.value) {
+    if (f.required) {
+      const v = customForm[f.key];
+      const missing =
+        f.type === "boolean" ? v !== true : v === "" || v == null;
+      if (missing) {
+        formError.value = `"${f.label}" is required.`;
+        return;
+      }
+    }
+  }
   saving.value = true;
   formError.value = "";
   dupContactId.value = null;
+
+  const payload = {
+    email,
+    firstName: form.firstName.trim(),
+    lastName: form.lastName.trim(),
+    status: form.status,
+    company: form.company.trim(),
+    phone: form.phone.trim(),
+    city: form.city.trim(),
+    country: form.country.trim(),
+    timezone: form.timezone.trim(),
+    tags: parseTags(tagsText.value),
+    customFields: collectCustomFields(),
+  };
+
   try {
     if (formMode.value === "add") {
-      await addContact(audienceId.value, {
-        email,
-        firstName: form.value.firstName.trim(),
-        lastName: form.value.lastName.trim(),
-        status: form.value.status,
-      });
+      await addContact(audienceId.value, payload);
     } else {
-      await updateContact(editingId.value, {
-        email,
-        firstName: form.value.firstName.trim(),
-        lastName: form.value.lastName.trim(),
-        status: form.value.status,
-      });
+      await updateContact(editingId.value, payload);
     }
     showForm.value = false;
     await Promise.all([loadContacts(), loadAudience()]);
@@ -214,9 +357,58 @@ async function removeContact(c) {
   }
 }
 
+// ── Bulk actions ──────────────────────────────────────────────────────────────
+const bulkBusy = ref(false);
+async function bulkDelete() {
+  const ids = Array.from(selected.value);
+  if (ids.length === 0) return;
+  if (!confirm(`Remove ${ids.length} contact(s) from this audience?`)) return;
+  bulkBusy.value = true;
+  try {
+    await bulkDeleteContacts(ids);
+    clearSelection();
+    await Promise.all([loadContacts(), loadAudience()]);
+  } catch (err) {
+    listError.value = err?.message || "Could not remove contacts.";
+  } finally {
+    bulkBusy.value = false;
+  }
+}
+async function bulkTag(action) {
+  const ids = Array.from(selected.value);
+  if (ids.length === 0) return;
+  const tag = window.prompt(
+    action === "add" ? "Tag to add to selected contacts:" : "Tag to remove:",
+  );
+  if (!tag || !tag.trim()) return;
+  bulkBusy.value = true;
+  try {
+    await bulkTagContacts(ids, tag.trim(), action);
+    await loadContacts();
+  } catch (err) {
+    listError.value = err?.message || "Could not update tags.";
+  } finally {
+    bulkBusy.value = false;
+  }
+}
+
+// Drawer custom fields: prefer the registry order + labels; fall back to any
+// stored keys that are no longer in the registry (deleted fields) so nothing
+// silently vanishes from the detail view.
 const drawerCustomFields = computed(() => {
   const cf = drawerContact.value?.customFields || {};
-  return Object.entries(cf);
+  const out = [];
+  const seen = new Set();
+  for (const f of customFields.value) {
+    if (cf[f.key] !== undefined) {
+      out.push({ label: f.label, value: displayCustomValue(f, cf[f.key]) });
+      seen.add(f.key);
+    }
+  }
+  for (const [k, v] of Object.entries(cf)) {
+    if (!seen.has(k)) out.push({ label: k, value: String(v) });
+  }
+  return out;
 });
 </script>
 
@@ -256,6 +448,35 @@ const drawerCustomFields = computed(() => {
         placeholder="Search by email…"
         aria-label="Search contacts by email"
       />
+      <select v-model="statusFilter" class="ad-filter" aria-label="Filter by status">
+        <option value="">All statuses</option>
+        <option value="subscribed">Subscribed</option>
+        <option value="unsubscribed">Unsubscribed</option>
+        <option value="pending">Pending</option>
+        <option value="cleaned">Cleaned</option>
+      </select>
+      <select
+        v-if="knownTags.length"
+        v-model="tagFilter"
+        class="ad-filter"
+        aria-label="Filter by tag"
+      >
+        <option value="">All tags</option>
+        <option v-for="t in knownTags" :key="t" :value="t">{{ t }}</option>
+      </select>
+      <span class="ad-toolbar-spacer" aria-hidden="true"></span>
+      <NuxtLink to="/app/audiences/fields" class="ad-toolbar-link">Manage fields</NuxtLink>
+    </div>
+
+    <!-- Bulk action bar -->
+    <div v-if="selectedCount > 0" class="ad-bulkbar">
+      <span class="ad-bulkbar-count">{{ selectedCount }} selected</span>
+      <div class="ad-bulkbar-actions">
+        <button type="button" class="ad-btn ad-btn--ghost" :disabled="bulkBusy" @click="bulkTag('add')">Add tag</button>
+        <button type="button" class="ad-btn ad-btn--ghost" :disabled="bulkBusy" @click="bulkTag('remove')">Remove tag</button>
+        <button type="button" class="ad-btn ad-btn--ghost ad-btn--danger" :disabled="bulkBusy" @click="bulkDelete">Remove from audience</button>
+        <button type="button" class="ad-btn ad-btn--ghost" :disabled="bulkBusy" @click="clearSelection">Clear</button>
+      </div>
     </div>
 
     <!-- Table -->
@@ -279,21 +500,52 @@ const drawerCustomFields = computed(() => {
       <table class="ad-table">
         <thead>
           <tr>
+            <th class="ad-th-check">
+              <input
+                type="checkbox"
+                :checked="allOnPageSelected"
+                aria-label="Select all on this page"
+                @change="toggleAllOnPage"
+              />
+            </th>
             <th>Email</th>
             <th>Name</th>
             <th>Status</th>
+            <th v-for="f in columnFields" :key="f.id">{{ f.label }}</th>
+            <th>Tags</th>
             <th>Added</th>
             <th class="ad-th-actions"><span class="sr-only">Actions</span></th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="c in contacts" :key="c.id" class="ad-row" @click="openDrawer(c)">
+          <tr
+            v-for="c in contacts"
+            :key="c.id"
+            class="ad-row"
+            :class="{ 'ad-row--selected': selected.has(c.id) }"
+            @click="openDrawer(c)"
+          >
+            <td class="ad-td-check" @click.stop>
+              <input
+                type="checkbox"
+                :checked="selected.has(c.id)"
+                :aria-label="`Select ${c.email}`"
+                @change="toggleRow(c.id)"
+              />
+            </td>
             <td class="ad-td-email">{{ c.email }}</td>
             <td>{{ fullName(c) }}</td>
             <td>
               <span :class="['ad-status', `ad-status--${c.status}`]">
                 {{ STATUS_LABELS[c.status] || c.status }}
               </span>
+            </td>
+            <td v-for="f in columnFields" :key="f.id" class="ad-td-cf">
+              {{ displayCustomValue(f, (c.customFields || {})[f.key]) }}
+            </td>
+            <td class="ad-td-tags">
+              <span v-if="(c.tags || []).length === 0" class="ad-td-muted">—</span>
+              <span v-for="t in c.tags" :key="t" class="ad-tag-chip">{{ t }}</span>
             </td>
             <td class="ad-td-date">{{ formatDate(c.createdAt) }}</td>
             <td class="ad-td-actions" @click.stop>
@@ -355,6 +607,72 @@ const drawerCustomFields = computed(() => {
               <option value="cleaned">Cleaned</option>
             </select>
           </label>
+
+          <div class="ad-field-row">
+            <label class="ad-field">
+              <span class="ad-field-label">Company</span>
+              <input v-model="form.company" class="ad-input" type="text" />
+            </label>
+            <label class="ad-field">
+              <span class="ad-field-label">Phone</span>
+              <input v-model="form.phone" class="ad-input" type="tel" />
+            </label>
+          </div>
+          <div class="ad-field-row">
+            <label class="ad-field">
+              <span class="ad-field-label">City</span>
+              <input v-model="form.city" class="ad-input" type="text" />
+            </label>
+            <label class="ad-field">
+              <span class="ad-field-label">Country</span>
+              <input v-model="form.country" class="ad-input" type="text" />
+            </label>
+          </div>
+          <label class="ad-field">
+            <span class="ad-field-label">Timezone</span>
+            <input v-model="form.timezone" class="ad-input" type="text" placeholder="e.g. Europe/Berlin" />
+          </label>
+          <label class="ad-field">
+            <span class="ad-field-label">Tags <span class="ad-field-opt">(comma separated)</span></span>
+            <input v-model="tagsText" class="ad-input" type="text" placeholder="vip, beta, newsletter" />
+          </label>
+
+          <!-- Dynamic custom-field section, generated from the org registry. -->
+          <template v-if="customFields.length">
+            <h3 class="ad-form-subhead">Custom fields</h3>
+            <label v-for="f in customFields" :key="f.id" class="ad-field">
+              <span class="ad-field-label">
+                {{ f.label }}
+                <span v-if="f.required" class="ad-field-req" aria-hidden="true">*</span>
+              </span>
+
+              <template v-if="f.type === 'boolean'">
+                <span class="ad-check-inline">
+                  <input v-model="customForm[f.key]" type="checkbox" />
+                  <span class="ad-field-opt">Yes</span>
+                </span>
+              </template>
+              <select v-else-if="f.type === 'enum'" v-model="customForm[f.key]" class="ad-input">
+                <option value="">—</option>
+                <option v-for="opt in f.enumValues" :key="opt" :value="opt">{{ opt }}</option>
+              </select>
+              <input
+                v-else-if="f.type === 'number'"
+                v-model="customForm[f.key]"
+                class="ad-input"
+                type="number"
+                step="any"
+              />
+              <input
+                v-else-if="f.type === 'date'"
+                v-model="customForm[f.key]"
+                class="ad-input"
+                type="date"
+              />
+              <input v-else v-model="customForm[f.key]" class="ad-input" type="text" />
+            </label>
+          </template>
+
           <p v-if="formError" class="ad-modal-error">
             {{ formError }}
             <button
@@ -415,6 +733,18 @@ const drawerCustomFields = computed(() => {
             <dt>First name</dt><dd>{{ drawerContact.firstName || "—" }}</dd>
             <dt>Last name</dt><dd>{{ drawerContact.lastName || "—" }}</dd>
             <dt>Status</dt><dd>{{ STATUS_LABELS[drawerContact.status] || drawerContact.status }}</dd>
+            <dt>Company</dt><dd>{{ drawerContact.company || "—" }}</dd>
+            <dt>Phone</dt><dd>{{ drawerContact.phone || "—" }}</dd>
+            <dt>City</dt><dd>{{ drawerContact.city || "—" }}</dd>
+            <dt>Country</dt><dd>{{ drawerContact.country || "—" }}</dd>
+            <dt>Timezone</dt><dd>{{ drawerContact.timezone || "—" }}</dd>
+            <dt>Tags</dt>
+            <dd>
+              <template v-if="(drawerContact.tags || []).length">
+                <span v-for="t in drawerContact.tags" :key="t" class="ad-tag-chip">{{ t }}</span>
+              </template>
+              <span v-else>—</span>
+            </dd>
             <dt>List membership</dt><dd>{{ (drawerContact.lists || []).length }} list(s)</dd>
             <dt>Added</dt><dd>{{ formatDate(drawerContact.createdAt) }}</dd>
           </dl>
@@ -422,8 +752,8 @@ const drawerCustomFields = computed(() => {
           <template v-if="drawerCustomFields.length">
             <h3 class="ad-drawer-subhead">Custom fields</h3>
             <dl class="ad-deflist">
-              <template v-for="[k, v] in drawerCustomFields" :key="k">
-                <dt>{{ k }}</dt><dd>{{ v }}</dd>
+              <template v-for="row in drawerCustomFields" :key="row.label">
+                <dt>{{ row.label }}</dt><dd>{{ row.value }}</dd>
               </template>
             </dl>
           </template>
@@ -515,10 +845,10 @@ const drawerCustomFields = computed(() => {
 .ad-cta:focus-visible { outline: none; box-shadow: var(--shadow-pop-glow); }
 
 /* Toolbar */
-.ad-toolbar { display: flex; gap: var(--space-3); }
+.ad-toolbar { display: flex; gap: var(--space-3); align-items: center; flex-wrap: wrap; }
 .ad-search {
   width: 100%;
-  max-width: 320px;
+  max-width: 280px;
   padding: var(--space-2) var(--space-3);
   min-height: var(--field-height);
   border: 1px solid var(--field-border);
@@ -530,6 +860,36 @@ const drawerCustomFields = computed(() => {
   outline: none;
 }
 .ad-search:focus-visible { border-color: var(--field-border-focus); box-shadow: var(--shadow-pop-glow); }
+.ad-filter {
+  padding: var(--space-2) var(--space-3);
+  min-height: var(--field-height);
+  border: 1px solid var(--field-border);
+  border-radius: var(--radius-sm);
+  background: var(--field-bg);
+  color: var(--field-text);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  outline: none;
+}
+.ad-filter:focus-visible { border-color: var(--field-border-focus); box-shadow: var(--shadow-pop-glow); }
+.ad-toolbar-spacer { flex: 1 1 auto; }
+.ad-toolbar-link {
+  font-family: var(--font-body); font-size: var(--text-sm); font-weight: 600;
+  color: var(--link-color); text-decoration: none; white-space: nowrap;
+}
+.ad-toolbar-link:hover { text-decoration: underline; }
+
+/* Bulk action bar */
+.ad-bulkbar {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--space-3); flex-wrap: wrap;
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface-sunk);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-md);
+}
+.ad-bulkbar-count { font-family: var(--font-body); font-size: var(--text-sm); font-weight: 600; color: var(--color-ink); }
+.ad-bulkbar-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; }
 
 /* State + empty */
 .ad-state { margin: 0; font-family: var(--font-body); font-size: var(--text-sm); color: var(--color-ink-soft); }
@@ -572,8 +932,25 @@ const drawerCustomFields = computed(() => {
   background: var(--color-surface-sunk);
 }
 .ad-th-actions { width: 1%; }
+.ad-th-check { width: 1%; }
+.ad-td-check { width: 1%; }
 .ad-row { cursor: pointer; transition: background-color var(--dur-fast) var(--ease-out); }
 .ad-row:hover { background: var(--color-surface-sunk); }
+.ad-row--selected { background: var(--color-pop-glow, var(--color-surface-sunk)); }
+.ad-td-cf { color: var(--color-ink-soft); }
+.ad-td-muted { color: var(--color-ink-dim); }
+.ad-td-tags { max-width: 220px; }
+.ad-tag-chip {
+  display: inline-block;
+  margin: 0 var(--space-1) var(--space-1) 0;
+  padding: 1px var(--space-2);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--color-ink-soft);
+  background: var(--color-surface-sunk);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-pill);
+}
 .ad-table td {
   padding: var(--space-3) var(--space-4);
   border-bottom: 1px solid var(--color-rule);
@@ -645,6 +1022,8 @@ const drawerCustomFields = computed(() => {
 }
 .ad-modal {
   width: 100%; max-width: 480px;
+  max-height: 90vh;
+  overflow-y: auto;
   padding: var(--space-6);
   background: var(--color-surface);
   border: 1px solid var(--color-rule);
@@ -655,6 +1034,14 @@ const drawerCustomFields = computed(() => {
 .ad-field { display: flex; flex-direction: column; gap: var(--space-2); margin-bottom: var(--space-4); }
 .ad-field-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); }
 .ad-field-label { font-family: var(--font-body); font-size: var(--text-sm); font-weight: 600; color: var(--color-ink); }
+.ad-field-opt { font-weight: 400; color: var(--color-ink-dim); }
+.ad-field-req { color: var(--color-danger); margin-left: 2px; }
+.ad-form-subhead {
+  margin: var(--space-2) 0 var(--space-3);
+  font-family: var(--font-body); font-size: var(--text-xs); font-weight: 600;
+  letter-spacing: var(--tracking-wider); text-transform: uppercase; color: var(--color-ink-dim);
+}
+.ad-check-inline { display: inline-flex; align-items: center; gap: var(--space-2); min-height: var(--field-height); }
 .ad-input {
   width: 100%;
   padding: var(--space-2) var(--space-3);

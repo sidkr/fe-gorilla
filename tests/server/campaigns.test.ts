@@ -296,4 +296,280 @@ describe("campaigns cloud + compileBlocks", () => {
     )) as any;
     expect(list.campaigns.find((x: any) => x.id === c.id)).toBeUndefined();
   });
+
+  // ── renameCampaign ───────────────────────────────────────────────────────
+  it("renameCampaign updates the name on an editable campaign", async () => {
+    const u = await signUp("RenameCo");
+    const Campaign = Parse.Object.extend("Campaign");
+    const c = new Campaign();
+    c.set("name", "Old name");
+    c.set("status", "draft");
+    c.set("body", sampleBody());
+    await c.save(null, { sessionToken: u.sessionToken });
+
+    const r = (await Parse.Cloud.run(
+      "renameCampaign",
+      { id: c.id, name: "  Shiny new name  " },
+      { sessionToken: u.sessionToken },
+    )) as { ok: boolean; name: string };
+    expect(r.ok).toBe(true);
+    expect(r.name).toBe("Shiny new name"); // trimmed
+
+    const fetched = await new Parse.Query(Campaign).get(c.id, { useMasterKey: true });
+    expect(fetched.get("name")).toBe("Shiny new name");
+  });
+
+  it("renameCampaign rejects an empty name", async () => {
+    const u = await signUp("RenameEmptyCo");
+    const Campaign = Parse.Object.extend("Campaign");
+    const c = new Campaign();
+    c.set("name", "Keep me");
+    c.set("status", "draft");
+    await c.save(null, { sessionToken: u.sessionToken });
+
+    await expect(
+      Parse.Cloud.run(
+        "renameCampaign",
+        { id: c.id, name: "   " },
+        { sessionToken: u.sessionToken },
+      ),
+    ).rejects.toMatchObject({ code: Parse.Error.VALIDATION_ERROR });
+  });
+
+  it("renameCampaign rejects renaming a sent campaign", async () => {
+    const u = await signUp("RenameSentCo");
+    const Campaign = Parse.Object.extend("Campaign");
+    const c = new Campaign();
+    c.set("name", "Already sent");
+    c.set("status", "sent");
+    await c.save(null, { sessionToken: u.sessionToken });
+
+    await expect(
+      Parse.Cloud.run(
+        "renameCampaign",
+        { id: c.id, name: "Try to rename" },
+        { sessionToken: u.sessionToken },
+      ),
+    ).rejects.toMatchObject({ code: Parse.Error.OPERATION_FORBIDDEN });
+  });
+
+  // ── updateCampaign ───────────────────────────────────────────────────────
+  it("updateCampaign patches metadata on an editable campaign and ignores unknown keys", async () => {
+    const u = await signUp("UpdateCo");
+    const Campaign = Parse.Object.extend("Campaign");
+    const c = new Campaign();
+    c.set("name", "Patch me");
+    c.set("status", "draft");
+    c.set("body", sampleBody());
+    await c.save(null, { sessionToken: u.sessionToken });
+
+    const when = "2026-06-01T09:00:00.000Z";
+    const r = (await Parse.Cloud.run(
+      "updateCampaign",
+      {
+        id: c.id,
+        patch: {
+          subject: "Patched subject",
+          preheader: "A preheader",
+          fromEmail: "hello@example.com",
+          scheduledAt: when,
+          // Non-patchable keys MUST be ignored, not applied.
+          status: "sent",
+          compiledHtml: "<b>nope</b>",
+          body: { version: 1, blocks: [] },
+        },
+      },
+      { sessionToken: u.sessionToken },
+    )) as { ok: boolean };
+    expect(r.ok).toBe(true);
+
+    const fetched = await new Parse.Query(Campaign).get(c.id, { useMasterKey: true });
+    expect(fetched.get("subject")).toBe("Patched subject");
+    expect(fetched.get("preheader")).toBe("A preheader");
+    expect(fetched.get("fromEmail")).toBe("hello@example.com");
+    expect((fetched.get("scheduledAt") as Date).toISOString()).toBe(when);
+    // Ignored keys unchanged.
+    expect(fetched.get("status")).toBe("draft");
+    expect(fetched.get("body").blocks.length).toBe(5);
+    // compiledHtml still reflects the original body, not the injected value.
+    expect(fetched.get("compiledHtml")).toContain("Welcome aboard");
+  });
+
+  it("updateCampaign clears a string field with empty string and unsets scheduledAt with null", async () => {
+    const u = await signUp("UpdateClearCo");
+    const Campaign = Parse.Object.extend("Campaign");
+    const c = new Campaign();
+    c.set("name", "Clear me");
+    c.set("status", "scheduled");
+    c.set("subject", "Has a subject");
+    c.set("scheduledAt", new Date("2026-07-01T00:00:00.000Z"));
+    await c.save(null, { sessionToken: u.sessionToken });
+
+    await Parse.Cloud.run(
+      "updateCampaign",
+      { id: c.id, patch: { subject: "", scheduledAt: null } },
+      { sessionToken: u.sessionToken },
+    );
+
+    const fetched = await new Parse.Query(Campaign).get(c.id, { useMasterKey: true });
+    expect(fetched.get("subject")).toBeNull();
+    expect(fetched.get("scheduledAt")).toBeUndefined();
+  });
+
+  it("updateCampaign rejects editing a sent campaign", async () => {
+    const u = await signUp("UpdateSentCo");
+    const Campaign = Parse.Object.extend("Campaign");
+    const c = new Campaign();
+    c.set("name", "Sent already");
+    c.set("status", "sent");
+    await c.save(null, { sessionToken: u.sessionToken });
+
+    await expect(
+      Parse.Cloud.run(
+        "updateCampaign",
+        { id: c.id, patch: { subject: "nope" } },
+        { sessionToken: u.sessionToken },
+      ),
+    ).rejects.toMatchObject({ code: Parse.Error.OPERATION_FORBIDDEN });
+  });
+
+  it("updateCampaign rejects editing a sending campaign", async () => {
+    const u = await signUp("UpdateSendingCo");
+    const Campaign = Parse.Object.extend("Campaign");
+    const c = new Campaign();
+    c.set("name", "In flight");
+    c.set("status", "sending");
+    await c.save(null, { sessionToken: u.sessionToken });
+
+    await expect(
+      Parse.Cloud.run(
+        "updateCampaign",
+        { id: c.id, patch: { subject: "nope" } },
+        { sessionToken: u.sessionToken },
+      ),
+    ).rejects.toMatchObject({ code: Parse.Error.OPERATION_FORBIDDEN });
+  });
+
+  it("updateCampaign allows editing a paused campaign", async () => {
+    const u = await signUp("UpdatePausedCo");
+    const Campaign = Parse.Object.extend("Campaign");
+    const c = new Campaign();
+    c.set("name", "Paused");
+    c.set("status", "paused");
+    await c.save(null, { sessionToken: u.sessionToken });
+
+    const r = (await Parse.Cloud.run(
+      "updateCampaign",
+      { id: c.id, patch: { subject: "Resumed subject" } },
+      { sessionToken: u.sessionToken },
+    )) as { ok: boolean };
+    expect(r.ok).toBe(true);
+
+    const fetched = await new Parse.Query(Campaign).get(c.id, { useMasterKey: true });
+    expect(fetched.get("subject")).toBe("Resumed subject");
+  });
+
+  // ── deleteCampaign ─────────────────────────────────────────────────────────
+  it("deleteCampaign hard-destroys a draft", async () => {
+    const u = await signUp("DeleteDraftCo");
+    const Campaign = Parse.Object.extend("Campaign");
+    const c = new Campaign();
+    c.set("name", "Disposable draft");
+    c.set("status", "draft");
+    await c.save(null, { sessionToken: u.sessionToken });
+    const id = c.id;
+
+    const r = (await Parse.Cloud.run(
+      "deleteCampaign",
+      { id },
+      { sessionToken: u.sessionToken },
+    )) as { ok: boolean; deleted: boolean };
+    expect(r.ok).toBe(true);
+    expect(r.deleted).toBe(true);
+
+    const found = await new Parse.Query(Campaign)
+      .equalTo("objectId", id)
+      .first({ useMasterKey: true });
+    expect(found).toBeUndefined();
+  });
+
+  it("deleteCampaign soft-archives a sent campaign (preserves history)", async () => {
+    const u = await signUp("DeleteSentCo");
+    const Campaign = Parse.Object.extend("Campaign");
+    const c = new Campaign();
+    c.set("name", "Sent history");
+    c.set("status", "sent");
+    await c.save(null, { sessionToken: u.sessionToken });
+
+    const r = (await Parse.Cloud.run(
+      "deleteCampaign",
+      { id: c.id },
+      { sessionToken: u.sessionToken },
+    )) as { ok: boolean; deleted: boolean };
+    expect(r.ok).toBe(true);
+    expect(r.deleted).toBe(false); // soft delete
+
+    const fetched = await new Parse.Query(Campaign).get(c.id, { useMasterKey: true });
+    expect(fetched.get("status")).toBe("archived");
+  });
+
+  it("deleteCampaign rejects deleting a sending campaign", async () => {
+    const u = await signUp("DeleteSendingCo");
+    const Campaign = Parse.Object.extend("Campaign");
+    const c = new Campaign();
+    c.set("name", "In flight");
+    c.set("status", "sending");
+    await c.save(null, { sessionToken: u.sessionToken });
+
+    await expect(
+      Parse.Cloud.run(
+        "deleteCampaign",
+        { id: c.id },
+        { sessionToken: u.sessionToken },
+      ),
+    ).rejects.toMatchObject({ code: Parse.Error.OPERATION_FORBIDDEN });
+
+    // Still present + still sending.
+    const fetched = await new Parse.Query(Campaign).get(c.id, { useMasterKey: true });
+    expect(fetched.get("status")).toBe("sending");
+  });
+
+  // ── archiveCampaign guard ───────────────────────────────────────────────────
+  it("archiveCampaign rejects archiving a sending campaign", async () => {
+    const u = await signUp("ArchiveSendingCo");
+    const Campaign = Parse.Object.extend("Campaign");
+    const c = new Campaign();
+    c.set("name", "In flight");
+    c.set("status", "sending");
+    await c.save(null, { sessionToken: u.sessionToken });
+
+    await expect(
+      Parse.Cloud.run(
+        "archiveCampaign",
+        { id: c.id },
+        { sessionToken: u.sessionToken },
+      ),
+    ).rejects.toMatchObject({ code: Parse.Error.OPERATION_FORBIDDEN });
+  });
+
+  // ── cross-org isolation for mutations ────────────────────────────────────────
+  it("mutations isolate across orgs (B cannot rename/update/delete A's campaign)", async () => {
+    const a = await signUp("MutA");
+    const b = await signUp("MutB");
+    const Campaign = Parse.Object.extend("Campaign");
+    const c = new Campaign();
+    c.set("name", "A's campaign");
+    c.set("status", "draft");
+    await c.save(null, { sessionToken: a.sessionToken });
+
+    await expect(
+      Parse.Cloud.run("renameCampaign", { id: c.id, name: "hijack" }, { sessionToken: b.sessionToken }),
+    ).rejects.toMatchObject({});
+    await expect(
+      Parse.Cloud.run("updateCampaign", { id: c.id, patch: { subject: "x" } }, { sessionToken: b.sessionToken }),
+    ).rejects.toMatchObject({});
+    await expect(
+      Parse.Cloud.run("deleteCampaign", { id: c.id }, { sessionToken: b.sessionToken }),
+    ).rejects.toMatchObject({});
+  });
 });

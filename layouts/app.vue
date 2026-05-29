@@ -41,8 +41,8 @@ async function onLogout() {
   <div class="app-shell">
     <aside class="app-sidebar" aria-label="Primary">
       <!-- ── Brand lockup ─────────────────────────────────────────── -->
-      <NuxtLink to="/app/dashboard" class="brand" aria-label="Gorilla home">
-        <svg class="brand-mark" width="28" height="28" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Gorilla">
+      <NuxtLink to="/app/dashboard" class="brand" aria-label="Fe-Mail Gorilla home">
+        <svg class="brand-mark" width="28" height="28" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Fe-Mail Gorilla">
           <path d="M14 22 C14 11 21 4 32 4 C43 4 50 11 50 22 L50 36 C50 47 43 56 32 60 C21 56 14 47 14 36 Z" fill="var(--color-pop)"/>
           <path d="M14 22 L50 22 L50 28 L14 28 Z" fill="var(--color-pop-deep)"/>
           <line x1="32" y1="4" x2="32" y2="22" stroke="var(--color-ink)" stroke-width="1.4" stroke-opacity="0.32"/>
@@ -53,7 +53,7 @@ async function onLogout() {
           <rect x="36" y="33" width="9" height="2.2" rx="0.5" fill="var(--color-ink)"/>
           <path d="M22 45 L42 45 L38 53 L26 53 Z" fill="var(--color-pop-deep)"/>
         </svg>
-        <span class="brand-word">Gorilla</span>
+        <span class="brand-word">Fe-Mail Gorilla</span>
         <span class="fe26" aria-label="Iron, element 26">
           <span class="num">26</span><span class="sym">Fe</span>
         </span>

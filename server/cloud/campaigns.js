@@ -9,6 +9,23 @@
 //   - getCampaign({ id })    → one campaign as a plain object
 //   - duplicateCampaign({ id }) → clone body + meta into a new draft
 //   - archiveCampaign({ id })   → soft-delete (status = "archived")
+//   - renameCampaign({ id, name }) → rename (thin wrapper over updateCampaign)
+//   - updateCampaign({ id, patch }) → patch metadata fields with status guards
+//   - deleteCampaign({ id })    → destroy a draft; soft-delete a sent campaign;
+//                                 reject deleting one mid-send
+//
+// ── Status-guard matrix ───────────────────────────────────────────────────────
+// Campaign status ∈ draft | scheduled | sending | sent | paused | archived.
+//   rename / update : allowed on draft, scheduled, paused. Rejected on
+//                     sending, sent, archived (a sent/in-flight campaign's
+//                     metadata is historical and must not change).
+//   delete          : rejected on sending (in flight). A sent campaign is
+//                     soft-deleted (status → archived) so delivery history is
+//                     never lost. Everything else is hard-destroyed.
+//   archive         : rejected on sending; allowed on every other status
+//                     (archiving an already-archived campaign is a no-op).
+//   duplicate       : always allowed — clones into a fresh draft regardless of
+//                     the source status.
 //
 // The Campaign block model is locked (see components/app/editor/blocks/registry.ts).
 //   Campaign.body = { version: 1, blocks: [{ id, type, props }] }
@@ -316,6 +333,42 @@ Parse.Cloud.define("listCampaigns", async (request) => {
   };
 });
 
+// ── Mutation helpers / guards ─────────────────────────────────────────────────
+// Statuses whose metadata may still be edited. A sending/sent/archived campaign
+// is frozen: its content + meta are historical (or in flight) and must not move.
+const EDITABLE_STATUSES = new Set(["draft", "scheduled", "paused"]);
+
+// Metadata fields updateCampaign is allowed to patch. Excludes body/compiledHtml
+// (owned by the editor), status, counters, and tenancy/ACL fields.
+const PATCHABLE_FIELDS = new Set([
+  "name",
+  "subject",
+  "preheader",
+  "fromName",
+  "fromEmail",
+  "replyTo",
+  "audienceId",
+  "scheduledAt",
+]);
+
+// Common preamble for a mutation: require auth + id, load the campaign as the
+// caller (ACL isolates cross-org → OBJECT_NOT_FOUND), return { c, sessionToken }.
+async function loadOwned(request) {
+  const { id } = request.params || {};
+  if (!request.user) {
+    throw new Parse.Error(
+      Parse.Error.INVALID_SESSION_TOKEN,
+      "Must be logged in.",
+    );
+  }
+  if (!id) {
+    throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, "Missing campaign id.");
+  }
+  const sessionToken = request.user.getSessionToken();
+  const c = await new Parse.Query("Campaign").get(id, { sessionToken });
+  return { c, sessionToken };
+}
+
 // ── getCampaign ──────────────────────────────────────────────────────────────
 // One campaign as a plain object including its body + compiledHtml. Scoped by
 // the caller's session (ACL isolates cross-org gets → OBJECT_NOT_FOUND).
@@ -397,21 +450,138 @@ Parse.Cloud.define("duplicateCampaign", async (request) => {
 
 // ── archiveCampaign ──────────────────────────────────────────────────────────
 // Soft-delete: flips status to "archived" so listCampaigns hides it. Returns
-// { ok: true }. (Hard delete is intentionally not exposed here.)
+// { ok: true }. Rejected while a send is in flight — you can't archive a
+// campaign that's actively mailing. Archiving an already-archived campaign is a
+// harmless no-op.
 Parse.Cloud.define("archiveCampaign", async (request) => {
-  const { id } = request.params || {};
-  if (!id) {
-    throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, "Missing campaign id.");
-  }
-  if (!request.user) {
+  const { c, sessionToken } = await loadOwned(request);
+  if ((c.get("status") || "draft") === "sending") {
     throw new Parse.Error(
-      Parse.Error.INVALID_SESSION_TOKEN,
-      "Must be logged in.",
+      Parse.Error.OPERATION_FORBIDDEN,
+      "Can't archive a campaign while it's sending. Pause it first.",
     );
   }
-  const sessionToken = request.user.getSessionToken();
-  const c = await new Parse.Query("Campaign").get(id, { sessionToken });
   c.set("status", "archived");
   await c.save(null, { sessionToken });
   return { ok: true };
+});
+
+// ── updateCampaign ────────────────────────────────────────────────────────────
+// Patches metadata (name, subject, preheader, fromName, fromEmail, replyTo,
+// audienceId, scheduledAt) on an editable campaign. Body/compiledHtml/status
+// are NOT patchable here — the editor owns content, and status transitions are
+// owned by the send pipeline. Rejects edits to a sending/sent/archived
+// campaign. Unknown patch keys are ignored. Returns { ok, id, status }.
+Parse.Cloud.define("updateCampaign", async (request) => {
+  const { c, sessionToken } = await loadOwned(request);
+  const status = c.get("status") || "draft";
+  if (!EDITABLE_STATUSES.has(status)) {
+    throw new Parse.Error(
+      Parse.Error.OPERATION_FORBIDDEN,
+      `Can't edit a campaign that is ${status}. Only draft, scheduled, or paused campaigns are editable.`,
+    );
+  }
+
+  const patch = (request.params && request.params.patch) || {};
+  if (typeof patch !== "object" || Array.isArray(patch)) {
+    throw new Parse.Error(Parse.Error.INVALID_JSON, "patch must be an object.");
+  }
+
+  let applied = 0;
+  for (const [key, value] of Object.entries(patch)) {
+    if (!PATCHABLE_FIELDS.has(key)) continue; // ignore non-patchable keys
+    if (key === "scheduledAt") {
+      // Accept an ISO string, epoch ms, Date, or null (clears the schedule).
+      if (value == null) {
+        c.unset("scheduledAt");
+      } else {
+        const d = value instanceof Date ? value : new Date(value);
+        if (Number.isNaN(d.getTime())) {
+          throw new Parse.Error(
+            Parse.Error.INVALID_JSON,
+            "scheduledAt must be a valid date.",
+          );
+        }
+        c.set("scheduledAt", d);
+      }
+      applied++;
+      continue;
+    }
+    if (key === "name") {
+      const name = typeof value === "string" ? value.trim() : "";
+      if (!name) {
+        throw new Parse.Error(
+          Parse.Error.VALIDATION_ERROR,
+          "Campaign name can't be empty.",
+        );
+      }
+      c.set("name", name);
+      applied++;
+      continue;
+    }
+    // Remaining string fields: empty string clears (stored as null).
+    c.set(key, value === "" || value == null ? null : value);
+    applied++;
+  }
+
+  if (applied > 0) {
+    await c.save(null, { sessionToken });
+  }
+  return { ok: true, id: c.id, status: c.get("status") || "draft" };
+});
+
+// ── renameCampaign ────────────────────────────────────────────────────────────
+// Thin convenience wrapper over updateCampaign's name path — same editability
+// guard. Returns { ok, id, name }.
+Parse.Cloud.define("renameCampaign", async (request) => {
+  const { c, sessionToken } = await loadOwned(request);
+  const status = c.get("status") || "draft";
+  if (!EDITABLE_STATUSES.has(status)) {
+    throw new Parse.Error(
+      Parse.Error.OPERATION_FORBIDDEN,
+      `Can't rename a campaign that is ${status}. Only draft, scheduled, or paused campaigns are editable.`,
+    );
+  }
+  const raw = request.params && request.params.name;
+  const name = typeof raw === "string" ? raw.trim() : "";
+  if (!name) {
+    throw new Parse.Error(
+      Parse.Error.VALIDATION_ERROR,
+      "Campaign name can't be empty.",
+    );
+  }
+  c.set("name", name);
+  await c.save(null, { sessionToken });
+  return { ok: true, id: c.id, name };
+});
+
+// ── deleteCampaign ────────────────────────────────────────────────────────────
+// Hard-destroys a campaign UNLESS:
+//   - status is "sending" → rejected (an in-flight send must not be torn out
+//     from under the pipeline).
+//   - status is "sent"    → soft-deleted (status → archived) so delivery
+//     history / report data is preserved rather than lost.
+// Drafts, scheduled, paused, and already-archived campaigns are destroyed.
+// Returns { ok, deleted } where deleted is true for a hard destroy, false when
+// the campaign was soft-archived instead.
+Parse.Cloud.define("deleteCampaign", async (request) => {
+  const { c, sessionToken } = await loadOwned(request);
+  const status = c.get("status") || "draft";
+
+  if (status === "sending") {
+    throw new Parse.Error(
+      Parse.Error.OPERATION_FORBIDDEN,
+      "Can't delete a campaign while it's sending. Pause it first.",
+    );
+  }
+
+  if (status === "sent") {
+    // Preserve history: soft-delete rather than destroy a delivered campaign.
+    c.set("status", "archived");
+    await c.save(null, { sessionToken });
+    return { ok: true, deleted: false };
+  }
+
+  await c.destroy({ sessionToken });
+  return { ok: true, deleted: true };
 });

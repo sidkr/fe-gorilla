@@ -22,6 +22,7 @@
 
 const Parse = require("parse/node");
 const { getUserOrg } = require("./lib/tenancy");
+const { FIELD_TYPES } = require("./lib/customFields");
 
 // ── Rule DSL ────────────────────────────────────────────────────────────────
 //
@@ -30,26 +31,41 @@ const { getUserOrg } = require("./lib/tenancy");
 //   { op: "and" | "or", conditions: [ { field, operator, value }, ... ] }
 //
 // Fields:
-//   - top-level Contact fields: email, status, firstName, lastName
-//   - dotted custom fields:     customFields.<key>
+//   - top-level Contact std fields: email, status, firstName, lastName,
+//     company, phone, city, country, timezone (text), subscribedAt,
+//     unsubscribedAt, createdAt (date)
+//   - tags (Array)             → membership operators contains/not_contains
+//   - dotted custom fields:    customFields.<key>
 //
 // Field types drive the allowed operator set. Top-level text fields are "text".
-// Custom field types are inferred from the leaf's `value` at compile time
-// (string→text, number→number, boolean→boolean, ISO-date string with a date
-// operator→date). This keeps the MVP self-contained without a CustomField
-// registry lookup; the operator validation below is the real guard.
+// Custom field types are resolved from the org's CustomField REGISTRY when one
+// is supplied to compileRules (the registry is the authoritative source of a
+// field's type). When no registry is available (e.g. a unit-level compile call
+// without an org context), we fall back to inferring the type from the leaf's
+// `value`. The operator validation below is the real guard either way.
 
 const TOP_LEVEL_FIELDS = {
   email: "text",
   status: "text",
   firstName: "text",
   lastName: "text",
+  // Std rich contact fields (added with the contact rich-field work).
+  company: "text",
+  phone: "text",
+  city: "text",
+  country: "text",
+  timezone: "text",
   // Date-typed top-level fields (Architecture.md §5.1 uses subscribedAt as the
   // canonical date example; createdAt is Parse's built-in timestamp).
   subscribedAt: "date",
   unsubscribedAt: "date",
   createdAt: "date",
 };
+
+// `tags` is an Array<string> on Contact. Mongo matches equalTo/notEqualTo on an
+// array as element membership, so we model it as a dedicated "tags" type with
+// just membership operators.
+const TAGS_FIELD = "tags";
 
 const OPERATORS_BY_TYPE = {
   text: [
@@ -67,6 +83,10 @@ const OPERATORS_BY_TYPE = {
   number: ["eq", "neq", "gt", "gte", "lt", "lte", "in", "not_in"],
   date: ["before", "after", "between", "last_n_days"],
   boolean: ["eq"],
+  // enum custom fields behave like a constrained text field for filtering.
+  enum: ["eq", "neq", "in", "not_in", "is_empty", "is_not_empty"],
+  // Array membership — contains/not_contains test for an element in the array.
+  tags: ["contains", "not_contains", "is_empty", "is_not_empty"],
 };
 
 const DATE_OPERATORS = new Set(["before", "after", "between", "last_n_days"]);
@@ -75,10 +95,18 @@ function badRequest(message) {
   return new Parse.Error(Parse.Error.INVALID_QUERY, message);
 }
 
-// Is `field` a permitted path? Top-level whitelist OR a customFields.<key> path.
-function fieldInfo(field) {
+// Resolve `field` → { path, type, custom }.
+//
+// `registry` (optional) is the org's CustomField definitions as plain objects
+// [{ key, type, ... }]. When present, a customFields.<key> path's type is taken
+// from the registry (and an unknown key is rejected). When absent, the custom
+// field's type is inferred from the leaf value at applyLeaf time.
+function fieldInfo(field, registry) {
   if (typeof field !== "string" || !field) {
     throw badRequest(`Condition is missing a "field".`);
+  }
+  if (field === TAGS_FIELD) {
+    return { path: TAGS_FIELD, type: "tags", custom: false };
   }
   if (Object.prototype.hasOwnProperty.call(TOP_LEVEL_FIELDS, field)) {
     return { path: field, type: TOP_LEVEL_FIELDS[field], custom: false };
@@ -88,12 +116,23 @@ function fieldInfo(field) {
     if (!key || key.includes(".")) {
       throw badRequest(`Invalid custom field path "${field}".`);
     }
+    // Registry available → resolve (and require) the declared type.
+    if (registry) {
+      const def = registry[key];
+      if (!def) {
+        throw badRequest(
+          `Custom field "${key}" is not defined in this org's registry.`,
+        );
+      }
+      const type = FIELD_TYPES.includes(def.type) ? def.type : "text";
+      return { path: field, type, custom: true, def };
+    }
     return { path: field, type: null, custom: true };
   }
   throw badRequest(`Field "${field}" is not allowed in a segment rule.`);
 }
 
-// Infer the value type for a custom-field leaf (top-level fields are fixed-type).
+// Infer the value type for a custom-field leaf when no registry type is known.
 function inferType(operator, value) {
   if (DATE_OPERATORS.has(operator)) return "date";
   // For in/not_in the value is an array; infer from its first element.
@@ -113,10 +152,15 @@ function toDate(value, label) {
 }
 
 // Apply a single leaf condition to a Parse.Query.
-function applyLeaf(query, condition) {
+//
+// `registry` (optional) is a { key -> CustomFieldDef } map; when present the
+// custom field's type comes from the registry rather than value-inference.
+function applyLeaf(query, condition, registry) {
   const { field, operator, value } = condition || {};
-  const info = fieldInfo(field);
-  const type = info.custom ? inferType(operator, value) : info.type;
+  const info = fieldInfo(field, registry);
+  // Type resolution: top-level/tags are fixed; custom fields use the registry
+  // type when known, else inference from the value.
+  const type = info.type != null ? info.type : inferType(operator, value);
   const allowed = OPERATORS_BY_TYPE[type] || [];
   if (!allowed.includes(operator)) {
     throw badRequest(
@@ -124,6 +168,40 @@ function applyLeaf(query, condition) {
     );
   }
   const path = info.path;
+
+  // For a registry-backed date custom field, the stored value is an ISO string;
+  // date operators still work via lexicographic compare on ISO strings, but to
+  // keep semantics identical to top-level Date fields we coerce date operands to
+  // ISO strings below (in toOperand) when the field is a stored-ISO date.
+  const isoDate = type === "date" && info.custom === true;
+
+  // tags membership: contains/not_contains compile to equalTo/notEqualTo on the
+  // array field — Mongo treats that as "array contains this element".
+  if (type === "tags") {
+    switch (operator) {
+      case "contains":
+        query.equalTo(path, value);
+        return;
+      case "not_contains":
+        query.notEqualTo(path, value);
+        return;
+      case "is_empty":
+        // "No tags" → the tags key is unset (the common case: contacts without
+        // tags simply don't carry the array). Mirrors text is_empty semantics.
+        query.doesNotExist(path);
+        return;
+      case "is_not_empty":
+        // Has at least one tag → the array key exists.
+        query.exists(path);
+        return;
+      default:
+        throw badRequest(`Unhandled tags operator "${operator}".`);
+    }
+  }
+
+  // Coerce a date operand for a stored-ISO custom date field to an ISO string so
+  // the comparison aligns with how the value is stored.
+  const dateOperand = (v, label) => (isoDate ? toDate(v, label).toISOString() : toDate(v, label));
 
   switch (operator) {
     // text
@@ -175,18 +253,18 @@ function applyLeaf(query, condition) {
 
     // date
     case "before":
-      query.lessThan(path, toDate(value, "before"));
+      query.lessThan(path, dateOperand(value, "before"));
       break;
     case "after":
-      query.greaterThan(path, toDate(value, "after"));
+      query.greaterThan(path, dateOperand(value, "after"));
       break;
     case "between": {
       const arr = asArray(value);
       if (arr.length !== 2) {
         throw badRequest(`"between" expects a [start, end] pair.`);
       }
-      query.greaterThanOrEqualTo(path, toDate(arr[0], "between.start"));
-      query.lessThanOrEqualTo(path, toDate(arr[1], "between.end"));
+      query.greaterThanOrEqualTo(path, dateOperand(arr[0], "between.start"));
+      query.lessThanOrEqualTo(path, dateOperand(arr[1], "between.end"));
       break;
     }
     case "last_n_days": {
@@ -197,7 +275,7 @@ function applyLeaf(query, condition) {
         throw badRequest(`"last_n_days" expects a positive number of days.`);
       }
       const cutoff = new Date(Date.now() - n * 86400000);
-      query.greaterThanOrEqualTo(path, cutoff);
+      query.greaterThanOrEqualTo(path, isoDate ? cutoff.toISOString() : cutoff);
       break;
     }
 
@@ -213,6 +291,28 @@ function escapeRegex(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+// Load the org's CustomField registry as a { key -> { key, type, enumValues } }
+// map for type-resolving customFields.<key> rule leaves. Master key: this is
+// definition metadata, the compiled Contact query is what enforces tenancy.
+async function loadRegistry(org) {
+  const rows = await new Parse.Query("CustomField")
+    .equalTo("organization", org)
+    .limit(1000)
+    .find({ useMasterKey: true });
+  const map = Object.create(null);
+  for (const r of rows) {
+    const key = r.get("key");
+    if (key) {
+      map[key] = {
+        key,
+        type: r.get("type") || "text",
+        enumValues: r.get("enumValues") || [],
+      };
+    }
+  }
+  return map;
+}
+
 function asArray(value) {
   if (Array.isArray(value)) return value;
   throw badRequest(`Operator expects an array value, got ${JSON.stringify(value)}.`);
@@ -221,7 +321,10 @@ function asArray(value) {
 // Compile the rule tree → Parse.Query("Contact"), ALWAYS scoped to `org`.
 // MVP: a single top-level group of leaf conditions (no nested groups required,
 // but a nested group is tolerated by recursing one level via Parse.Query.and/or).
-function compileRules(rules, org) {
+//
+// `registry` (optional) is a { key -> CustomFieldDef } map used to resolve and
+// validate custom-field types. Pass it whenever an org context is available.
+function compileRules(rules, org, registry) {
   if (!rules || typeof rules !== "object") {
     throw badRequest("rules must be an object { op, conditions }.");
   }
@@ -236,7 +339,7 @@ function compileRules(rules, org) {
 
   const buildLeafQuery = (cond) => {
     const q = new Parse.Query("Contact");
-    applyLeaf(q, cond);
+    applyLeaf(q, cond, registry);
     return q;
   };
 
@@ -245,7 +348,7 @@ function compileRules(rules, org) {
   const subQueries = conditions.map((cond) => {
     if (cond && (cond.op === "and" || cond.op === "or")) {
       // Nested group — recurse (one extra level). Returns a Parse.Query.
-      return compileGroup(cond);
+      return compileGroup(cond, registry);
     }
     return buildLeafQuery(cond);
   });
@@ -270,13 +373,13 @@ function compileRules(rules, org) {
 
 // Compile a (possibly nested) group WITHOUT the org scope — used for sub-groups
 // inside an and/or. Org scope is applied once at the root in compileRules.
-function compileGroup(group) {
+function compileGroup(group, registry) {
   const op = group.op;
   const conditions = Array.isArray(group.conditions) ? group.conditions : [];
   const subQueries = conditions.map((cond) => {
-    if (cond && (cond.op === "and" || cond.op === "or")) return compileGroup(cond);
+    if (cond && (cond.op === "and" || cond.op === "or")) return compileGroup(cond, registry);
     const q = new Parse.Query("Contact");
-    applyLeaf(q, cond);
+    applyLeaf(q, cond, registry);
     return q;
   });
   if (subQueries.length === 0) return new Parse.Query("Contact");
@@ -345,7 +448,8 @@ Parse.Cloud.define("createSegment", async (request) => {
   }
 
   // Compile up-front to validate the rule tree before we persist anything.
-  const compiled = compileRules(rules, org);
+  const registry = await loadRegistry(org);
+  const compiled = compileRules(rules, org, registry);
   if (list) compiled.equalTo("lists", listPointerFrom(list));
 
   const Segment = Parse.Object.extend("Segment");
@@ -396,6 +500,23 @@ Parse.Cloud.define("listSegments", async (request) => {
   });
 });
 
+// ── getSegment ───────────────────────────────────────────────────────────────
+// Fetch a single segment by id (for the editor page). ACL isolates by session.
+Parse.Cloud.define("getSegment", async (request) => {
+  await getUserOrg(request.user, { useMasterKey: true });
+  const { id } = request.params || {};
+  if (!id) throw badRequest("getSegment requires an `id`.");
+  const q = new Parse.Query("Segment");
+  q.include("list");
+  const seg = await q.get(id, {
+    sessionToken: request.user.getSessionToken(),
+  });
+  const out = serializeSegment(seg);
+  const listPtr = seg.get("list");
+  out.listName = listPtr && listPtr.get ? listPtr.get("name") || null : null;
+  return out;
+});
+
 // ── evaluateSegment ────────────────────────────────────────────────────────
 // Accepts either an ad-hoc rule tree ({ rules }) for the live editor preview,
 // or a saved segment id ({ id }). Returns { count, sample }. When `id` points
@@ -411,7 +532,8 @@ Parse.Cloud.define("evaluateSegment", async (request) => {
 
   // Ad-hoc preview path: compile the passed rule tree directly.
   if (rules && !id) {
-    const compiled = compileRules(rules, org);
+    const registry = await loadRegistry(org);
+    const compiled = compileRules(rules, org, registry);
     return evaluateQuery(compiled, opts);
   }
 
@@ -446,7 +568,8 @@ Parse.Cloud.define("evaluateSegment", async (request) => {
   }
 
   // Dynamic segment: compile its stored rules and (optionally) refresh cache.
-  const compiled = compileRules(seg.get("rules"), org);
+  const registry = await loadRegistry(org);
+  const compiled = compileRules(seg.get("rules"), org, registry);
   const listPtr = seg.get("list");
   if (listPtr) compiled.equalTo("lists", listPtr);
   const result = await evaluateQuery(compiled, opts);
@@ -480,7 +603,8 @@ Parse.Cloud.define("updateSegment", async (request) => {
 
   // Recompile + refresh the cached count/snapshot with the effective values.
   const effectiveKind = seg.get("kind");
-  const compiled = compileRules(seg.get("rules"), org);
+  const registry = await loadRegistry(org);
+  const compiled = compileRules(seg.get("rules"), org, registry);
   const effectiveList = seg.get("list");
   if (effectiveList) compiled.equalTo("lists", effectiveList);
 

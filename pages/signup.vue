@@ -8,7 +8,7 @@ definePageMeta({
 useHead({
   title: "Sign up",
   meta: [
-    { name: "description", content: "Create your Gorilla account. Send your first email campaign in minutes — free for 10,000 emails a month." },
+    { name: "description", content: "Create your Fe-Mail Gorilla account. Send your first email campaign in minutes — free for 10,000 emails a month." },
     { name: "robots", content: "index,follow" },
   ],
   link: [
@@ -73,7 +73,7 @@ async function onSubmit() {
   <section class="col col-form">
     <header class="chrome">
       <div class="brand">
-        <svg class="brand-mark" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Gorilla">
+        <svg class="brand-mark" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Fe-Mail Gorilla">
           <path d="M14 22 C14 11 21 4 32 4 C43 4 50 11 50 22 L50 36 C50 47 43 56 32 60 C21 56 14 47 14 36 Z" fill="var(--color-pop)"/>
           <path d="M14 22 L50 22 L50 28 L14 28 Z" fill="var(--color-pop-deep)"/>
           <line x1="32" y1="4" x2="32" y2="22" stroke="var(--color-ink)" stroke-width="1.4" stroke-opacity="0.32"/>
@@ -84,7 +84,7 @@ async function onSubmit() {
           <rect x="36" y="33" width="9" height="2.2" rx="0.5" fill="var(--color-ink)"/>
           <path d="M22 45 L42 45 L38 53 L26 53 Z" fill="var(--color-pop-deep)"/>
         </svg>
-        <span class="wordmark">Gorilla</span>
+        <span class="wordmark">Fe-Mail Gorilla</span>
         <span class="fe-chip">Fe26</span>
       </div>
       <div class="ghost-link">Already have an account?<NuxtLink to="/login">Sign in</NuxtLink></div>
@@ -197,7 +197,7 @@ async function onSubmit() {
   <aside class="col col-promo">
     <div class="col-body">
       <div class="promo-wrap">
-        <span class="eyebrow"><span class="dot"></span>WHY GORILLA</span>
+        <span class="eyebrow"><span class="dot"></span>WHY FE-MAIL GORILLA</span>
 
         <h2 class="promo-h">Heavy-duty marketing tools, light on the brain.</h2>
 
@@ -253,7 +253,7 @@ async function onSubmit() {
             <svg width="14" height="14" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2l2.95 6.6 7.05.85-5.2 4.95L18.2 22 12 18.3 5.8 22l1.4-7.6L2 9.45l7.05-.85L12 2z" fill="var(--color-pop)"/></svg>
           </div>
           <blockquote class="quote-text">
-            "We switched off Mailchimp in a weekend. Best decision we made all quarter."
+            "We switched off Mailchimp in a weekend. Fe-Mail Gorilla is forged for people who actually send — best decision we made all quarter."
           </blockquote>
           <div class="attrib">
             <span class="avatar" aria-hidden="true">AK</span>

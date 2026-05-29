@@ -101,6 +101,66 @@ describe("audiences cloud functions", () => {
     expect(withArchived.find((x) => x.id === created.id)?.archived).toBe(true);
   });
 
+  it("updateAudience renames + edits description; validates name", async () => {
+    const a = await signUp("RenameCo", "rename@example.com");
+    const created = (await Parse.Cloud.run(
+      "createAudience",
+      { name: "Old name" },
+      as(a.sessionToken),
+    )) as { id: string };
+
+    const updated = (await Parse.Cloud.run(
+      "updateAudience",
+      { id: created.id, patch: { name: "New name", description: "Edited" } },
+      as(a.sessionToken),
+    )) as { name: string; description: string };
+    expect(updated.name).toBe("New name");
+    expect(updated.description).toBe("Edited");
+
+    await expect(
+      Parse.Cloud.run(
+        "updateAudience",
+        { id: created.id, patch: { name: "   " } },
+        as(a.sessionToken),
+      ),
+    ).rejects.toMatchObject({});
+  });
+
+  it("deleteAudience removes an empty list but refuses a non-empty one", async () => {
+    const a = await signUp("DelCo", "del@example.com");
+    const empty = (await Parse.Cloud.run(
+      "createAudience",
+      { name: "Empty" },
+      as(a.sessionToken),
+    )) as { id: string };
+    const full = (await Parse.Cloud.run(
+      "createAudience",
+      { name: "Full" },
+      as(a.sessionToken),
+    )) as { id: string };
+    await Parse.Cloud.run(
+      "addContact",
+      { audienceId: full.id, email: "member@example.com" },
+      as(a.sessionToken),
+    );
+
+    // Non-empty → guarded reject.
+    await expect(
+      Parse.Cloud.run("deleteAudience", { id: full.id }, as(a.sessionToken)),
+    ).rejects.toMatchObject({});
+
+    // Empty → deletes.
+    const res = (await Parse.Cloud.run(
+      "deleteAudience",
+      { id: empty.id },
+      as(a.sessionToken),
+    )) as { ok: boolean };
+    expect(res.ok).toBe(true);
+    await expect(
+      Parse.Cloud.run("getAudience", { id: empty.id }, as(a.sessionToken)),
+    ).rejects.toMatchObject({});
+  });
+
   it("resolveAudienceRecipients returns subscribed contacts minus suppressed", async () => {
     const a = await signUp("ResolveCo", "resolve@example.com");
     const list = (await Parse.Cloud.run(

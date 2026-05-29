@@ -23,8 +23,13 @@
 
 const Parse = require("parse/node");
 const { getUserOrg, orgPointer } = require("./lib/tenancy");
+const { validateCustomFields } = require("./lib/customFields");
 
 const VALID_STATUSES = ["subscribed", "unsubscribed", "cleaned", "pending"];
+
+// The rich standard string fields a contact may carry beyond email/name/status.
+// Each is an optional free-text String column on Contact.
+const STD_STRING_FIELDS = ["company", "phone", "city", "country", "timezone"];
 const DEFAULT_PER_PAGE = 25;
 const MAX_PER_PAGE = 100;
 // Pragmatic RFC-5322-ish check; the real gate is the unique index + send-time
@@ -52,12 +57,94 @@ function contactToJSON(c) {
     firstName: c.get("firstName") || "",
     lastName: c.get("lastName") || "",
     status: c.get("status") || "subscribed",
+    company: c.get("company") || "",
+    phone: c.get("phone") || "",
+    city: c.get("city") || "",
+    country: c.get("country") || "",
+    timezone: c.get("timezone") || "",
+    tags: c.get("tags") || [],
+    consent: c.get("consent") || null,
     customFields: c.get("customFields") || {},
     lists: c.get("lists") || [],
     deleted: c.get("deleted") === true,
     createdAt: c.createdAt ? c.createdAt.toISOString() : null,
     updatedAt: c.updatedAt ? c.updatedAt.toISOString() : null,
   };
+}
+
+// Load the org's CustomField registry as plain {key,type,enumValues} objects,
+// the shape validateCustomFields expects. Master key — the registry is org-wide.
+async function loadRegistry(org) {
+  const q = new Parse.Query("CustomField");
+  q.equalTo("organization", org);
+  q.ascending("order");
+  q.limit(1000);
+  const rows = await q.find({ useMasterKey: true });
+  return rows.map((f) => ({
+    key: f.get("key"),
+    type: f.get("type"),
+    enumValues: f.get("enumValues") || [],
+  }));
+}
+
+// Normalize an incoming tags value to a clean array of non-empty trimmed
+// strings (dedup). Accepts an array, or a comma-separated string. Anything else
+// → []. Returns null when the caller did not send `tags` at all (so callers can
+// distinguish "not provided" from "cleared to empty").
+function normTags(raw) {
+  if (raw === undefined) return null;
+  let arr = [];
+  if (Array.isArray(raw)) arr = raw;
+  else if (typeof raw === "string") arr = raw.split(",");
+  const out = [];
+  const seen = new Set();
+  for (const t of arr) {
+    const s = String(t == null ? "" : t).trim();
+    if (s && !seen.has(s)) {
+      seen.add(s);
+      out.push(s);
+    }
+  }
+  return out;
+}
+
+// Apply the rich standard fields (company/phone/city/country/timezone) from a
+// raw params/row object onto a Contact. Only sets keys that were provided.
+function applyStdStringFields(contact, src) {
+  for (const f of STD_STRING_FIELDS) {
+    if (src[f] != null) contact.set(f, String(src[f]));
+  }
+}
+
+// Apply tags + consent if provided. consent is stored as-is when it's an object.
+function applyTagsAndConsent(contact, src) {
+  const tags = normTags(src.tags);
+  if (tags !== null) contact.set("tags", tags);
+  if (src.consent !== undefined) {
+    if (src.consent && typeof src.consent === "object") {
+      contact.set("consent", src.consent);
+    } else if (src.consent === null) {
+      contact.unset("consent");
+    }
+  }
+}
+
+// Clean a raw customFields map against the org registry and apply the result.
+// `mode` "set" replaces the map; "merge" merges cleaned keys onto the existing
+// map (used by bulk update of an existing contact). Returns the errors map so a
+// caller could surface it; we do not reject (foundation contract: never throw).
+async function applyCustomFields(contact, rawMap, registry, mode) {
+  if (rawMap == null || typeof rawMap !== "object") return {};
+  const { cleaned, errors } = validateCustomFields(rawMap, registry);
+  if (mode === "merge") {
+    contact.set("customFields", {
+      ...(contact.get("customFields") || {}),
+      ...cleaned,
+    });
+  } else {
+    contact.set("customFields", cleaned);
+  }
+  return errors;
 }
 
 // Verify a List id belongs to the caller's org (session-scoped). Throws if not.
@@ -123,8 +210,11 @@ Parse.Cloud.define("addContact", async (request) => {
   contact.set("status", status);
   if (p.firstName != null) contact.set("firstName", String(p.firstName));
   if (p.lastName != null) contact.set("lastName", String(p.lastName));
+  applyStdStringFields(contact, p);
+  applyTagsAndConsent(contact, p);
   if (p.customFields && typeof p.customFields === "object") {
-    contact.set("customFields", p.customFields);
+    const registry = await loadRegistry(org);
+    await applyCustomFields(contact, p.customFields, registry, "set");
   }
   // Add the list id to the membership array (dedup).
   const lists = new Set(contact.get("lists") || []);
@@ -163,6 +253,7 @@ Parse.Cloud.define("addContactsBulk", async (request) => {
   let added = 0;
   let updated = 0;
   const Contact = Parse.Object.extend("Contact");
+  const registry = await loadRegistry(org);
 
   for (const [email, row] of byEmail) {
     const existing = await findContactByEmail(org, email);
@@ -170,13 +261,8 @@ Parse.Cloud.define("addContactsBulk", async (request) => {
     if (existing) {
       contact = existing;
       if (contact.get("deleted") === true) contact.set("deleted", false);
-      // Merge custom fields rather than clobber.
-      if (row.customFields && typeof row.customFields === "object") {
-        contact.set("customFields", {
-          ...(contact.get("customFields") || {}),
-          ...row.customFields,
-        });
-      }
+      // Merge cleaned custom fields rather than clobber.
+      await applyCustomFields(contact, row.customFields, registry, "merge");
       updated += 1;
     } else {
       contact = new Contact();
@@ -185,13 +271,13 @@ Parse.Cloud.define("addContactsBulk", async (request) => {
         "status",
         VALID_STATUSES.includes(row.status) ? row.status : "subscribed",
       );
-      if (row.customFields && typeof row.customFields === "object") {
-        contact.set("customFields", row.customFields);
-      }
+      await applyCustomFields(contact, row.customFields, registry, "set");
       added += 1;
     }
     if (row.firstName != null) contact.set("firstName", String(row.firstName));
     if (row.lastName != null) contact.set("lastName", String(row.lastName));
+    applyStdStringFields(contact, row);
+    applyTagsAndConsent(contact, row);
     const lists = new Set(contact.get("lists") || []);
     lists.add(list.id);
     contact.set("lists", Array.from(lists));
@@ -233,6 +319,12 @@ Parse.Cloud.define("listContacts", async (request) => {
     q.notEqualTo("deleted", true);
     if (p.search) {
       q.startsWith("email", normEmail(p.search));
+    }
+    if (p.status && VALID_STATUSES.includes(p.status)) {
+      q.equalTo("status", p.status);
+    }
+    if (p.tag) {
+      q.equalTo("tags", String(p.tag));
     }
     return q;
   }
@@ -296,8 +388,11 @@ Parse.Cloud.define("updateContact", async (request) => {
   }
   if (patch.firstName != null) contact.set("firstName", String(patch.firstName));
   if (patch.lastName != null) contact.set("lastName", String(patch.lastName));
+  applyStdStringFields(contact, patch);
+  applyTagsAndConsent(contact, patch);
   if (patch.customFields && typeof patch.customFields === "object") {
-    contact.set("customFields", patch.customFields);
+    const registry = await loadRegistry(org);
+    await applyCustomFields(contact, patch.customFields, registry, "set");
   }
   if (Array.isArray(patch.lists)) {
     contact.set("lists", Array.from(new Set(patch.lists)));
@@ -360,6 +455,69 @@ Parse.Cloud.define("deleteContact", async (request) => {
   contact.set("deleted", true);
   await contact.save(null, { sessionToken });
   return { ok: true };
+});
+
+// ── bulkDeleteContacts (soft) ─────────────────────────────────────────────────
+// Soft-delete many contacts by id in one round-trip (table bulk action). Ids not
+// in the caller's org are silently skipped (ACL hides them). Returns the count.
+Parse.Cloud.define("bulkDeleteContacts", async (request) => {
+  const user = requireUser(request);
+  const ids = Array.isArray(request.params && request.params.ids)
+    ? request.params.ids
+    : [];
+  if (ids.length === 0) {
+    throw new Parse.Error(Parse.Error.OTHER_CAUSE, "ids[] is required.");
+  }
+  const sessionToken = user.getSessionToken();
+
+  const q = new Parse.Query("Contact");
+  q.containedIn("objectId", ids.map(String));
+  q.notEqualTo("deleted", true);
+  q.limit(1000);
+  const rows = await q.find({ sessionToken });
+  for (const c of rows) c.set("deleted", true);
+  if (rows.length) await Parse.Object.saveAll(rows, { sessionToken });
+  return { ok: true, deleted: rows.length };
+});
+
+// ── bulkTagContacts ──────────────────────────────────────────────────────────
+// Add or remove a tag across many contacts in one call (table bulk action).
+// `action` is "add" (default) or "remove". Returns how many rows were updated.
+Parse.Cloud.define("bulkTagContacts", async (request) => {
+  const user = requireUser(request);
+  const p = request.params || {};
+  const ids = Array.isArray(p.ids) ? p.ids : [];
+  const tag = String(p.tag == null ? "" : p.tag).trim();
+  const action = p.action === "remove" ? "remove" : "add";
+  if (ids.length === 0) {
+    throw new Parse.Error(Parse.Error.OTHER_CAUSE, "ids[] is required.");
+  }
+  if (!tag) {
+    throw new Parse.Error(Parse.Error.OTHER_CAUSE, "A tag is required.");
+  }
+  const sessionToken = user.getSessionToken();
+
+  const q = new Parse.Query("Contact");
+  q.containedIn("objectId", ids.map(String));
+  q.notEqualTo("deleted", true);
+  q.limit(1000);
+  const rows = await q.find({ sessionToken });
+
+  let changed = 0;
+  for (const c of rows) {
+    const set = new Set(c.get("tags") || []);
+    const had = set.has(tag);
+    if (action === "add") set.add(tag);
+    else set.delete(tag);
+    const nowHas = set.has(tag);
+    if (had !== nowHas) {
+      c.set("tags", Array.from(set));
+      changed += 1;
+    }
+  }
+  const dirty = rows.filter((c) => c.dirty("tags"));
+  if (dirty.length) await Parse.Object.saveAll(dirty, { sessionToken });
+  return { ok: true, updated: changed };
 });
 
 // ── deleteContactData (GDPR hard delete) ────────────────────────────────────--
