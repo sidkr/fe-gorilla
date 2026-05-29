@@ -378,6 +378,8 @@ useHead({
     .btn {
       display: inline-flex;
       align-items: center;
+      justify-content: center;
+      white-space: nowrap;
       gap: var(--space-2);
       height: 44px;
       padding: 0 var(--space-5);
@@ -474,12 +476,13 @@ useHead({
       transition: color var(--dur-fast) var(--ease-out);
     }
     .nav-links a:hover { color: var(--color-ink); }
-    .nav-cta { display: flex; align-items: center; gap: var(--space-3); }
+    .nav-cta { display: flex; align-items: center; gap: var(--space-3); flex-shrink: 0; }
     .nav-signin {
       font-size: var(--text-sm);
       font-weight: 500;
       color: var(--color-ink);
       padding: 0 var(--space-3);
+      white-space: nowrap;
     }
 
     /* ── Hero ──────────────────────────────────────────────── */
