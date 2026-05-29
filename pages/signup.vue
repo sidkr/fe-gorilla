@@ -253,7 +253,7 @@ async function onSubmit() {
             <svg width="14" height="14" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2l2.95 6.6 7.05.85-5.2 4.95L18.2 22 12 18.3 5.8 22l1.4-7.6L2 9.45l7.05-.85L12 2z" fill="var(--color-pop)"/></svg>
           </div>
           <blockquote class="quote-text">
-            "We switched off Mailchimp in a weekend. Fe-Mail Gorilla is forged for people who actually send — best decision we made all quarter."
+            "We switched our whole stack over in a weekend. Fe-Mail Gorilla is forged for people who actually send — best decision we made all quarter."
           </blockquote>
           <div class="attrib">
             <span class="avatar" aria-hidden="true">AK</span>

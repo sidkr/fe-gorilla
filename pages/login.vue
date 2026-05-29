@@ -83,48 +83,49 @@ async function onSubmit() {
 
         <form class="form" @submit.prevent="onSubmit" novalidate>
           <!-- Email -->
-          <div class="field">
-            <label for="email">Email</label>
-            <div class="input-shell">
-              <input v-model="email" id="email" class="input" type="email" placeholder="name@company.com" autocomplete="email" required>
-            </div>
-          </div>
+          <FormField label="Email" inputId="email">
+            <TextInput v-model="email" id="email" type="email" placeholder="name@company.com" autocomplete="email" />
+          </FormField>
 
           <!-- Password -->
-          <div class="field">
-            <label for="password">Password</label>
-            <div class="input-shell">
-              <input v-model="password" id="password" class="input" type="password" autocomplete="current-password" required>
-            </div>
-            <div class="field-row">
-              <NuxtLink to="/forgot-password" class="forgot-link">Forgot password?</NuxtLink>
-            </div>
-          </div>
+          <FormField label="Password" inputId="password">
+            <TextInput v-model="password" id="password" type="password" autocomplete="current-password" />
+            <template #default>
+              <TextInput v-model="password" id="password" type="password" autocomplete="current-password" />
+              <div class="field-row">
+                <NuxtLink to="/forgot-password" class="forgot-link">Forgot password?</NuxtLink>
+              </div>
+            </template>
+          </FormField>
 
           <!-- Error -->
           <p v-if="errorMsg" class="form-error" role="alert">{{ errorMsg }}</p>
 
           <!-- Primary CTA -->
-          <button type="submit" class="btn btn-primary" :disabled="submitting" style="margin-top: var(--space-2);">
+          <Button variant="primary" block type="submit" :loading="submitting" :disabled="submitting" style="margin-top: var(--space-2);">
             {{ submitting ? "Logging in…" : "Log in" }}
-            <svg v-if="!submitting" width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-              <path d="M5 12 H19 M13 6 L19 12 L13 18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </button>
+            <template v-if="!submitting" #trailing>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <path d="M5 12 H19 M13 6 L19 12 L13 18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </template>
+          </Button>
 
           <!-- OR divider -->
           <div class="or"><span class="or-chip">or</span></div>
 
           <!-- Google -->
-          <button type="button" class="btn btn-ghost">
-            <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-              <path d="M17.64 9.2c0-.64-.06-1.25-.17-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.79 2.72v2.26h2.9c1.7-1.56 2.69-3.86 2.69-6.62z" fill="#4285F4"/>
-              <path d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.9-2.26c-.8.54-1.83.86-3.06.86-2.35 0-4.34-1.59-5.05-3.72H.96v2.33A9 9 0 0 0 9 18z" fill="#34A853"/>
-              <path d="M3.95 10.7A5.4 5.4 0 0 1 3.66 9c0-.59.1-1.16.29-1.7V4.97H.96A9 9 0 0 0 0 9c0 1.45.35 2.82.96 4.03l2.99-2.33z" fill="#FBBC05"/>
-              <path d="M9 3.58c1.32 0 2.51.45 3.44 1.35l2.58-2.58A9 9 0 0 0 9 0 9 9 0 0 0 .96 4.97l2.99 2.33C4.66 5.17 6.65 3.58 9 3.58z" fill="#EA4335"/>
-            </svg>
+          <Button variant="ghost" block type="button">
+            <template #leading>
+              <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <path d="M17.64 9.2c0-.64-.06-1.25-.17-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.79 2.72v2.26h2.9c1.7-1.56 2.69-3.86 2.69-6.62z" fill="#4285F4"/>
+                <path d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.9-2.26c-.8.54-1.83.86-3.06.86-2.35 0-4.34-1.59-5.05-3.72H.96v2.33A9 9 0 0 0 9 18z" fill="#34A853"/>
+                <path d="M3.95 10.7A5.4 5.4 0 0 1 3.66 9c0-.59.1-1.16.29-1.7V4.97H.96A9 9 0 0 0 0 9c0 1.45.35 2.82.96 4.03l2.99-2.33z" fill="#FBBC05"/>
+                <path d="M9 3.58c1.32 0 2.51.45 3.44 1.35l2.58-2.58A9 9 0 0 0 9 0 9 9 0 0 0 .96 4.97l2.99 2.33C4.66 5.17 6.65 3.58 9 3.58z" fill="#EA4335"/>
+              </svg>
+            </template>
             Continue with Google
-          </button>
+          </Button>
 
           <p class="micro">Don't have an account? <NuxtLink to="/signup" class="micro-link">Sign up</NuxtLink></p>
         </form>

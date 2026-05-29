@@ -33,8 +33,8 @@ useHead({
         <li><a href="#">Docs</a></li>
       </ul>
       <div class="nav-cta">
-        <NuxtLink to="/login" class="nav-signin">Sign in</NuxtLink>
-        <NuxtLink to="/signup" class="btn btn-primary btn-sm">Sign up free</NuxtLink>
+        <Button variant="subtle" size="sm" to="/login">Sign in</Button>
+        <Button variant="primary" size="sm" to="/signup">Sign up free</Button>
       </div>
     </div>
   </nav>
@@ -54,11 +54,11 @@ useHead({
         <h1>Email that hits like iron.</h1>
         <p class="lede">Fe-Mail Gorilla is iron-forged email marketing — design, segment, and send campaigns that actually arrive. 98.4% inbox placement, real-time reporting, and a visual editor your team won't fight.</p>
         <div class="hero-cta">
-          <NuxtLink to="/signup" class="btn btn-primary btn-lg">
+          <Button variant="primary" size="lg" to="/signup">
             Sign up free
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
-          </NuxtLink>
-          <a href="#" class="btn btn-ghost btn-lg">See live demo</a>
+            <template #trailing><Icon name="arrow-right" /></template>
+          </Button>
+          <Button variant="ghost" size="lg" href="#">See live demo</Button>
         </div>
         <p class="hero-trust">Free for your first 10,000 emails / month · no card required</p>
       </div>
@@ -117,7 +117,7 @@ useHead({
   <section class="block">
     <div class="wrap">
       <div class="sect-head">
-        <span class="sect-eyebrow">What you get</span>
+        <SectionEyebrow>What you get</SectionEyebrow>
         <h2>Heavy-duty tools, finally easy to use.</h2>
       </div>
       <div class="features">
@@ -162,7 +162,7 @@ useHead({
   <section class="block how">
     <div class="wrap">
       <div class="sect-head">
-        <span class="sect-eyebrow">How it works</span>
+        <SectionEyebrow>How it works</SectionEyebrow>
         <h2>Three steps. No surprises.</h2>
       </div>
       <div class="steps">
@@ -214,7 +214,7 @@ useHead({
     <div class="wrap testimonial-wrap">
       <div class="testimonial">
         <span class="qmark" aria-hidden="true">“</span>
-        <blockquote>We moved off Mailchimp in a weekend. Fe-Mail Gorilla feels like it was forged by people who actually send email.</blockquote>
+        <blockquote>We switched our whole stack over in a weekend. Fe-Mail Gorilla feels like it was forged by people who actually send email.</blockquote>
         <cite><strong>Alex K.</strong> · Head of Growth, Folkways</cite>
       </div>
 
@@ -246,10 +246,10 @@ useHead({
   <section class="final-cta">
     <div class="wrap">
       <h2>Start sending. We'll do the heavy lifting.</h2>
-      <NuxtLink to="/signup" class="btn btn-primary btn-lg">
+      <Button variant="primary" size="lg" to="/signup">
         Sign up free
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
-      </NuxtLink>
+        <template #trailing><Icon name="arrow-right" /></template>
+      </Button>
       <p class="trust">Free for your first 10,000 emails / month · no card required</p>
     </div>
   </section>
@@ -373,39 +373,6 @@ useHead({
       color: var(--color-ink-on-pop);
       letter-spacing: var(--tracking-wider);
     }
-
-    /* ── Buttons ───────────────────────────────────────────── */
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      white-space: nowrap;
-      gap: var(--space-2);
-      height: 44px;
-      padding: 0 var(--space-5);
-      border-radius: var(--radius-md);
-      font-family: var(--font-body);
-      font-weight: 600;
-      font-size: var(--text-base);
-      letter-spacing: var(--tracking-tight);
-      transition: background var(--dur-base) var(--ease-out),
-                  color var(--dur-base) var(--ease-out),
-                  transform var(--dur-fast) var(--ease-out);
-    }
-    .btn:active { transform: translateY(1px); }
-    .btn-primary {
-      background: var(--btn-primary-bg);
-      color: var(--btn-primary-fg);
-    }
-    .btn-primary:hover { background: var(--btn-primary-hover); }
-    .btn-ghost {
-      color: var(--btn-ghost-fg);
-      border: 1px solid var(--btn-ghost-border);
-      background: var(--color-surface);
-    }
-    .btn-ghost:hover { background: var(--btn-ghost-hover-bg); }
-    .btn-sm { height: 36px; padding: 0 var(--space-4); font-size: var(--text-sm); }
-    .btn-lg { height: 52px; padding: 0 var(--space-6); font-size: var(--text-md); }
 
     /* ── Eyebrow chip (periodic-table styled) ──────────────── */
     .eyebrow {

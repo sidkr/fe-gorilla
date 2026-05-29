@@ -113,6 +113,22 @@ function index(schema, existing, name, spec) {
   schema.addIndex(name, spec);
 }
 
+// CLP that grants NO public + NO authenticated access — only the master key can
+// touch the class. Used for the global mock-SES outbox (MockSentMessage): it's a
+// dev/test inspection store, never reachable by a client session.
+function masterKeyOnlyCLP() {
+  return {
+    find: {},
+    count: {},
+    get: {},
+    create: {},
+    update: {},
+    delete: {},
+    addField: {},
+    protectedFields: {},
+  };
+}
+
 async function bootstrapSchemas() {
   // Point the Parse Node SDK at the running server with the master key. Idempotent.
   initParseClient();
@@ -179,6 +195,9 @@ async function bootstrapSchemas() {
     field(s, e, "deleted", "Boolean");
     field(s, e, "subscribedAt", "Date");
     field(s, e, "unsubscribedAt", "Date");
+    // Send-pipeline fields: opt-out flag + soft-bounce promotion counter.
+    field(s, e, "unsubscribed", "Boolean");
+    field(s, e, "softBounceCount", "Number");
     // Unique compound: one contact per email per org (CSV dedupe key).
     index(s, e, "contact_org_email_unique", { organization: 1, email: 1 });
     index(s, e, "contact_org_status", { organization: 1, status: 1 });
@@ -264,6 +283,16 @@ async function bootstrapSchemas() {
     field(s, e, "email", "String");
     field(s, e, "status", "String");
     field(s, e, "sesMessageId", "String");
+    // Snapshot of the contact's merge values at queue time (survives later edits).
+    field(s, e, "mergeFields", "Object");
+    field(s, e, "statusUpdatedAt", "Date");
+    field(s, e, "bounceCategory", "String");   // permanent | transient | undetermined
+    field(s, e, "bounceSubType", "String");    // mailbox-full | unknown-recipient | ...
+    field(s, e, "failureReason", "String");     // SMTP/SES-level failure if rejected
+    field(s, e, "openedAt", "Date");            // first open
+    field(s, e, "clickedAt", "Date");           // first click
+    field(s, e, "unsubscribedAt", "Date");
+    field(s, e, "attempts", "Number");          // send-email retry count
     // Idempotency on fanout retry: one send row per (campaign, contact).
     index(s, e, "send_campaign_contact_unique", { campaign: 1, contact: 1 });
     // Webhook lookup key, unique.
@@ -278,6 +307,13 @@ async function bootstrapSchemas() {
     field(s, e, "campaignSend", "Pointer", { targetClass: "CampaignSend" });
     field(s, e, "contact", "Pointer", { targetClass: "Contact" });
     field(s, e, "type", "String");
+    field(s, e, "timestamp", "Date");       // event-occurred time (not write time)
+    field(s, e, "linkUrl", "String");       // click only
+    field(s, e, "linkId", "String");        // click only — disambiguates dup URLs
+    field(s, e, "userAgent", "String");     // open/click
+    field(s, e, "ipAddress", "String");     // open/click
+    field(s, e, "bounceCategory", "String");// bounce only
+    field(s, e, "raw", "Object");           // full SES event body, for debugging
     index(s, e, "event_org_created", { organization: 1, createdAt: -1 });
     s.setCLP(authOnlyCLP());
   });
@@ -290,6 +326,25 @@ async function bootstrapSchemas() {
     // Per-org suppression (DECISIONS #4): unique (organization, email).
     index(s, e, "suppression_org_email_unique", { organization: 1, email: 1 });
     s.setCLP(authOnlyCLP());
+  });
+
+  // ── MockSentMessage (GLOBAL mock-SES outbox; NOT per-tenant) ────────────────
+  // Written by the mock SES adapter (server/lib/ses/mock.js) so tests + a future
+  // dev "outbox" can inspect what "sent". Master-key-only: no client session can
+  // read or write it. Deliberately NOT in PER_TENANT_CLASSES — it has no org
+  // scoping and no tenant ACL stamping. See DECISIONS #6 / #12.
+  await ensureClass("MockSentMessage", (s, e) => {
+    field(s, e, "to", "String");
+    field(s, e, "from", "String");
+    field(s, e, "replyTo", "String");
+    field(s, e, "subject", "String");
+    field(s, e, "html", "String");
+    field(s, e, "headers", "Object");
+    field(s, e, "messageId", "String");
+    field(s, e, "campaignSend", "Pointer", { targetClass: "CampaignSend" });
+    field(s, e, "sentAt", "Date");
+    index(s, e, "mock_message_id", { messageId: 1 });
+    s.setCLP(masterKeyOnlyCLP());
   });
 }
 
