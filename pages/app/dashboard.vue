@@ -188,7 +188,7 @@ const quickActions = [
     <section v-if="showOnboarding" class="onboard" aria-label="Setup checklist">
       <div class="onboard-head">
         <div class="onboard-head-text">
-          <h2 class="onboard-title">Finish setting up Gorilla</h2>
+          <h2 class="onboard-title">Finish setting up Fe-Mail Gorilla</h2>
           <p class="onboard-sub">
             {{ onboardingDoneCount }} of {{ onboardingSteps.length }} steps done — knock out the rest to start sending.
           </p>

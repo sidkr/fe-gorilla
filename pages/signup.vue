@@ -56,8 +56,8 @@ async function onSubmit() {
       name:     name.value.trim(),
       company:  company.value.trim(),
     });
-    const next = typeof route.query.next === "string" ? route.query.next : "/app/dashboard";
-    await navigateTo(next);
+    // Open-redirect guard: only honor `next` if it's a same-site app path.
+    await navigateTo(safeNextPath(route.query.next));
   } catch (err) {
     errorMsg.value = err?.message || "Sign up failed. Please try again.";
   } finally {
