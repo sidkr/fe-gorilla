@@ -58,43 +58,34 @@ const addressIsPlaceholder = computed(() => {
   <div v-else class="footer-inspect">
     <label class="ins-row">
       <span class="ins-label">Business address</span>
-      <textarea
-        class="ins-textarea"
-        rows="3"
-        :value="blockProps.businessAddress"
+      <TextArea
+        :rows="3"
+        :model-value="blockProps.businessAddress"
         placeholder="Your business · Street, City, State ZIP, Country"
-        @input="patch('businessAddress', ($event.target as HTMLTextAreaElement).value)"
-      ></textarea>
+        @update:model-value="patch('businessAddress', $event)"
+      />
       <span class="footer-helper">
         CAN-SPAM requires a physical postal address in every commercial email.
       </span>
     </label>
 
-    <label class="ins-checkrow">
-      <input
-        type="checkbox"
-        class="ins-check"
-        :checked="blockProps.showUnsubscribe"
-        disabled
-      />
+    <Checkbox class="ins-checkrow" :model-value="blockProps.showUnsubscribe" disabled>
       <span class="ins-checktext">
         <span class="ins-checklabel">Show "Unsubscribe" link</span>
         <span class="footer-helper">Required by CAN-SPAM. Cannot be turned off.</span>
       </span>
-    </label>
+    </Checkbox>
 
-    <label class="ins-checkrow">
-      <input
-        type="checkbox"
-        class="ins-check"
-        :checked="blockProps.showWebVersion"
-        @change="patch('showWebVersion', ($event.target as HTMLInputElement).checked)"
-      />
+    <Checkbox
+      class="ins-checkrow"
+      :model-value="blockProps.showWebVersion"
+      @update:model-value="patch('showWebVersion', $event)"
+    >
       <span class="ins-checktext">
         <span class="ins-checklabel">Show "View in browser" link</span>
         <span class="footer-helper">Optional. Helps recipients whose client mangles your layout.</span>
       </span>
-    </label>
+    </Checkbox>
   </div>
 </template>
 
@@ -150,18 +141,10 @@ const addressIsPlaceholder = computed(() => {
   line-height: var(--leading-snug);
 }
 
+/* Override the shared Checkbox's centered alignment so the box sits at the
+   top of the multi-line label + helper stack. */
 .ins-checkrow {
-  display: flex;
   align-items: flex-start;
-  gap: var(--space-2);
-  cursor: pointer;
-}
-.ins-check {
-  margin-top: 3px;
-  width: 14px;
-  height: 14px;
-  accent-color: var(--color-pop);
-  flex-shrink: 0;
 }
 .ins-checktext {
   display: flex;

@@ -39,11 +39,24 @@ function patch(k: keyof Props["blockProps"], v: unknown) {
 }
 
 // ── Merge-tag insertion (inspect mode) ───────────────────────────────────
+// The label field is a shared <TextInput> whose root element IS the <input>,
+// so we capture that DOM node via a function ref for caret-aware insertion.
 const labelInput = ref<HTMLInputElement | null>(null);
+function setLabelInput(el: unknown) {
+  labelInput.value = (el && (el as { $el?: HTMLInputElement }).$el)
+    ? (el as { $el: HTMLInputElement }).$el
+    : (el as HTMLInputElement | null);
+}
 function insertTag(token: string) {
   const next = insertAtCursor(labelInput.value, token);
   patch("label", next);
 }
+
+const alignOptions = [
+  { label: "Left", value: "left" },
+  { label: "Center", value: "center" },
+  { label: "Right", value: "right" },
+] as const;
 </script>
 
 <template>
@@ -62,23 +75,21 @@ function insertTag(token: string) {
         <span>Label</span>
         <MergeTagPicker compact @insert="insertTag" />
       </span>
-      <input
-        ref="labelInput"
+      <TextInput
+        :ref="setLabelInput"
         type="text"
-        class="ins-input"
-        :value="blockProps.label"
-        @input="patch('label', ($event.target as HTMLInputElement).value)"
+        :model-value="blockProps.label"
+        @update:model-value="patch('label', $event)"
       />
     </div>
 
     <label class="ins-row">
       <span class="ins-label">Link URL</span>
-      <input
+      <TextInput
         type="url"
-        class="ins-input"
         placeholder="https://…"
-        :value="blockProps.href"
-        @input="patch('href', ($event.target as HTMLInputElement).value)"
+        :model-value="blockProps.href"
+        @update:model-value="patch('href', $event)"
       />
     </label>
 
@@ -100,17 +111,12 @@ function insertTag(token: string) {
 
     <div class="ins-row">
       <span class="ins-label">Align</span>
-      <div class="ins-segmented" role="group">
-        <button
-          v-for="a in ['left', 'center', 'right'] as const"
-          :key="a"
-          type="button"
-          :class="['ins-seg', { active: blockProps.align === a }]"
-          @click="patch('align', a)"
-        >
-          {{ a }}
-        </button>
-      </div>
+      <SegmentedControl
+        :options="alignOptions"
+        aria-label="Align"
+        :model-value="blockProps.align"
+        @update:model-value="patch('align', $event)"
+      />
     </div>
 
     <label class="ins-row">

@@ -100,8 +100,7 @@ function onChildUpdate(patch: Record<string, unknown>) {
   font-family: var(--font-mono);
   font-size: var(--text-xs);
 }
-.ins-input,
-.ins-textarea {
+.ins-input {
   width: 100%;
   padding: var(--space-2) var(--space-3);
   border: 1px solid var(--field-border);
@@ -115,19 +114,9 @@ function onChildUpdate(patch: Record<string, unknown>) {
   transition: border-color var(--dur-fast) var(--ease-out),
     box-shadow var(--dur-fast) var(--ease-out);
 }
-.ins-input:focus,
-.ins-textarea:focus {
+.ins-input:focus {
   border-color: var(--field-border-focus);
   box-shadow: var(--shadow-pop-glow);
-}
-.ins-textarea {
-  resize: vertical;
-  min-height: 80px;
-  font-family: var(--font-body);
-}
-.ins-input-mono {
-  font-family: var(--font-mono);
-  text-transform: uppercase;
 }
 
 .ins-segmented {

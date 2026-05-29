@@ -47,11 +47,30 @@ function patch(k: keyof Props["blockProps"], v: unknown) {
 }
 
 // ── Merge-tag insertion (inspect mode) ───────────────────────────────────
+// The text field is a shared <TextInput> whose root element IS the <input>,
+// so we capture that DOM node via a function ref for caret-aware insertion.
 const textInput = ref<HTMLInputElement | null>(null);
+function setTextInput(el: unknown) {
+  textInput.value = (el && (el as { $el?: HTMLInputElement }).$el)
+    ? (el as { $el: HTMLInputElement }).$el
+    : (el as HTMLInputElement | null);
+}
 function insertTag(token: string) {
   const next = insertAtCursor(textInput.value, token);
   patch("text", next);
 }
+
+const levelOptions = [
+  { label: "H1", value: 1 },
+  { label: "H2", value: 2 },
+  { label: "H3", value: 3 },
+] as const;
+
+const alignOptions = [
+  { label: "Left", value: "left" },
+  { label: "Center", value: "center" },
+  { label: "Right", value: "right" },
+] as const;
 
 // ── Inline editing (render mode) ─────────────────────────────────────────
 // The contenteditable element is rendered with v-once-like semantics
@@ -156,43 +175,32 @@ watch(
         <span>Text</span>
         <MergeTagPicker compact @insert="insertTag" />
       </span>
-      <input
-        ref="textInput"
+      <TextInput
+        :ref="setTextInput"
         type="text"
-        class="ins-input"
-        :value="blockProps.text"
-        @input="patch('text', ($event.target as HTMLInputElement).value)"
+        :model-value="blockProps.text"
+        @update:model-value="patch('text', $event)"
       />
     </div>
 
     <div class="ins-row">
       <span class="ins-label">Level</span>
-      <div class="ins-segmented" role="group">
-        <button
-          v-for="l in [1, 2, 3]"
-          :key="l"
-          type="button"
-          :class="['ins-seg', { active: blockProps.level === l }]"
-          @click="patch('level', l)"
-        >
-          H{{ l }}
-        </button>
-      </div>
+      <SegmentedControl
+        :options="levelOptions"
+        aria-label="Level"
+        :model-value="blockProps.level"
+        @update:model-value="patch('level', $event)"
+      />
     </div>
 
     <div class="ins-row">
       <span class="ins-label">Align</span>
-      <div class="ins-segmented" role="group">
-        <button
-          v-for="a in ['left', 'center', 'right'] as const"
-          :key="a"
-          type="button"
-          :class="['ins-seg', { active: blockProps.align === a }]"
-          @click="patch('align', a)"
-        >
-          {{ a }}
-        </button>
-      </div>
+      <SegmentedControl
+        :options="alignOptions"
+        aria-label="Align"
+        :model-value="blockProps.align"
+        @update:model-value="patch('align', $event)"
+      />
     </div>
 
     <div class="ins-row">

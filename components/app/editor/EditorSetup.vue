@@ -8,7 +8,15 @@ import type { SetupField, SetupValues } from "./editor-types";
 //
 // `focusField` is a one-shot directive driven by the pre-flight modal's
 // "Edit →" links: when the popover opens we focus that named field.
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
+import {
+  computed,
+  nextTick,
+  onMounted,
+  onUnmounted,
+  ref,
+  watch,
+  type ComponentPublicInstance,
+} from "vue";
 import AudienceSelector from "./AudienceSelector.vue";
 import BrandColorPicker from "./BrandColorPicker.vue";
 import MergeTagPicker from "./MergeTagPicker.vue";
@@ -70,20 +78,33 @@ function patch<K extends keyof SetupValues>(k: K, v: SetupValues[K]) {
 // Splice the token into the focused input at the caret, then push the new
 // value up through the normal patch path. Subject + preview text are the
 // two personalizable sender-metadata fields.
+//
+// The text fields render via the shared <TextInput> component; a template
+// ref on a component resolves to its public instance, so reach through `$el`
+// to get the underlying <input> that insertAtCursor / .focus() operate on.
+function inputEl(
+  r: ComponentPublicInstance | HTMLInputElement | null,
+): HTMLInputElement | null {
+  if (!r) return null;
+  const el = (r as ComponentPublicInstance).$el ?? r;
+  return (el as HTMLElement)?.tagName === "INPUT" ? (el as HTMLInputElement) : null;
+}
 function insertSubjectTag(token: string) {
-  patch("subject", insertAtCursor(subjectInput.value, token));
+  patch("subject", insertAtCursor(inputEl(subjectInput.value), token));
 }
 function insertPreheaderTag(token: string) {
-  patch("preheader", insertAtCursor(preheaderInput.value, token));
+  patch("preheader", insertAtCursor(inputEl(preheaderInput.value), token));
 }
 
 // ── Focus management ─────────────────────────────────────────────────────
+// `name` is still a raw <input> (no label/validation), so its ref is a real
+// element. The rest are <TextInput> instances, reached via inputEl().
 const nameInput = ref<HTMLInputElement | null>(null);
-const subjectInput = ref<HTMLInputElement | null>(null);
-const preheaderInput = ref<HTMLInputElement | null>(null);
-const fromNameInput = ref<HTMLInputElement | null>(null);
-const fromEmailInput = ref<HTMLInputElement | null>(null);
-const replyToInput = ref<HTMLInputElement | null>(null);
+const subjectInput = ref<ComponentPublicInstance | null>(null);
+const preheaderInput = ref<ComponentPublicInstance | null>(null);
+const fromNameInput = ref<ComponentPublicInstance | null>(null);
+const fromEmailInput = ref<ComponentPublicInstance | null>(null);
+const replyToInput = ref<ComponentPublicInstance | null>(null);
 const audienceSel = ref<InstanceType<typeof AudienceSelector> | null>(null);
 const rootEl = ref<HTMLElement | null>(null);
 
@@ -91,11 +112,11 @@ function focusField(f: SetupField | null) {
   if (!f) return;
   void nextTick(() => {
     if (f === "name") nameInput.value?.focus();
-    else if (f === "subject") subjectInput.value?.focus();
-    else if (f === "preheader") preheaderInput.value?.focus();
-    else if (f === "fromName") fromNameInput.value?.focus();
-    else if (f === "fromEmail") fromEmailInput.value?.focus();
-    else if (f === "replyTo") replyToInput.value?.focus();
+    else if (f === "subject") inputEl(subjectInput.value)?.focus();
+    else if (f === "preheader") inputEl(preheaderInput.value)?.focus();
+    else if (f === "fromName") inputEl(fromNameInput.value)?.focus();
+    else if (f === "fromEmail") inputEl(fromEmailInput.value)?.focus();
+    else if (f === "replyTo") inputEl(replyToInput.value)?.focus();
     else if (f === "audience") audienceSel.value?.focus();
     emit("focus-handled");
   });
@@ -166,14 +187,13 @@ onUnmounted(() => {
               </span>
             </span>
           </span>
-          <input
+          <TextInput
             ref="subjectInput"
             type="text"
-            class="setup-input"
-            :class="{ 'setup-input--err': subjectError }"
-            :value="values.subject"
+            :model-value="values.subject"
+            :invalid="!!subjectError"
             placeholder="Spring sale is here"
-            @input="patch('subject', ($event.target as HTMLInputElement).value)"
+            @update:model-value="patch('subject', $event as string)"
           />
           <span v-if="subjectError" class="setup-err">{{ subjectError }}</span>
         </label>
@@ -189,66 +209,60 @@ onUnmounted(() => {
               </span>
             </span>
           </span>
-          <input
+          <TextInput
             ref="preheaderInput"
             type="text"
-            class="setup-input"
-            :class="{ 'setup-input--err': preheaderError }"
-            :value="values.preheader"
+            :model-value="values.preheader"
+            :invalid="!!preheaderError"
             placeholder="20% off, members first"
-            @input="patch('preheader', ($event.target as HTMLInputElement).value)"
+            @update:model-value="patch('preheader', $event as string)"
           />
           <span class="setup-hint">Inbox preview shown next to the subject in most clients.</span>
           <span v-if="preheaderError" class="setup-err">{{ preheaderError }}</span>
         </label>
 
         <!-- From name --------------------------------------------------- -->
-        <label class="setup-row">
-          <span class="setup-label">From name</span>
-          <input
+        <FormField class="setup-row" label="From name" :error="fromNameError || ''">
+          <TextInput
             ref="fromNameInput"
             type="text"
-            class="setup-input"
-            :class="{ 'setup-input--err': fromNameError }"
-            :value="values.fromName"
+            :model-value="values.fromName"
+            :invalid="!!fromNameError"
             placeholder="Folkways"
-            @input="patch('fromName', ($event.target as HTMLInputElement).value)"
+            @update:model-value="patch('fromName', $event as string)"
           />
-          <span v-if="fromNameError" class="setup-err">{{ fromNameError }}</span>
-        </label>
+        </FormField>
 
         <!-- From email -------------------------------------------------- -->
-        <label class="setup-row">
-          <span class="setup-label">From email</span>
-          <input
+        <FormField class="setup-row" label="From email" :error="fromEmailError || ''">
+          <TextInput
             ref="fromEmailInput"
             type="email"
-            class="setup-input"
-            :class="{ 'setup-input--err': fromEmailError }"
-            :value="values.fromEmail"
+            :model-value="values.fromEmail"
+            :invalid="!!fromEmailError"
             placeholder="team@folkways.io"
             autocomplete="off"
-            @input="patch('fromEmail', ($event.target as HTMLInputElement).value)"
+            @update:model-value="patch('fromEmail', $event as string)"
           />
-          <span v-if="fromEmailError" class="setup-err">{{ fromEmailError }}</span>
-        </label>
+        </FormField>
 
         <!-- Reply-to ---------------------------------------------------- -->
-        <label class="setup-row">
-          <span class="setup-label">Reply-to <span class="setup-optional">(optional)</span></span>
-          <input
+        <FormField
+          class="setup-row"
+          label="Reply-to (optional)"
+          :error="replyToError || ''"
+          hint="Defaults to your From email if left blank."
+        >
+          <TextInput
             ref="replyToInput"
             type="email"
-            class="setup-input"
-            :class="{ 'setup-input--err': replyToError }"
-            :value="values.replyTo"
+            :model-value="values.replyTo"
+            :invalid="!!replyToError"
             :placeholder="values.fromEmail || 'replies@folkways.io'"
             autocomplete="off"
-            @input="patch('replyTo', ($event.target as HTMLInputElement).value)"
+            @update:model-value="patch('replyTo', $event as string)"
           />
-          <span class="setup-hint">Defaults to your From email if left blank.</span>
-          <span v-if="replyToError" class="setup-err">{{ replyToError }}</span>
-        </label>
+        </FormField>
 
         <!-- Audience ---------------------------------------------------- -->
         <div class="setup-row">
@@ -347,13 +361,6 @@ onUnmounted(() => {
   text-transform: uppercase;
   letter-spacing: var(--tracking-wider);
 }
-.setup-optional {
-  font-weight: 500;
-  color: var(--color-ink-dim);
-  text-transform: none;
-  letter-spacing: var(--tracking-normal);
-  margin-left: var(--space-1);
-}
 .setup-counter {
   font-family: var(--font-mono);
   font-size: var(--text-xs);
@@ -361,32 +368,6 @@ onUnmounted(() => {
   font-variant-numeric: tabular-nums;
 }
 .setup-counter--over { color: var(--color-danger); }
-
-.setup-input {
-  width: 100%;
-  padding: var(--space-2) var(--space-3);
-  min-height: var(--field-height);
-  border: 1px solid var(--field-border);
-  border-radius: var(--radius-sm);
-  background: var(--field-bg);
-  color: var(--field-text);
-  font-family: var(--font-body);
-  font-size: var(--text-sm);
-  outline: none;
-  transition: border-color var(--dur-fast) var(--ease-out),
-    box-shadow var(--dur-fast) var(--ease-out);
-}
-.setup-input::placeholder { color: var(--field-placeholder); }
-.setup-input:focus {
-  border-color: var(--field-border-focus);
-  box-shadow: var(--shadow-pop-glow);
-}
-.setup-input--err {
-  border-color: var(--color-danger);
-}
-.setup-input--err:focus {
-  box-shadow: 0 0 0 4px var(--color-danger-bg);
-}
 
 .setup-hint {
   font-size: var(--text-xs);

@@ -137,27 +137,10 @@ function onBackdrop(e: MouseEvent) {
             <h2 class="pv-title">{{ campaignName || "Untitled campaign" }}</h2>
           </div>
           <div class="pv-head-actions">
-            <label class="pv-sample-toggle" :class="{ 'pv-sample-toggle--on': useSampleData }">
-              <input
-                type="checkbox"
-                class="pv-sample-checkbox"
-                :checked="useSampleData"
-                @change="useSampleData = ($event.target as HTMLInputElement).checked"
-              />
-              <span class="pv-sample-track" aria-hidden="true"><span class="pv-sample-knob"></span></span>
-              <span class="pv-sample-label">Preview with sample data</span>
-            </label>
-            <button type="button" class="pv-close" aria-label="Close" @click="emit('close')">
-              <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-                <path
-                  d="M6 6l12 12M6 18L18 6"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="1.8"
-                  stroke-linecap="round"
-                />
-              </svg>
-            </button>
+            <Checkbox v-model="useSampleData">Preview with sample data</Checkbox>
+            <Button variant="subtle" size="sm" aria-label="Close" @click="emit('close')">
+              <Icon name="x" :size="18" />
+            </Button>
           </div>
         </header>
         <p class="pv-note">
@@ -224,76 +207,10 @@ function onBackdrop(e: MouseEvent) {
   font-size: var(--text-lg);
   font-weight: 700;
 }
-.pv-close {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border: 1px solid var(--color-rule);
-  border-radius: var(--radius-sm);
-  background: var(--color-surface);
-  color: var(--color-ink-soft);
-  cursor: pointer;
-  padding: 0;
-}
-.pv-close:hover { background: var(--color-surface-2); color: var(--color-ink); }
-
 .pv-head-actions {
   display: inline-flex;
   align-items: center;
   gap: var(--space-3);
-}
-
-/* Sample-data toggle — a compact on-brand switch. */
-.pv-sample-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  cursor: pointer;
-  font-size: var(--text-xs);
-  font-weight: 600;
-  color: var(--color-ink-soft);
-  user-select: none;
-}
-.pv-sample-toggle--on { color: var(--color-pop); }
-.pv-sample-checkbox {
-  position: absolute;
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-.pv-sample-track {
-  position: relative;
-  display: inline-block;
-  width: 34px;
-  height: 18px;
-  border-radius: var(--radius-pill);
-  background: var(--color-surface-sunk);
-  border: 1px solid var(--color-rule);
-  transition: background var(--dur-fast) var(--ease-out);
-}
-.pv-sample-toggle--on .pv-sample-track {
-  background: var(--color-pop);
-  border-color: var(--color-pop);
-}
-.pv-sample-knob {
-  position: absolute;
-  top: 1px;
-  left: 1px;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: var(--color-surface);
-  box-shadow: var(--shadow-xs);
-  transition: transform var(--dur-fast) var(--ease-out);
-}
-.pv-sample-toggle--on .pv-sample-knob {
-  transform: translateX(16px);
-}
-.pv-sample-label { white-space: nowrap; }
-.pv-sample-checkbox:focus-visible + .pv-sample-track {
-  box-shadow: var(--shadow-pop-glow);
 }
 
 .pv-note {

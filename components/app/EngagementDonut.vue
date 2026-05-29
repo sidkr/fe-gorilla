@@ -48,12 +48,10 @@ function strokeFor(kind) {
 
 <template>
   <div class="ed">
-    <div class="ed-eyebrow">
-      <span class="ed-eyebrow-dot" aria-hidden="true"></span>
-      <span>Audience engagement</span>
-    </div>
+    <SectionEyebrow>Audience engagement</SectionEyebrow>
 
-    <div class="ed-card">
+    <Card padding="md">
+      <div class="ed-body">
       <div class="ed-donut-wrap">
         <svg
           class="ed-svg"
@@ -130,7 +128,8 @@ function strokeFor(kind) {
           <span class="ed-legend-pct">({{ seg.pct }}%)</span>
         </li>
       </ul>
-    </div>
+      </div>
+    </Card>
   </div>
 </template>
 
@@ -141,31 +140,7 @@ function strokeFor(kind) {
   gap: var(--space-3);
   min-width: 0;
 }
-.ed-eyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  font-family: var(--font-body);
-  font-size: var(--text-xs);
-  font-weight: 600;
-  letter-spacing: var(--tracking-wider);
-  text-transform: uppercase;
-  color: var(--color-ink-dim);
-}
-.ed-eyebrow-dot {
-  display: inline-block;
-  width: var(--space-2);
-  height: var(--space-2);
-  background: var(--color-pop);
-  border-radius: var(--radius-pill);
-  box-shadow: 0 0 0 3px var(--color-pop-glow);
-}
-.ed-card {
-  background: var(--color-surface);
-  border: 1px solid var(--color-rule);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
-  padding: var(--space-5);
+.ed-body {
   display: flex;
   align-items: center;
   gap: var(--space-5);
@@ -251,7 +226,7 @@ function strokeFor(kind) {
 }
 
 @media (max-width: 480px) {
-  .ed-card {
+  .ed-body {
     flex-direction: column;
     align-items: stretch;
   }

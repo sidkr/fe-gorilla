@@ -1,16 +1,30 @@
 <script setup>
 // StatusPill — small rounded status badge for campaign states.
-// Three known statuses drive the color scheme:
-//   - sent      → coral (uses --color-pop / --color-ink-on-pop)
-//   - draft     → muted (ink-soft on sunk surface)
-//   - scheduled → green (uses --color-ok / --color-ok-bg)
+// Public API is unchanged: a single `status` string drives the color.
+// We now render via the shared <Pill> primitive, mapping each status to a
+// tone that mirrors the previous hand-rolled colors as closely as possible:
+//   - sent      → brand   (coral / pop)
+//   - draft     → neutral  (muted ink-soft on sunk surface)
+//   - scheduled → success (green, matches the old --color-ok treatment)
+//   - sending   → info
+//   - failed    → danger
 // Unknown values fall through to the neutral "draft" treatment so we never
-// blow up on bad data while the Parse pipeline isn't wired.
+// blow up on bad data while the Parse pipeline isn't fully wired.
 import { computed } from "vue";
 
 const props = defineProps({
   status: { type: String, required: true },
 });
+
+const TONE_BY_STATUS = {
+  sent: "brand",
+  draft: "neutral",
+  scheduled: "success",
+  sending: "info",
+  failed: "danger",
+};
+
+const tone = computed(() => TONE_BY_STATUS[props.status] || "neutral");
 
 const label = computed(() => {
   if (!props.status) return "";
@@ -19,32 +33,5 @@ const label = computed(() => {
 </script>
 
 <template>
-  <span :class="['pill', `pill--${status}`]">{{ label }}</span>
+  <Pill :tone="tone">{{ label }}</Pill>
 </template>
-
-<style scoped>
-.pill {
-  display: inline-flex;
-  align-items: center;
-  padding: var(--space-1) var(--space-3);
-  font-family: var(--font-body);
-  font-size: var(--text-xs);
-  font-weight: 600;
-  letter-spacing: var(--tracking-wide);
-  border-radius: var(--radius-pill);
-  line-height: 1.2;
-  white-space: nowrap;
-}
-.pill--sent {
-  background: var(--color-pop);
-  color: var(--color-ink-on-pop);
-}
-.pill--draft {
-  background: var(--color-surface-sunk);
-  color: var(--color-ink-soft);
-}
-.pill--scheduled {
-  background: var(--color-ok-bg);
-  color: var(--color-ok);
-}
-</style>

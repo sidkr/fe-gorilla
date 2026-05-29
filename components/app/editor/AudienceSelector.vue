@@ -155,16 +155,7 @@ defineExpose({ focus: () => triggerEl.value?.focus() });
         <span class="aud-count">{{ formatCount(selected.count) }}</span>
       </span>
       <span v-else class="aud-trigger-placeholder">Choose an audience</span>
-      <svg class="aud-caret" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
-        <path
-          d="M6 9l6 6 6-6"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.8"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        />
-      </svg>
+      <Icon name="chevron-down" :size="14" class="aud-caret" />
     </button>
 
     <ul
@@ -202,23 +193,12 @@ defineExpose({ focus: () => triggerEl.value?.focus() });
           <span class="aud-name">{{ a.name }}</span>
           <span class="aud-opt-meta">{{ formatCount(a.count) }} contacts</span>
         </span>
-        <svg
+        <Icon
           v-if="a.id === modelValue"
-          viewBox="0 0 24 24"
-          width="14"
-          height="14"
-          aria-hidden="true"
+          name="check"
+          :size="14"
           class="aud-opt-check"
-        >
-          <path
-            d="M5 12l5 5 9-11"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          />
-        </svg>
+        />
       </li>
     </ul>
   </div>

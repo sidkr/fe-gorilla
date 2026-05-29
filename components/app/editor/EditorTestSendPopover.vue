@@ -1,12 +1,20 @@
 <script setup lang="ts">
-// Test-send popover. Stub for MVP — does not call any cloud function.
-// Renders inline; the Shell anchors it under the Test send button via
-// fixed positioning at a coordinate it passes in.
+// Test-send popover. Wired to the real sendTestEmail cloud function via
+// useSending. Renders inline; the Shell anchors it under the Test send
+// button via fixed positioning at a coordinate it passes in.
+//
+// Before sending, we ask the Shell to flush a save (saveFn) so the
+// campaign — and its compiledHtml — is up to date on the server. The
+// cloud function compiles/sends from the persisted campaign.
 import { onMounted, onUnmounted, ref } from "vue";
+import { useSending } from "~/composables/app/useSending";
 
 interface Props {
   open: boolean;
   defaultEmail: string;
+  campaignId: string;
+  // Flushes a save in the Shell so compiledHtml is fresh before the test.
+  saveFn: () => Promise<void>;
   // top/right in viewport pixels — Shell computes from button getBoundingClientRect
   anchorTop: number;
   anchorRight: number;
@@ -15,21 +23,39 @@ interface Props {
 const props = defineProps<Props>();
 const emit = defineEmits<{ (e: "close"): void }>();
 
-const email = ref(props.defaultEmail);
-const stage = ref<"idle" | "sent">("idle");
+const { sendTestEmail } = useSending();
 
-function onSend() {
-  // Stub: real test-send is a cloud function landing with the send
-  // pipeline. We just optimistically show success after a beat so the
-  // UI flow is honest about being clickable.
-  setTimeout(() => {
+const email = ref(props.defaultEmail);
+const stage = ref<"idle" | "sending" | "sent" | "error">("idle");
+const sentTo = ref<string>("");
+const messageId = ref<string>("");
+const errorMsg = ref<string>("");
+
+async function onSend() {
+  if (!email.value || stage.value === "sending") return;
+  stage.value = "sending";
+  errorMsg.value = "";
+  try {
+    // Make sure the latest edits (and the compiled HTML) are persisted
+    // before the server compiles + sends the test.
+    await props.saveFn();
+    const res = await sendTestEmail(props.campaignId, [email.value.trim()]);
+    sentTo.value = (res.sentTo && res.sentTo.join(", ")) || email.value.trim();
+    messageId.value = res.messageId || "";
     stage.value = "sent";
-  }, 200);
+  } catch (err: unknown) {
+    errorMsg.value =
+      (err as { message?: string })?.message || "Couldn't send the test. Try again.";
+    stage.value = "error";
+  }
 }
 
 function reset() {
   stage.value = "idle";
   email.value = props.defaultEmail;
+  errorMsg.value = "";
+  sentTo.value = "";
+  messageId.value = "";
 }
 
 function onClickOutside(e: MouseEvent) {
@@ -58,30 +84,35 @@ onUnmounted(() => {
       role="dialog"
       aria-label="Test send"
     >
-      <div v-if="stage === 'idle'">
+      <div v-if="stage === 'idle' || stage === 'sending' || stage === 'error'">
         <h3 class="tsp-title">Send a test email</h3>
         <p class="tsp-help">Receive this draft in your inbox to check it looks right.</p>
         <label class="tsp-row">
           <span class="tsp-label">Recipient</span>
-          <input
-            type="email"
-            class="tsp-input"
+          <TextInput
             v-model="email"
+            type="email"
             placeholder="you@example.com"
+            :disabled="stage === 'sending'"
           />
         </label>
+        <p v-if="stage === 'error'" class="tsp-error" role="alert">{{ errorMsg }}</p>
         <div class="tsp-actions">
-          <button type="button" class="tsp-btn tsp-btn--ghost" @click="emit('close'); reset()">
+          <Button
+            variant="ghost"
+            :disabled="stage === 'sending'"
+            @click="emit('close'); reset()"
+          >
             Cancel
-          </button>
-          <button
-            type="button"
-            class="tsp-btn tsp-btn--pop"
-            :disabled="!email"
+          </Button>
+          <Button
+            variant="primary"
+            :disabled="!email || stage === 'sending'"
+            :loading="stage === 'sending'"
             @click="onSend"
           >
-            Send test
-          </button>
+            {{ stage === "error" ? "Try again" : "Send test" }}
+          </Button>
         </div>
       </div>
 
@@ -98,12 +129,11 @@ onUnmounted(() => {
             />
           </svg>
         </span>
-        <h3 class="tsp-title">Test sent to {{ email }}</h3>
+        <h3 class="tsp-title">Test sent to {{ sentTo }}</h3>
         <p class="tsp-help">Check your inbox in a few seconds.</p>
+        <p v-if="messageId" class="tsp-msgid">Message ID: {{ messageId }}</p>
         <div class="tsp-actions">
-          <button type="button" class="tsp-btn tsp-btn--ghost" @click="emit('close'); reset()">
-            Done
-          </button>
+          <Button variant="ghost" @click="emit('close'); reset()">Done</Button>
         </div>
       </div>
     </div>
@@ -146,53 +176,24 @@ onUnmounted(() => {
   text-transform: uppercase;
   letter-spacing: var(--tracking-wider);
 }
-.tsp-input {
-  width: 100%;
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--field-border);
-  border-radius: var(--radius-sm);
-  background: var(--field-bg);
-  color: var(--field-text);
-  font-family: var(--font-body);
-  font-size: var(--text-sm);
-  outline: none;
-}
-.tsp-input:focus {
-  border-color: var(--field-border-focus);
-  box-shadow: var(--shadow-pop-glow);
-}
 .tsp-actions {
   display: flex;
   justify-content: flex-end;
   gap: var(--space-2);
   margin-top: var(--space-4);
 }
-.tsp-btn {
-  padding: var(--space-2) var(--space-4);
-  white-space: nowrap;
-  border-radius: var(--radius-md);
-  font-family: var(--font-body);
-  font-size: var(--text-sm);
-  font-weight: 600;
-  cursor: pointer;
-  border: 1px solid transparent;
+.tsp-error {
+  margin: var(--space-3) 0 0;
+  font-size: var(--text-xs);
+  color: var(--color-danger);
+  line-height: var(--leading-snug);
 }
-.tsp-btn--ghost {
-  background: var(--color-surface);
-  color: var(--color-ink);
-  border-color: var(--color-rule);
+.tsp-msgid {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-xs);
+  color: var(--color-ink-dim);
+  word-break: break-all;
 }
-.tsp-btn--ghost:hover { background: var(--color-surface-2); }
-.tsp-btn--pop {
-  background: var(--color-pop);
-  color: var(--color-ink-on-pop);
-  border-color: var(--color-pop);
-}
-.tsp-btn--pop:hover {
-  background: var(--color-pop-deep);
-  border-color: var(--color-pop-deep);
-}
-.tsp-btn--pop[disabled] { opacity: 0.5; cursor: not-allowed; }
 
 .tsp-sent { text-align: center; }
 .tsp-check {

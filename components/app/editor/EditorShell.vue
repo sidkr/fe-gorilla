@@ -29,6 +29,8 @@ import {
   type SetupValues,
 } from "./editor-types";
 import { useAudiences, type Audience } from "~/composables/app/useAudiences";
+import { useSending } from "~/composables/app/useSending";
+import { useToast, type ToastTone } from "~/composables/shared/useToast";
 import {
   type Block,
   type BlockType,
@@ -107,21 +109,32 @@ const setupFocusField = ref<SetupField | null>(null);
 
 // Pre-flight checklist state.
 const preflightOpen = ref(false);
+// Send-in-flight state for the real send path. While `sending` is true the
+// pre-flight Send button is disabled. `sendStage` drives the success/error
+// overlay copy; `sendError` carries a validation message from the cloud fn.
+const sendInFlight = ref(false);
+const sendStage = ref<"idle" | "sending" | "sent" | "error">("idle");
+const sendRecipientCount = ref<number | null>(null);
+const sendError = ref<string>("");
+
+const { scheduleSend } = useSending();
 
 // Preview-width preference (Editor-phase1.md §7). Persists in localStorage.
 const PREVIEW_WIDTH_KEY = "gorilla_editor_preview_width";
 const previewWidth = ref<"desktop" | "mobile">("desktop");
 
-// Inline toast for stub-action feedback.
-const toast = ref<string | null>(null);
-let toastTimer: ReturnType<typeof setTimeout> | null = null;
+// Toast feedback routes through the shared global toast system (a single
+// <ToastHost/> is mounted in layouts/app.vue). Child @toast events may emit
+// either a plain string or a { message, tone } payload — normalize both.
+const { push } = useToast();
 
-function showToast(text: string) {
-  toast.value = text;
-  if (toastTimer) clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => {
-    toast.value = null;
-  }, 3500);
+function showToast(
+  payload: string | { message?: string; tone?: ToastTone },
+) {
+  const message = typeof payload === "string" ? payload : (payload.message ?? "");
+  const tone: ToastTone =
+    typeof payload === "string" ? "neutral" : (payload.tone ?? "neutral");
+  if (message) push(message, { tone });
 }
 
 // ── Body shape normalization ────────────────────────────────────────────
@@ -641,10 +654,51 @@ function onOpenSend() {
   preflightOpen.value = true;
 }
 
-function onPreflightSend() {
-  // Stub — see Editor.md §11.
+async function onPreflightSend() {
+  if (sendInFlight.value) return;
+  sendInFlight.value = true;
+  sendStage.value = "sending";
+  sendError.value = "";
+  try {
+    // Flush a save first so the server compiles + sends from the latest
+    // campaign state (subject, body, audience, compiledHtml).
+    await save();
+    const res = await scheduleSend(props.campaign.id, "now");
+    sendRecipientCount.value = res.recipientCount ?? null;
+    sendStage.value = "sent";
+    sendInFlight.value = false;
+  } catch (err: unknown) {
+    // Surface validation errors from the cloud fn inline in the modal
+    // (e.g. "no verified recipients", "subject required").
+    sendError.value =
+      (err as { message?: string })?.message ||
+      "Send failed. Check the campaign and try again.";
+    sendStage.value = "error";
+    sendInFlight.value = false;
+  }
+}
+
+function onSendSuccessDone() {
+  // Close the modal and route to the campaigns list so the user can
+  // track the send in Reports.
   preflightOpen.value = false;
-  showToast("Send pipeline lands in the next iteration.");
+  sendStage.value = "idle";
+  void router.push("/app/campaigns");
+}
+
+function onSendErrorDismiss() {
+  // Return to the checklist so the user can fix + retry.
+  sendStage.value = "idle";
+  sendError.value = "";
+}
+
+function onPreflightClose() {
+  // Don't allow closing mid-send; reset any terminal state on close so a
+  // re-open starts fresh on the checklist.
+  if (sendInFlight.value) return;
+  preflightOpen.value = false;
+  sendStage.value = "idle";
+  sendError.value = "";
 }
 
 function onPreflightEdit(field: SetupField) {
@@ -727,7 +781,6 @@ onUnmounted(() => {
   window.removeEventListener("resize", syncTopOffset);
   if (nowTimer) clearInterval(nowTimer);
   if (autosaveTimer) clearTimeout(autosaveTimer);
-  if (toastTimer) clearTimeout(toastTimer);
 });
 
 // If the campaign object reference changes (shouldn't happen mid-mount
@@ -830,6 +883,8 @@ watch(
     <EditorTestSendPopover
       :open="testSendOpen"
       :default-email="currentUserEmail"
+      :campaign-id="props.campaign.id"
+      :save-fn="save"
       :anchor-top="testSendAnchorTop"
       :anchor-right="testSendAnchorRight"
       @close="testSendOpen = false"
@@ -846,18 +901,17 @@ watch(
       :open="preflightOpen"
       :checks="preflightChecks"
       :recipient-count="preflightRecipientCount"
-      @close="preflightOpen = false"
+      :send-stage="sendStage"
+      :send-recipient-count="sendRecipientCount"
+      :send-error="sendError"
+      @close="onPreflightClose"
       @send="onPreflightSend"
+      @send-success-done="onSendSuccessDone"
+      @send-error-dismiss="onSendErrorDismiss"
       @edit="onPreflightEdit"
       @open-test-send="onPreflightOpenTestSend"
       @toast="showToast"
     />
-
-    <Teleport to="body">
-      <div v-if="toast" class="shell-toast" role="status">
-        {{ toast }}
-      </div>
-    </Teleport>
   </div>
 </template>
 
@@ -883,20 +937,4 @@ watch(
 .shell-left { min-width: 0; }
 .shell-center { min-width: 0; display: flex; flex-direction: column; }
 .shell-right { min-width: 0; }
-
-/* Toast for stub-action feedback */
-.shell-toast {
-  position: fixed;
-  bottom: var(--space-5);
-  left: 50%;
-  transform: translateX(-50%);
-  background: var(--color-ink);
-  color: var(--color-surface);
-  padding: var(--space-3) var(--space-4);
-  border-radius: var(--radius-md);
-  font-size: var(--text-sm);
-  box-shadow: var(--shadow-md);
-  z-index: var(--z-toast);
-  max-width: 480px;
-}
 </style>

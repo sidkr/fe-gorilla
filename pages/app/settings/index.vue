@@ -125,20 +125,18 @@ async function submit() {
     <form v-else class="set-card" @submit.prevent="submit">
       <section class="set-section">
         <h2 class="set-section-title">Organization</h2>
-        <label class="set-field">
-          <span class="set-field-label">Organization name</span>
-          <input v-model="form.name" class="set-input" type="text" maxlength="120" />
-        </label>
+        <FormField label="Organization name">
+          <TextInput v-model="form.name" type="text" />
+        </FormField>
         <div class="set-field set-field--readonly">
           <span class="set-field-label">Plan</span>
           <span class="set-readonly">{{ settings?.plan || "free" }}</span>
         </div>
-        <label class="set-field">
-          <span class="set-field-label">Timezone</span>
-          <select v-model="form.timezone" class="set-input">
+        <FormField label="Timezone">
+          <SelectInput v-model="form.timezone">
             <option v-for="tz in TIMEZONES" :key="tz" :value="tz">{{ tz }}</option>
-          </select>
-        </label>
+          </SelectInput>
+        </FormField>
       </section>
 
       <section class="set-section">
@@ -147,18 +145,15 @@ async function submit() {
           Used to pre-fill new campaigns. From-email should be a verified
           <NuxtLink to="/app/settings/senders" class="set-inline-link">sender identity</NuxtLink>.
         </p>
-        <label class="set-field">
-          <span class="set-field-label">Default from-name</span>
-          <input v-model="form.defaultFromName" class="set-input" type="text" placeholder="e.g. Acme Team" />
-        </label>
-        <label class="set-field">
-          <span class="set-field-label">Default from-email</span>
-          <input v-model="form.defaultFromEmail" class="set-input" type="email" placeholder="hello@acme.com" />
-        </label>
-        <label class="set-field">
-          <span class="set-field-label">Reply-to <span class="set-field-opt">(optional)</span></span>
-          <input v-model="form.replyTo" class="set-input" type="email" placeholder="support@acme.com" />
-        </label>
+        <FormField label="Default from-name">
+          <TextInput v-model="form.defaultFromName" type="text" placeholder="e.g. Acme Team" />
+        </FormField>
+        <FormField label="Default from-email">
+          <TextInput v-model="form.defaultFromEmail" type="email" placeholder="hello@acme.com" />
+        </FormField>
+        <FormField label="Reply-to (optional)">
+          <TextInput v-model="form.replyTo" type="email" placeholder="support@acme.com" />
+        </FormField>
       </section>
 
       <section class="set-section">
@@ -167,24 +162,22 @@ async function submit() {
           A physical mailing address is included in your email footers — it's
           required by anti-spam law (CAN-SPAM).
         </p>
-        <label class="set-field">
-          <span class="set-field-label">Postal address</span>
-          <textarea
+        <FormField label="Postal address">
+          <TextArea
             v-model="form.address"
-            class="set-input set-textarea"
-            rows="3"
+            :rows="3"
             placeholder="123 Main St, Suite 100&#10;Springfield, IL 62704&#10;USA"
-          ></textarea>
-        </label>
+          />
+        </FormField>
       </section>
 
       <div class="set-actions">
         <p v-if="saveError" class="set-msg set-msg--error">{{ saveError }}</p>
         <p v-else-if="saved" class="set-msg set-msg--ok">Settings saved.</p>
         <span v-else class="set-msg"></span>
-        <button type="submit" class="set-btn set-btn--primary" :disabled="saving">
+        <Button type="submit" variant="primary" :loading="saving" :disabled="saving">
           {{ saving ? "Saving…" : "Save changes" }}
-        </button>
+        </Button>
       </div>
     </form>
   </div>
@@ -232,33 +225,14 @@ async function submit() {
 
 .set-field { display: flex; flex-direction: column; gap: var(--space-2); }
 .set-field-label { font-family: var(--font-body); font-size: var(--text-sm); font-weight: 600; color: var(--color-ink); }
-.set-field-opt { font-weight: 400; color: var(--color-ink-dim); }
 .set-field--readonly { gap: var(--space-1); }
 .set-readonly {
   font-family: var(--font-mono, monospace); font-size: var(--text-sm); color: var(--color-ink-soft);
   text-transform: capitalize;
 }
-.set-input {
-  width: 100%; padding: var(--space-2) var(--space-3); min-height: var(--field-height);
-  border: 1px solid var(--field-border); border-radius: var(--radius-sm);
-  background: var(--field-bg); color: var(--field-text);
-  font-family: var(--font-body); font-size: var(--text-sm); outline: none;
-}
-.set-input:focus-visible { border-color: var(--field-border-focus); box-shadow: var(--shadow-pop-glow); }
-.set-textarea { min-height: auto; resize: vertical; line-height: var(--leading-normal, 1.5); }
 
 .set-actions { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-4); }
 .set-msg { margin: 0; flex: 1; font-family: var(--font-body); font-size: var(--text-sm); }
 .set-msg--error { color: var(--color-danger); }
 .set-msg--ok { color: var(--color-success, var(--color-pop-deep)); }
-.set-btn {
-  padding: var(--space-2) var(--space-5); border-radius: var(--radius-md);
-  font-family: var(--font-body); font-size: var(--text-sm); font-weight: 600;
-  cursor: pointer; border: 1px solid transparent;
-  transition: background-color var(--dur-base) var(--ease-out);
-}
-.set-btn:disabled { opacity: 0.6; cursor: default; }
-.set-btn--primary { background: var(--btn-primary-bg); color: var(--btn-primary-fg); }
-.set-btn--primary:not(:disabled):hover { background: var(--btn-primary-hover); }
-.set-btn--primary:focus-visible { outline: none; box-shadow: var(--shadow-pop-glow); }
 </style>

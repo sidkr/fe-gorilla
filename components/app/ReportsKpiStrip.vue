@@ -91,18 +91,18 @@ const cards = computed(() => {
   <section class="rep-kpis" aria-label="Campaign KPI summary">
     <header class="rep-kpis-head">
       <h2 class="rep-kpis-title">Overview</h2>
-      <span v-if="demo" class="rep-kpis-sample" title="Illustrative sample data">Sample</span>
+      <Pill v-if="demo" tone="brand" class="rep-kpis-sample" title="Illustrative sample data">Sample</Pill>
     </header>
 
     <div class="rep-kpis-grid">
-      <div v-for="c in cards" :key="c.key" class="rep-kpi">
+      <Card v-for="c in cards" :key="c.key" padding="md" interactive class="rep-kpi">
         <div class="rep-kpi-label">{{ c.label }}</div>
         <div class="rep-kpi-value">{{ c.value }}</div>
         <div class="rep-kpi-sub" :class="`is-${c.tone}`">
           <span class="rep-kpi-dot" aria-hidden="true" />
           <span>{{ c.sub }}</span>
         </div>
-      </div>
+      </Card>
     </div>
   </section>
 </template>
@@ -127,17 +127,8 @@ const cards = computed(() => {
   color: var(--color-ink);
 }
 .rep-kpis-sample {
-  display: inline-flex;
-  align-items: center;
-  padding: var(--space-1) var(--space-3);
-  border-radius: var(--radius-pill);
-  font-family: var(--font-body);
-  font-size: var(--text-xs);
-  font-weight: 600;
   letter-spacing: var(--tracking-wide);
   text-transform: uppercase;
-  color: var(--color-pop-deep);
-  background: var(--color-pop-bg);
 }
 
 /* Auto-fit grid: 6 across on wide, gracefully collapsing to 3 / 2 / 1. */
@@ -156,20 +147,10 @@ const cards = computed(() => {
   .rep-kpis-grid { grid-template-columns: 1fr; }
 }
 
-.rep-kpi {
+.rep-kpi :deep(.card__body) {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  padding: var(--space-5);
-  background: var(--color-surface);
-  border: 1px solid var(--color-rule);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
-  transition: border-color var(--dur-base) var(--ease-out),
-              box-shadow var(--dur-base) var(--ease-out);
-}
-.rep-kpi:hover {
-  border-color: var(--color-rule-strong);
 }
 .rep-kpi-label {
   font-family: var(--font-body);

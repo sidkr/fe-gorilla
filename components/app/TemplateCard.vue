@@ -1,12 +1,13 @@
 <script setup>
 // TemplateCard — a single card on /app/templates.
 // The thumbnail is an inline SVG whose shape varies per template (selected
-// by `id` via the renderer in the parent). The card owns the surrounding
-// chrome: white surface, hover border, name + tag chip, and meta row.
+// by `id` via the renderer in the parent). The surrounding chrome now comes
+// from the shared <Card> primitive (interactive, navigates via `to`); we use
+// padding="none" so the thumbnail can bleed edge-to-edge and supply the body
+// padding ourselves.
 //
-// Click target wraps the whole card via NuxtLink so the entire surface is
-// keyboard-focusable. The destination `/app/templates/{id}/edit` does not
-// exist yet — that's intentional; the editor route lands in a later phase.
+// The destination `/app/templates/{id}/edit` does not exist yet — that's
+// intentional; the editor route lands in a later phase.
 import { computed } from "vue";
 
 const props = defineProps({
@@ -35,7 +36,7 @@ const metaLine = computed(() => {
 </script>
 
 <template>
-  <NuxtLink :to="to" class="tpl-card">
+  <Card :interactive="true" :to="to" padding="none" class="tpl-card">
     <!-- Thumbnail surface. The actual stylized email layout SVG is rendered
          via the named slot so each template can supply its own shape. -->
     <div class="tpl-card-thumb">
@@ -46,36 +47,23 @@ const metaLine = computed(() => {
     <div class="tpl-card-body">
       <div class="tpl-card-head">
         <h3 class="tpl-card-name">{{ name }}</h3>
-        <span class="tpl-card-tag">{{ tagLabel }}</span>
+        <Pill tone="brand">{{ tagLabel }}</Pill>
       </div>
       <p class="tpl-card-meta">{{ metaLine }}</p>
     </div>
-  </NuxtLink>
+  </Card>
 </template>
 
 <style scoped>
-.tpl-card {
+/* Card chrome (surface, border, radius, shadow, hover, focus) now comes from
+   the shared <Card> primitive. With padding="none" the body holds the
+   thumbnail + text stack; clip its corners so the thumbnail respects the
+   card radius. */
+.tpl-card :deep(.card__body) {
   display: flex;
   flex-direction: column;
-  background: var(--color-surface);
-  border: 1px solid var(--color-rule);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
   overflow: hidden;
-  text-decoration: none;
-  color: inherit;
-  transition: border-color var(--dur-base) var(--ease-out),
-              box-shadow var(--dur-base) var(--ease-out),
-              transform var(--dur-fast) var(--ease-out);
-}
-.tpl-card:hover {
-  border-color: var(--color-pop);
-  box-shadow: var(--shadow-md);
-}
-.tpl-card:focus-visible {
-  outline: none;
-  border-color: var(--color-pop);
-  box-shadow: var(--shadow-pop-glow);
+  border-radius: inherit;
 }
 
 /* Thumbnail — fixed 3:4 ratio so the gallery reads as a uniform grid even
@@ -119,19 +107,6 @@ const metaLine = computed(() => {
   color: var(--color-ink);
   min-width: 0;
   overflow-wrap: anywhere;
-}
-.tpl-card-tag {
-  flex: none;
-  padding: var(--space-1) var(--space-3);
-  background: var(--color-pop-bg);
-  color: var(--color-pop-deep);
-  border-radius: var(--radius-pill);
-  font-family: var(--font-body);
-  font-size: var(--text-xs);
-  font-weight: 600;
-  letter-spacing: var(--tracking-wide);
-  line-height: 1.2;
-  white-space: nowrap;
 }
 .tpl-card-meta {
   margin: 0;

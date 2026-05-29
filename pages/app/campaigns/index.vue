@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount, nextTick } from "vue";
+import { ref, computed, onMounted, onBeforeUnmount } from "vue";
 import { useCampaigns } from "~/composables/app/useCampaigns";
 
 definePageMeta({
@@ -168,20 +168,26 @@ const renameTarget = ref(null);
 const renameValue = ref("");
 const renameError = ref(null);
 const renameSaving = ref(false);
-const renameInput = ref(null);
 
 function openRename(c) {
   closeMenu();
   renameTarget.value = c;
   renameValue.value = c.name === "Untitled campaign" ? "" : c.name;
   renameError.value = null;
-  nextTick(() => renameInput.value?.focus());
 }
 function cancelRename() {
   renameTarget.value = null;
   renameValue.value = "";
   renameError.value = null;
 }
+// Modal open state mapped onto the target ref; closing routes through cancel so
+// the transient form state resets.
+const renameOpen = computed({
+  get: () => !!renameTarget.value,
+  set: (v) => {
+    if (!v) cancelRename();
+  },
+});
 async function confirmRename() {
   const c = renameTarget.value;
   if (!c) return;
@@ -219,6 +225,12 @@ function cancelDelete() {
   deleteTarget.value = null;
   deleteError.value = null;
 }
+const deleteOpen = computed({
+  get: () => !!deleteTarget.value,
+  set: (v) => {
+    if (!v) cancelDelete();
+  },
+});
 // A sent campaign is soft-archived (history preserved); everything else is
 // destroyed. Surface that distinction in the confirm copy.
 const deleteIsSoft = computed(() => deleteTarget.value?.status === "sent");
@@ -248,12 +260,14 @@ async function confirmDelete() {
         <h1>Campaigns</h1>
         <p class="cmp-lede">All your campaign activity, drafts to deliveries.</p>
       </div>
-      <NuxtLink to="/app/campaigns/new" class="cmp-cta">
-        <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
-          <path d="M7 2.5 V11.5 M2.5 7 H11.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
-        </svg>
-        <span>New campaign</span>
-      </NuxtLink>
+      <Button to="/app/campaigns/new" variant="primary">
+        <template #leading>
+          <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+            <path d="M7 2.5 V11.5 M2.5 7 H11.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+          </svg>
+        </template>
+        New campaign
+      </Button>
     </header>
 
     <!-- 2. KPI strip -->
@@ -409,58 +423,50 @@ async function confirmDelete() {
     </section>
 
     <!-- Rename modal -->
-    <div v-if="renameTarget" class="cmp-modal-scrim" @click.self="cancelRename">
-      <div class="cmp-modal" role="dialog" aria-modal="true" aria-labelledby="rename-title">
-        <h2 id="rename-title" class="cmp-modal-title">Rename campaign</h2>
-        <p class="cmp-modal-lede">Give this campaign a name you'll recognise.</p>
-        <input
-          ref="renameInput"
-          v-model="renameValue"
-          type="text"
-          class="cmp-modal-input"
-          placeholder="Campaign name"
-          maxlength="120"
-          @keydown.enter.prevent="confirmRename"
-          @keydown.esc="cancelRename"
-        />
-        <p v-if="renameError" class="cmp-modal-error" role="alert">{{ renameError }}</p>
-        <div class="cmp-modal-actions">
-          <button type="button" class="cmp-btn cmp-btn--ghost" :disabled="renameSaving" @click="cancelRename">
-            Cancel
-          </button>
-          <button type="button" class="cmp-btn cmp-btn--primary" :disabled="renameSaving" @click="confirmRename">
-            {{ renameSaving ? "Saving…" : "Save" }}
-          </button>
-        </div>
-      </div>
-    </div>
+    <Modal v-model:open="renameOpen" title="Rename campaign" :width="420">
+      <p class="cmp-modal-lede">Give this campaign a name you'll recognise.</p>
+      <TextInput
+        v-model="renameValue"
+        placeholder="Campaign name"
+        @keydown.enter.prevent="confirmRename"
+        @keydown.esc="cancelRename"
+      />
+      <p v-if="renameError" class="cmp-modal-error" role="alert">{{ renameError }}</p>
+      <template #footer>
+        <Button variant="ghost" :disabled="renameSaving" @click="cancelRename">
+          Cancel
+        </Button>
+        <Button variant="primary" :loading="renameSaving" @click="confirmRename">
+          {{ renameSaving ? "Saving…" : "Save" }}
+        </Button>
+      </template>
+    </Modal>
 
     <!-- Delete confirm dialog -->
-    <div v-if="deleteTarget" class="cmp-modal-scrim" @click.self="cancelDelete">
-      <div class="cmp-modal" role="dialog" aria-modal="true" aria-labelledby="delete-title">
-        <h2 id="delete-title" class="cmp-modal-title">
-          {{ deleteIsSoft ? "Archive this campaign?" : "Delete this campaign?" }}
-        </h2>
-        <p class="cmp-modal-lede">
-          <template v-if="deleteIsSoft">
-            “{{ deleteTarget.name }}” has already been sent, so it'll be archived to
-            preserve its delivery history rather than permanently deleted.
-          </template>
-          <template v-else>
-            “{{ deleteTarget.name }}” will be permanently deleted. This can't be undone.
-          </template>
-        </p>
-        <p v-if="deleteError" class="cmp-modal-error" role="alert">{{ deleteError }}</p>
-        <div class="cmp-modal-actions">
-          <button type="button" class="cmp-btn cmp-btn--ghost" :disabled="deleteBusy" @click="cancelDelete">
-            Cancel
-          </button>
-          <button type="button" class="cmp-btn cmp-btn--danger" :disabled="deleteBusy" @click="confirmDelete">
-            {{ deleteBusy ? "Working…" : deleteIsSoft ? "Archive" : "Delete" }}
-          </button>
-        </div>
-      </div>
-    </div>
+    <Modal
+      v-model:open="deleteOpen"
+      :title="deleteIsSoft ? 'Archive this campaign?' : 'Delete this campaign?'"
+      :width="420"
+    >
+      <p class="cmp-modal-lede">
+        <template v-if="deleteIsSoft">
+          “{{ deleteTarget?.name }}” has already been sent, so it'll be archived to
+          preserve its delivery history rather than permanently deleted.
+        </template>
+        <template v-else>
+          “{{ deleteTarget?.name }}” will be permanently deleted. This can't be undone.
+        </template>
+      </p>
+      <p v-if="deleteError" class="cmp-modal-error" role="alert">{{ deleteError }}</p>
+      <template #footer>
+        <Button variant="ghost" :disabled="deleteBusy" @click="cancelDelete">
+          Cancel
+        </Button>
+        <Button variant="danger" :loading="deleteBusy" @click="confirmDelete">
+          {{ deleteBusy ? "Working…" : deleteIsSoft ? "Archive" : "Delete" }}
+        </Button>
+      </template>
+    </Modal>
   </div>
 </template>
 
@@ -495,36 +501,6 @@ async function confirmDelete() {
   font-size: var(--text-md);
   color: var(--color-ink-soft);
 }
-.cmp-cta {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-3) var(--space-5);
-  background: var(--btn-primary-bg);
-  color: var(--btn-primary-fg);
-  font-family: var(--font-display);
-  font-size: var(--text-sm);
-  font-weight: 700;
-  border-radius: var(--radius-md);
-  text-decoration: none;
-  box-shadow: var(--shadow-sm);
-  transition: background-color var(--dur-base) var(--ease-out),
-              transform var(--dur-fast) var(--ease-out),
-              box-shadow var(--dur-base) var(--ease-out);
-  white-space: nowrap;
-}
-.cmp-cta:hover {
-  background: var(--btn-primary-hover);
-  box-shadow: var(--shadow-md);
-}
-.cmp-cta:active {
-  transform: translateY(1px);
-}
-.cmp-cta:focus-visible {
-  outline: none;
-  box-shadow: var(--shadow-pop-glow);
-}
-
 /* KPI strip — three cards across, stack on narrow viewports. */
 .cmp-kpis {
   display: grid;
@@ -853,94 +829,16 @@ async function confirmDelete() {
   }
 }
 
-/* ── Modal / confirm dialog ─────────────────────────────────────────────────── */
-.cmp-modal-scrim {
-  position: fixed;
-  inset: 0;
-  z-index: 100;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--space-5);
-  background: rgba(0, 0, 0, 0.4);
-}
-.cmp-modal {
-  width: 100%;
-  max-width: 420px;
-  background: var(--color-surface);
-  border: 1px solid var(--color-rule);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-lg, var(--shadow-md));
-  padding: var(--space-5);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-.cmp-modal-title {
-  font-family: var(--font-display);
-  font-size: var(--text-xl);
-  font-weight: 800;
-  letter-spacing: var(--tracking-tight);
-  margin: 0;
-  color: var(--color-ink);
-}
+/* ── Modal content (lede + error live inside the shared <Modal>) ─────────────── */
 .cmp-modal-lede {
-  margin: 0;
+  margin: 0 0 var(--space-3);
   font-size: var(--text-sm);
   color: var(--color-ink-soft);
   line-height: var(--leading-normal);
 }
-.cmp-modal-input {
-  width: 100%;
-  padding: var(--space-3) var(--space-3);
-  border: 1px solid var(--color-rule);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-  color: var(--color-ink);
-  font-family: var(--font-body);
-  font-size: var(--text-md);
-}
-.cmp-modal-input:focus-visible {
-  outline: none;
-  border-color: var(--color-pop);
-  box-shadow: var(--shadow-pop-glow);
-}
 .cmp-modal-error {
-  margin: 0;
+  margin: var(--space-3) 0 0;
   font-size: var(--text-sm);
   color: var(--color-danger, #d23b3b);
 }
-.cmp-modal-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--space-2);
-  margin-top: var(--space-2);
-}
-.cmp-btn {
-  padding: var(--space-2) var(--space-4);
-  border-radius: var(--radius-md);
-  font-family: var(--font-display);
-  font-size: var(--text-sm);
-  font-weight: 700;
-  cursor: pointer;
-  border: 1px solid transparent;
-  transition: background var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
-}
-.cmp-btn:disabled { opacity: 0.6; cursor: default; }
-.cmp-btn--ghost {
-  background: transparent;
-  color: var(--color-ink-soft);
-  border-color: var(--color-rule);
-}
-.cmp-btn--ghost:hover:not(:disabled) { background: var(--color-surface-2); color: var(--color-ink); }
-.cmp-btn--primary {
-  background: var(--btn-primary-bg);
-  color: var(--btn-primary-fg);
-}
-.cmp-btn--primary:hover:not(:disabled) { background: var(--btn-primary-hover); }
-.cmp-btn--danger {
-  background: var(--color-danger, #d23b3b);
-  color: #fff;
-}
-.cmp-btn--danger:hover:not(:disabled) { filter: brightness(0.94); }
 </style>

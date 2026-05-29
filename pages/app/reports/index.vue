@@ -92,12 +92,10 @@ function onExport() {
         <h1>Reports</h1>
         <p class="rep-lede">Campaign performance, audience health, and deliverability at a glance.</p>
       </div>
-      <button type="button" class="rep-export" @click="onExport">
-        <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
-          <path d="M7 1.8 V8.8 M3.6 5.4 L7 8.8 L10.4 5.4 M2.2 11.2 H11.8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none" />
-        </svg>
-        <span>Export CSV</span>
-      </button>
+      <Button variant="ghost" @click="onExport">
+        <template #leading><Icon name="download" size="sm" /></template>
+        Export CSV
+      </Button>
     </header>
 
     <p v-if="error" class="rep-error">{{ error }}</p>
@@ -148,23 +146,6 @@ function onExport() {
   font-size: var(--text-md);
   color: var(--color-ink-soft);
 }
-.rep-export {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-3) var(--space-5);
-  background: transparent;
-  color: var(--btn-ghost-fg);
-  border: 1px solid var(--btn-ghost-border);
-  border-radius: var(--radius-md);
-  font-family: var(--font-body);
-  font-size: var(--text-sm);
-  font-weight: 600;
-  cursor: pointer;
-  white-space: nowrap;
-}
-.rep-export:hover { background: var(--btn-ghost-hover-bg); border-color: var(--color-rule-strong); }
-.rep-export:focus-visible { outline: none; box-shadow: var(--shadow-pop-glow); }
 .rep-error {
   margin: 0;
   padding: var(--space-3) var(--space-4);

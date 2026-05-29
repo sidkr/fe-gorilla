@@ -90,12 +90,9 @@ async function onSubmit() {
           <!-- Password -->
           <FormField label="Password" inputId="password">
             <TextInput v-model="password" id="password" type="password" autocomplete="current-password" />
-            <template #default>
-              <TextInput v-model="password" id="password" type="password" autocomplete="current-password" />
-              <div class="field-row">
-                <NuxtLink to="/forgot-password" class="forgot-link">Forgot password?</NuxtLink>
-              </div>
-            </template>
+            <div class="field-row">
+              <NuxtLink to="/forgot-password" class="forgot-link">Forgot password?</NuxtLink>
+            </div>
           </FormField>
 
           <!-- Error -->
@@ -314,33 +311,6 @@ async function onSubmit() {
     flex-direction: column;
     gap: var(--space-4);
   }
-  .field { display: flex; flex-direction: column; gap: var(--space-2); }
-  .field label {
-    font-family: var(--font-body);
-    font-size: var(--text-sm);
-    font-weight: 600;
-    color: var(--color-ink);
-  }
-  .input-shell {
-    position: relative;
-    display: flex;
-    align-items: center;
-  }
-  .input {
-    width: 100%;
-    height: 44px;
-    padding: 0 var(--space-4);
-    font-family: var(--font-body);
-    font-size: var(--text-md);
-    color: var(--field-text);
-    background: var(--field-bg);
-    border: 1px solid var(--field-border);
-    border-radius: var(--radius-md);
-    outline: none;
-    transition: border-color var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out);
-  }
-  .input::placeholder { color: var(--field-placeholder); }
-  .input:focus { border-color: var(--field-border-focus); box-shadow: var(--shadow-pop-glow); }
 
   /* ── Forgot-password row under the password field ───────────────────── */
   .field-row {
@@ -373,40 +343,6 @@ async function onSubmit() {
     font-size: var(--text-sm);
     line-height: var(--leading-snug);
   }
-
-  /* ── Buttons ─────────────────────────────────────────────────────────── */
-  .btn {
-    width: 100%;
-    height: 48px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: var(--space-2);
-    white-space: nowrap;
-    border-radius: var(--radius-md);
-    font-family: var(--font-display);
-    font-weight: 700;
-    font-size: var(--text-md);
-    cursor: pointer;
-    border: 1px solid transparent;
-    transition: background var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out);
-  }
-  .btn:disabled {
-    opacity: 0.65;
-    cursor: not-allowed;
-  }
-  .btn-primary {
-    background: var(--btn-primary-bg);
-    color: var(--btn-primary-fg);
-    box-shadow: var(--shadow-md);
-  }
-  .btn-primary:hover:not(:disabled) { background: var(--btn-primary-hover); }
-  .btn-ghost {
-    background: var(--color-surface);
-    color: var(--btn-ghost-fg);
-    border-color: var(--btn-ghost-border);
-  }
-  .btn-ghost:hover { background: var(--btn-ghost-hover-bg); }
 
   /* ── OR divider ──────────────────────────────────────────────────────── */
   .or {

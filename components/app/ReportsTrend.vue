@@ -73,13 +73,14 @@ const ticks = computed(() => {
 
 <template>
   <div class="rt">
-    <div class="rt-eyebrow">
-      <span class="rt-eyebrow-dot" aria-hidden="true"></span>
-      <span>Engagement over time</span>
-      <span v-if="demo" class="rt-sample">Sample</span>
-    </div>
+    <SectionEyebrow>
+      Engagement over time
+      <template v-if="demo" #trailing>
+        <Pill tone="brand" class="rt-sample">Sample</Pill>
+      </template>
+    </SectionEyebrow>
 
-    <div class="rt-card">
+    <Card padding="md" class="rt-card">
       <template v-if="hasData">
         <div class="rt-head">
           <div class="rt-legend">
@@ -149,23 +150,25 @@ const ticks = computed(() => {
         </div>
       </template>
 
-      <div v-else class="rt-empty">
-        <svg width="40" height="40" viewBox="0 0 40 40" aria-hidden="true" class="rt-empty-icon">
-          <path
-            d="M5 30 L15 20 L23 26 L35 12"
-            fill="none"
-            stroke="var(--color-pop)"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          />
-          <circle cx="35" cy="12" r="2.5" fill="var(--color-pop)" />
-        </svg>
-        <p class="rt-empty-text">
-          Your opens &amp; clicks will chart here as events roll in after your first send.
-        </p>
-      </div>
-    </div>
+      <EmptyState
+        v-else
+        subtitle="Your opens & clicks will chart here as events roll in after your first send."
+      >
+        <template #icon>
+          <svg width="40" height="40" viewBox="0 0 40 40" aria-hidden="true" class="rt-empty-icon">
+            <path
+              d="M5 30 L15 20 L23 26 L35 12"
+              fill="none"
+              stroke="var(--color-pop)"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+            <circle cx="35" cy="12" r="2.5" fill="var(--color-pop)" />
+          </svg>
+        </template>
+      </EmptyState>
+    </Card>
   </div>
 </template>
 
@@ -176,43 +179,11 @@ const ticks = computed(() => {
   gap: var(--space-3);
   width: 100%;
 }
-.rt-eyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  font-family: var(--font-body);
-  font-size: var(--text-xs);
-  font-weight: 600;
-  letter-spacing: var(--tracking-wider);
-  text-transform: uppercase;
-  color: var(--color-ink-dim);
-}
-.rt-eyebrow-dot {
-  display: inline-block;
-  width: var(--space-2);
-  height: var(--space-2);
-  background: var(--color-pop);
-  border-radius: var(--radius-pill);
-  box-shadow: 0 0 0 3px var(--color-pop-glow);
-}
 .rt-sample {
-  display: inline-flex;
-  align-items: center;
-  padding: var(--space-1) var(--space-2);
-  border-radius: var(--radius-pill);
-  background: var(--color-pop-bg);
-  color: var(--color-pop-deep);
-  font-size: 10px;
-  font-weight: 700;
   letter-spacing: var(--tracking-wide);
   text-transform: uppercase;
 }
-.rt-card {
-  background: var(--color-surface);
-  border: 1px solid var(--color-rule);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
-  padding: var(--space-5);
+.rt-card :deep(.card__body) {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
@@ -265,25 +236,7 @@ const ticks = computed(() => {
   font-size: 10px; /* coordinate-space units */
   fill: var(--color-ink-dim);
 }
-.rt-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  gap: var(--space-3);
-  min-height: 160px;
-  padding: var(--space-5) var(--space-4);
-}
 .rt-empty-icon {
   opacity: 0.7;
-}
-.rt-empty-text {
-  margin: 0;
-  max-width: 32ch;
-  font-family: var(--font-body);
-  font-size: var(--text-sm);
-  line-height: var(--leading-normal);
-  color: var(--color-ink-dim);
 }
 </style>

@@ -171,18 +171,22 @@ async function removeAudience(a) {
         <p class="aud-lede">Contact lists you can send campaigns to.</p>
       </div>
       <div class="aud-header-actions">
-        <NuxtLink to="/app/audiences/fields" class="aud-cta aud-cta--ghost">
-          <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
-            <path d="M2 4h10M2 7h10M2 10h6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
-          </svg>
-          <span>Manage fields</span>
-        </NuxtLink>
-        <button type="button" class="aud-cta" @click="openCreate">
-          <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
-            <path d="M7 2.5 V11.5 M2.5 7 H11.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
-          </svg>
-          <span>New audience</span>
-        </button>
+        <Button to="/app/audiences/fields" variant="ghost">
+          <template #leading>
+            <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+              <path d="M2 4h10M2 7h10M2 10h6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+            </svg>
+          </template>
+          Manage fields
+        </Button>
+        <Button variant="primary" @click="openCreate">
+          <template #leading>
+            <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+              <path d="M7 2.5 V11.5 M2.5 7 H11.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+            </svg>
+          </template>
+          New audience
+        </Button>
       </div>
     </header>
 
@@ -215,19 +219,22 @@ async function removeAudience(a) {
       </p>
 
       <!-- Empty -->
-      <div v-else-if="audiences.length === 0" class="aud-empty">
-        <h2 class="aud-empty-title">No audiences yet</h2>
-        <p class="aud-empty-lede">
-          Create your first audience to start collecting contacts and sending
-          campaigns.
-        </p>
-        <button type="button" class="aud-cta" @click="openCreate">
-          <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
-            <path d="M7 2.5 V11.5 M2.5 7 H11.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
-          </svg>
-          <span>New audience</span>
-        </button>
-      </div>
+      <EmptyState
+        v-else-if="audiences.length === 0"
+        title="No audiences yet"
+        subtitle="Create your first audience to start collecting contacts and sending campaigns."
+      >
+        <template #action>
+          <Button variant="primary" @click="openCreate">
+            <template #leading>
+              <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+                <path d="M7 2.5 V11.5 M2.5 7 H11.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+              </svg>
+            </template>
+            New audience
+          </Button>
+        </template>
+      </EmptyState>
 
       <!-- Grid -->
       <div v-else class="aud-grid">
@@ -244,16 +251,16 @@ async function removeAudience(a) {
             :tag="a.archived ? 'Archived' : null"
           />
           <div class="aud-cell-actions">
-            <button type="button" class="aud-cell-link" @click="openRename(a)">Rename</button>
-            <button
-              type="button"
-              class="aud-cell-link aud-cell-link--danger"
+            <Button variant="subtle" size="sm" @click="openRename(a)">Rename</Button>
+            <Button
+              variant="danger"
+              size="sm"
               :disabled="deletingId === a.id"
               :title="(a.contactCount || 0) > 0 ? 'Remove all contacts before deleting' : 'Delete this audience'"
               @click="removeAudience(a)"
             >
               {{ deletingId === a.id ? "Deleting…" : "Delete" }}
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -264,34 +271,28 @@ async function removeAudience(a) {
       <div class="aud-modal" role="dialog" aria-modal="true" aria-labelledby="aud-modal-title">
         <h2 id="aud-modal-title" class="aud-modal-title">New audience</h2>
         <form @submit.prevent="submitCreate">
-          <label class="aud-field">
-            <span class="aud-field-label">Name</span>
-            <input
+          <FormField label="Name" class="aud-field">
+            <TextInput
               v-model="newName"
-              class="aud-input"
               type="text"
-              maxlength="80"
               placeholder="e.g. Newsletter subscribers"
-              autofocus
             />
-          </label>
-          <label class="aud-field">
-            <span class="aud-field-label">Description <span class="aud-field-opt">(optional)</span></span>
-            <input
+          </FormField>
+          <FormField label="Description" hint="(optional)" class="aud-field">
+            <TextInput
               v-model="newDescription"
-              class="aud-input"
               type="text"
               placeholder="What is this list for?"
             />
-          </label>
+          </FormField>
           <p v-if="createError" class="aud-modal-error">{{ createError }}</p>
           <div class="aud-modal-actions">
-            <button type="button" class="aud-btn aud-btn--ghost" :disabled="creating" @click="closeCreate">
+            <Button variant="ghost" :disabled="creating" @click="closeCreate">
               Cancel
-            </button>
-            <button type="submit" class="aud-btn aud-btn--primary" :disabled="creating">
+            </Button>
+            <Button type="submit" variant="primary" :loading="creating">
               {{ creating ? "Creating…" : "Create audience" }}
-            </button>
+            </Button>
           </div>
         </form>
       </div>
@@ -302,20 +303,18 @@ async function removeAudience(a) {
       <div class="aud-modal" role="dialog" aria-modal="true" aria-labelledby="aud-rename-title">
         <h2 id="aud-rename-title" class="aud-modal-title">Rename audience</h2>
         <form @submit.prevent="submitRename">
-          <label class="aud-field">
-            <span class="aud-field-label">Name</span>
-            <input v-model="renameName" class="aud-input" type="text" maxlength="80" autofocus />
-          </label>
-          <label class="aud-field">
-            <span class="aud-field-label">Description <span class="aud-field-opt">(optional)</span></span>
-            <input v-model="renameDescription" class="aud-input" type="text" />
-          </label>
+          <FormField label="Name" class="aud-field">
+            <TextInput v-model="renameName" type="text" />
+          </FormField>
+          <FormField label="Description" hint="(optional)" class="aud-field">
+            <TextInput v-model="renameDescription" type="text" />
+          </FormField>
           <p v-if="renameError" class="aud-modal-error">{{ renameError }}</p>
           <div class="aud-modal-actions">
-            <button type="button" class="aud-btn aud-btn--ghost" :disabled="renaming" @click="closeRename">Cancel</button>
-            <button type="submit" class="aud-btn aud-btn--primary" :disabled="renaming">
+            <Button variant="ghost" :disabled="renaming" @click="closeRename">Cancel</Button>
+            <Button type="submit" variant="primary" :loading="renaming">
               {{ renaming ? "Saving…" : "Save changes" }}
-            </button>
+            </Button>
           </div>
         </form>
       </div>
@@ -354,53 +353,11 @@ async function removeAudience(a) {
   font-size: var(--text-md);
   color: var(--color-ink-soft);
 }
-.aud-cta {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-3) var(--space-5);
-  background: var(--btn-primary-bg);
-  color: var(--btn-primary-fg);
-  font-family: var(--font-body);
-  font-size: var(--text-sm);
-  font-weight: 600;
-  border: none;
-  border-radius: var(--radius-md);
-  text-decoration: none;
-  box-shadow: var(--shadow-sm);
-  cursor: pointer;
-  transition: background-color var(--dur-base) var(--ease-out),
-              transform var(--dur-fast) var(--ease-out),
-              box-shadow var(--dur-base) var(--ease-out);
-  white-space: nowrap;
-}
-.aud-cta:hover {
-  background: var(--btn-primary-hover);
-  box-shadow: var(--shadow-md);
-}
-.aud-cta:active {
-  transform: translateY(1px);
-}
-.aud-cta:focus-visible {
-  outline: none;
-  box-shadow: var(--shadow-pop-glow);
-}
 .aud-header-actions {
   display: inline-flex;
   align-items: center;
   gap: var(--space-3);
   flex-wrap: wrap;
-}
-.aud-cta--ghost {
-  background: var(--color-surface);
-  color: var(--color-ink-soft);
-  border: 1px solid var(--color-rule);
-  box-shadow: none;
-}
-.aud-cta--ghost:hover {
-  background: var(--color-surface-sunk);
-  color: var(--color-ink);
-  box-shadow: none;
 }
 
 /* KPI strip — 3 cards */
@@ -461,32 +418,6 @@ async function removeAudience(a) {
   text-decoration: underline;
 }
 
-/* Empty state */
-.aud-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--space-3);
-  padding: var(--space-7) var(--space-6);
-  background: var(--color-surface);
-  border: 1px dashed var(--color-rule-strong);
-  border-radius: var(--radius-lg);
-}
-.aud-empty-title {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: var(--text-xl);
-  font-weight: 700;
-  color: var(--color-ink);
-}
-.aud-empty-lede {
-  margin: 0 0 var(--space-2);
-  font-family: var(--font-body);
-  font-size: var(--text-sm);
-  color: var(--color-ink-soft);
-  max-width: 46ch;
-}
-
 /* Card grid — 3 cols ≥960px, 2 cols 720-960, 1 col below 720 */
 .aud-grid {
   display: grid;
@@ -509,21 +440,6 @@ async function removeAudience(a) {
   gap: var(--space-1);
   padding: 0 var(--space-2);
 }
-.aud-cell-link {
-  background: none;
-  border: none;
-  padding: var(--space-1) var(--space-2);
-  font-family: var(--font-body);
-  font-size: var(--text-xs);
-  font-weight: 600;
-  color: var(--color-ink-dim);
-  cursor: pointer;
-  border-radius: var(--radius-sm);
-}
-.aud-cell-link:hover { color: var(--color-ink); background: var(--color-surface-sunk); }
-.aud-cell-link:disabled { opacity: 0.5; cursor: default; }
-.aud-cell-link--danger { color: var(--color-danger); }
-.aud-cell-link--danger:hover { color: var(--color-danger); }
 
 /* Modal */
 .aud-modal-backdrop {
@@ -553,38 +469,7 @@ async function removeAudience(a) {
   color: var(--color-ink);
 }
 .aud-field {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
   margin-bottom: var(--space-4);
-}
-.aud-field-label {
-  font-family: var(--font-body);
-  font-size: var(--text-sm);
-  font-weight: 600;
-  color: var(--color-ink);
-}
-.aud-field-opt {
-  font-weight: 400;
-  color: var(--color-ink-dim);
-}
-.aud-input {
-  width: 100%;
-  padding: var(--space-2) var(--space-3);
-  min-height: var(--field-height);
-  border: 1px solid var(--field-border);
-  border-radius: var(--radius-sm);
-  background: var(--field-bg);
-  color: var(--field-text);
-  font-family: var(--font-body);
-  font-size: var(--text-sm);
-  outline: none;
-  transition: border-color var(--dur-fast) var(--ease-out),
-              box-shadow var(--dur-fast) var(--ease-out);
-}
-.aud-input:focus-visible {
-  border-color: var(--field-border-focus);
-  box-shadow: var(--shadow-pop-glow);
 }
 .aud-modal-error {
   margin: 0 0 var(--space-3);
@@ -598,26 +483,4 @@ async function removeAudience(a) {
   gap: var(--space-3);
   margin-top: var(--space-5);
 }
-.aud-btn {
-  padding: var(--space-2) var(--space-5);
-  border-radius: var(--radius-md);
-  font-family: var(--font-body);
-  font-size: var(--text-sm);
-  font-weight: 600;
-  cursor: pointer;
-  border: 1px solid transparent;
-  transition: background-color var(--dur-base) var(--ease-out);
-}
-.aud-btn:disabled { opacity: 0.6; cursor: default; }
-.aud-btn--primary {
-  background: var(--btn-primary-bg);
-  color: var(--btn-primary-fg);
-}
-.aud-btn--primary:not(:disabled):hover { background: var(--btn-primary-hover); }
-.aud-btn--ghost {
-  background: transparent;
-  color: var(--color-ink-soft);
-  border-color: var(--color-rule);
-}
-.aud-btn--ghost:not(:disabled):hover { background: var(--color-surface-sunk); }
 </style>

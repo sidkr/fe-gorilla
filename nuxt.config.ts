@@ -77,6 +77,13 @@ export default defineNuxtConfig({
     // it's taken; defaults to 8080. In dev, Parse is started by the concurrent
     // `node ./server/index.js`; in prod, run that process separately.
     "/api/**":    { proxy: `http://localhost:${process.env.PARSE_PORT || 8080}/api/**` },
+
+    // Tracking + unsubscribe endpoints live on the Express server (open pixel
+    // /t/o, click /t/c, unsubscribe /u). Proxy them so the links embedded in
+    // sent emails (PUBLIC_BASE_URL = the public origin) resolve through the
+    // same origin — in dev via :3001, in prod/tunnel via the public host.
+    "/t/**":      { proxy: `http://localhost:${process.env.PARSE_PORT || 8080}/t/**` },
+    "/u/**":      { proxy: `http://localhost:${process.env.PARSE_PORT || 8080}/u/**` },
   },
 
   // Marketing pages prerendered to static HTML at build time (SEO + speed),

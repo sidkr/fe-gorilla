@@ -97,37 +97,40 @@ const secondary = computed(() => {
 <template>
   <section class="re" aria-label="Engagement breakdown">
     <header class="re-head">
-      <div class="re-eyebrow">
-        <span class="re-eyebrow-dot" aria-hidden="true"></span>
-        <span>Engagement</span>
-      </div>
-      <span v-if="demo" class="re-sample-pill">Sample</span>
+      <SectionEyebrow>
+        Engagement
+        <template v-if="demo" #trailing>
+          <Pill tone="brand">Sample</Pill>
+        </template>
+      </SectionEyebrow>
     </header>
 
-    <div class="re-card">
+    <Card padding="md">
+      <div class="re-body">
       <!-- Empty state: fresh org, nothing sent/engaged yet -->
-      <div v-if="isEmpty" class="re-empty">
-        <svg
-          class="re-empty-icon"
-          width="28"
-          height="28"
-          viewBox="0 0 24 24"
-          fill="none"
-          aria-hidden="true"
-        >
-          <path
-            d="M3 13h4l2 5 4-12 2 7h6"
-            stroke="currentColor"
-            stroke-width="1.6"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          />
-        </svg>
-        <p class="re-empty-title">No engagement yet</p>
-        <p class="re-empty-sub">
-          Opens and clicks will appear here once your first campaign goes out.
-        </p>
-      </div>
+      <EmptyState
+        v-if="isEmpty"
+        title="No engagement yet"
+        subtitle="Opens and clicks will appear here once your first campaign goes out."
+      >
+        <template #icon>
+          <svg
+            width="28"
+            height="28"
+            viewBox="0 0 24 24"
+            fill="none"
+            aria-hidden="true"
+          >
+            <path
+              d="M3 13h4l2 5 4-12 2 7h6"
+              stroke="currentColor"
+              stroke-width="1.6"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+        </template>
+      </EmptyState>
 
       <template v-else>
         <!-- Funnel: Delivered → Opened → Clicked -->
@@ -160,7 +163,8 @@ const secondary = computed(() => {
           </div>
         </div>
       </template>
-    </div>
+      </div>
+    </Card>
   </section>
 </template>
 
@@ -174,47 +178,10 @@ const secondary = computed(() => {
 .re-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: var(--space-2);
-}
-.re-eyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  font-family: var(--font-body);
-  font-size: var(--text-xs);
-  font-weight: 600;
-  letter-spacing: var(--tracking-wider);
-  text-transform: uppercase;
-  color: var(--color-ink-dim);
-}
-.re-eyebrow-dot {
-  display: inline-block;
-  width: var(--space-2);
-  height: var(--space-2);
-  background: var(--color-pop);
-  border-radius: var(--radius-pill);
-  box-shadow: 0 0 0 3px var(--color-pop-glow);
-}
-.re-sample-pill {
-  font-family: var(--font-body);
-  font-size: var(--text-xs);
-  font-weight: 600;
-  letter-spacing: var(--tracking-wide);
-  text-transform: uppercase;
-  color: var(--color-pop-deep);
-  background: var(--color-pop-bg);
-  border-radius: var(--radius-pill);
-  padding: var(--space-1) var(--space-2);
-  line-height: 1;
 }
 
-.re-card {
-  background: var(--color-surface);
-  border: 1px solid var(--color-rule);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
-  padding: var(--space-5);
+.re-body {
   min-height: 180px;
   display: flex;
   flex-direction: column;
@@ -323,33 +290,9 @@ const secondary = computed(() => {
   color: var(--color-ink-soft);
 }
 
-/* Empty state */
-.re-empty {
+/* Empty state fills the body's min-height and centers via <EmptyState>. */
+.re-body > .empty {
   flex: 1 1 auto;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  gap: var(--space-2);
   padding: var(--space-4) var(--space-3);
-}
-.re-empty-icon {
-  color: var(--color-rule-strong);
-}
-.re-empty-title {
-  margin: var(--space-1) 0 0;
-  font-family: var(--font-display);
-  font-size: var(--text-sm);
-  font-weight: 700;
-  color: var(--color-ink-soft);
-}
-.re-empty-sub {
-  margin: 0;
-  max-width: 26ch;
-  font-family: var(--font-body);
-  font-size: var(--text-xs);
-  line-height: 1.5;
-  color: var(--color-ink-dim);
 }
 </style>

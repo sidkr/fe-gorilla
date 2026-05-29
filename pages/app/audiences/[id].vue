@@ -431,39 +431,41 @@ const drawerCustomFields = computed(() => {
           <span v-if="audience && audience.description"> &middot; {{ audience.description }}</span>
         </p>
       </div>
-      <button type="button" class="ad-cta" @click="openAdd">
-        <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
-          <path d="M7 2.5 V11.5 M2.5 7 H11.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
-        </svg>
-        <span>Add contact</span>
-      </button>
+      <Button variant="primary" @click="openAdd">
+        <template #leading>
+          <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+            <path d="M7 2.5 V11.5 M2.5 7 H11.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+          </svg>
+        </template>
+        Add contact
+      </Button>
     </header>
 
     <!-- Toolbar -->
     <div class="ad-toolbar">
-      <input
-        v-model="search"
-        class="ad-search"
-        type="search"
-        placeholder="Search by email…"
-        aria-label="Search contacts by email"
-      />
-      <select v-model="statusFilter" class="ad-filter" aria-label="Filter by status">
-        <option value="">All statuses</option>
-        <option value="subscribed">Subscribed</option>
-        <option value="unsubscribed">Unsubscribed</option>
-        <option value="pending">Pending</option>
-        <option value="cleaned">Cleaned</option>
-      </select>
-      <select
-        v-if="knownTags.length"
-        v-model="tagFilter"
-        class="ad-filter"
-        aria-label="Filter by tag"
-      >
-        <option value="">All tags</option>
-        <option v-for="t in knownTags" :key="t" :value="t">{{ t }}</option>
-      </select>
+      <div class="ad-search">
+        <TextInput
+          v-model="search"
+          type="search"
+          placeholder="Search by email…"
+          aria-label="Search contacts by email"
+        />
+      </div>
+      <div class="ad-filter">
+        <SelectInput v-model="statusFilter" aria-label="Filter by status">
+          <option value="">All statuses</option>
+          <option value="subscribed">Subscribed</option>
+          <option value="unsubscribed">Unsubscribed</option>
+          <option value="pending">Pending</option>
+          <option value="cleaned">Cleaned</option>
+        </SelectInput>
+      </div>
+      <div v-if="knownTags.length" class="ad-filter">
+        <SelectInput v-model="tagFilter" aria-label="Filter by tag">
+          <option value="">All tags</option>
+          <option v-for="t in knownTags" :key="t" :value="t">{{ t }}</option>
+        </SelectInput>
+      </div>
       <span class="ad-toolbar-spacer" aria-hidden="true"></span>
       <NuxtLink to="/app/audiences/fields" class="ad-toolbar-link">Manage fields</NuxtLink>
     </div>
@@ -472,10 +474,10 @@ const drawerCustomFields = computed(() => {
     <div v-if="selectedCount > 0" class="ad-bulkbar">
       <span class="ad-bulkbar-count">{{ selectedCount }} selected</span>
       <div class="ad-bulkbar-actions">
-        <button type="button" class="ad-btn ad-btn--ghost" :disabled="bulkBusy" @click="bulkTag('add')">Add tag</button>
-        <button type="button" class="ad-btn ad-btn--ghost" :disabled="bulkBusy" @click="bulkTag('remove')">Remove tag</button>
-        <button type="button" class="ad-btn ad-btn--ghost ad-btn--danger" :disabled="bulkBusy" @click="bulkDelete">Remove from audience</button>
-        <button type="button" class="ad-btn ad-btn--ghost" :disabled="bulkBusy" @click="clearSelection">Clear</button>
+        <Button variant="ghost" size="sm" :disabled="bulkBusy" @click="bulkTag('add')">Add tag</Button>
+        <Button variant="ghost" size="sm" :disabled="bulkBusy" @click="bulkTag('remove')">Remove tag</Button>
+        <Button variant="danger" size="sm" :disabled="bulkBusy" @click="bulkDelete">Remove from audience</Button>
+        <Button variant="ghost" size="sm" :disabled="bulkBusy" @click="clearSelection">Clear</Button>
       </div>
     </div>
 
@@ -485,39 +487,43 @@ const drawerCustomFields = computed(() => {
       {{ listError }}
       <button type="button" class="ad-retry" @click="loadContacts">Retry</button>
     </p>
-    <div v-else-if="contacts.length === 0" class="ad-empty">
-      <h2 class="ad-empty-title">No contacts yet</h2>
-      <p class="ad-empty-lede">Add your first contact to start building this audience.</p>
-      <button type="button" class="ad-cta" @click="openAdd">
-        <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
-          <path d="M7 2.5 V11.5 M2.5 7 H11.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
-        </svg>
-        <span>Add contact</span>
-      </button>
-    </div>
+    <EmptyState
+      v-else-if="contacts.length === 0"
+      title="No contacts yet"
+      subtitle="Add your first contact to start building this audience."
+    >
+      <template #action>
+        <Button variant="primary" @click="openAdd">
+          <template #leading>
+            <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+              <path d="M7 2.5 V11.5 M2.5 7 H11.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+            </svg>
+          </template>
+          Add contact
+        </Button>
+      </template>
+    </EmptyState>
 
-    <div v-else class="ad-table-wrap">
-      <table class="ad-table">
-        <thead>
-          <tr>
-            <th class="ad-th-check">
-              <input
-                type="checkbox"
-                :checked="allOnPageSelected"
-                aria-label="Select all on this page"
-                @change="toggleAllOnPage"
-              />
-            </th>
-            <th>Email</th>
-            <th>Name</th>
-            <th>Status</th>
-            <th v-for="f in columnFields" :key="f.id">{{ f.label }}</th>
-            <th>Tags</th>
-            <th>Added</th>
-            <th class="ad-th-actions"><span class="sr-only">Actions</span></th>
-          </tr>
-        </thead>
-        <tbody>
+    <div v-else>
+      <TableShell>
+        <template #head>
+          <th class="ad-th-check">
+            <input
+              type="checkbox"
+              :checked="allOnPageSelected"
+              aria-label="Select all on this page"
+              @change="toggleAllOnPage"
+            />
+          </th>
+          <th>Email</th>
+          <th>Name</th>
+          <th>Status</th>
+          <th v-for="f in columnFields" :key="f.id">{{ f.label }}</th>
+          <th>Tags</th>
+          <th>Added</th>
+          <th class="ad-th-actions"><span class="sr-only">Actions</span></th>
+        </template>
+        <template #body>
           <tr
             v-for="c in contacts"
             :key="c.id"
@@ -553,8 +559,8 @@ const drawerCustomFields = computed(() => {
               <button type="button" class="ad-link ad-link--danger" @click="removeContact(c)">Remove</button>
             </td>
           </tr>
-        </tbody>
-      </table>
+        </template>
+      </TableShell>
 
       <!-- Pager -->
       <div class="ad-pager">
@@ -562,17 +568,17 @@ const drawerCustomFields = computed(() => {
           {{ total.toLocaleString("en-US") }} contacts &middot; page {{ page + 1 }} of {{ totalPages }}
         </span>
         <div class="ad-pager-btns">
-          <button type="button" class="ad-btn ad-btn--ghost" :disabled="page === 0" @click="goPage(-1)">
+          <Button variant="ghost" size="sm" :disabled="page === 0" @click="goPage(-1)">
             Previous
-          </button>
-          <button
-            type="button"
-            class="ad-btn ad-btn--ghost"
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
             :disabled="page + 1 >= totalPages"
             @click="goPage(1)"
           >
             Next
-          </button>
+          </Button>
         </div>
       </div>
     </div>

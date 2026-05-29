@@ -397,25 +397,6 @@ useHead({
     }
     .eyebrow .sep { color: var(--color-ink-dim); }
 
-    /* ── Section eyebrow (mono small caps with coral dot) ──── */
-    .sect-eyebrow {
-      display: inline-flex;
-      align-items: center;
-      gap: var(--space-2);
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      letter-spacing: var(--tracking-wider);
-      color: var(--color-ink-soft);
-      text-transform: uppercase;
-    }
-    .sect-eyebrow::before {
-      content: "";
-      width: 8px;
-      height: 8px;
-      background: var(--color-pop);
-      display: inline-block;
-    }
-
     /* ── Nav ───────────────────────────────────────────────── */
     .nav {
       position: sticky;
@@ -444,13 +425,6 @@ useHead({
     }
     .nav-links a:hover { color: var(--color-ink); }
     .nav-cta { display: flex; align-items: center; gap: var(--space-3); flex-shrink: 0; }
-    .nav-signin {
-      font-size: var(--text-sm);
-      font-weight: 500;
-      color: var(--color-ink);
-      padding: 0 var(--space-3);
-      white-space: nowrap;
-    }
 
     /* ── Hero ──────────────────────────────────────────────── */
     .hero {
@@ -571,7 +545,7 @@ useHead({
       padding: var(--space-9) 0;
     }
     .sect-head { margin-bottom: var(--space-7); max-width: 720px; }
-    .sect-head .sect-eyebrow { margin-bottom: var(--space-4); }
+    .sect-head .eyebrow { margin-bottom: var(--space-4); }
     .sect-head h2 {
       font-family: var(--font-display);
       font-weight: 800;
@@ -756,15 +730,6 @@ useHead({
       margin-left: auto;
       margin-right: auto;
     }
-    .final-cta .btn-primary {
-      background: var(--color-pop);
-      color: var(--color-ink-on-pop);
-      height: 56px;
-      padding: 0 var(--space-6);
-      font-size: var(--text-md);
-      font-weight: 700;
-    }
-    .final-cta .btn-primary:hover { background: var(--color-pop-deep); }
     .final-cta .trust {
       margin-top: var(--space-5);
       font-size: var(--text-sm);

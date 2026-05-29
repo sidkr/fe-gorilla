@@ -162,12 +162,10 @@ const quickActions = [
         <h1>Welcome, {{ auth.name || auth.username }}.</h1>
         <p class="dash-lede">Here's what's happening across your campaigns.</p>
       </div>
-      <NuxtLink to="/app/campaigns/new" class="dash-cta">
-        <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
-          <path d="M7 2.5 V11.5 M2.5 7 H11.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
-        </svg>
-        <span>New campaign</span>
-      </NuxtLink>
+      <Button variant="primary" to="/app/campaigns/new">
+        <template #leading><Icon name="plus" size="sm" /></template>
+        New campaign
+      </Button>
     </header>
 
     <!-- 2. KPI strip -->
@@ -232,36 +230,27 @@ const quickActions = [
 
     <!-- 4. Funnel -->
     <section class="dash-section">
-      <div class="dash-eyebrow">
-        <span class="dash-eyebrow-dot" aria-hidden="true"></span>
-        <span>Lifetime &middot; campaign performance</span>
-      </div>
-      <div class="dash-card">
+      <SectionEyebrow>Lifetime &middot; campaign performance</SectionEyebrow>
+      <Card>
         <AppCampaignFunnel :stages="funnelStages" />
-      </div>
+      </Card>
     </section>
 
     <!-- 5. Recent campaigns + activity feed -->
     <section class="dash-split dash-split-60-40">
       <div class="dash-section">
-        <div class="dash-eyebrow">
-          <span class="dash-eyebrow-dot" aria-hidden="true"></span>
-          <span>Recent campaigns</span>
-        </div>
-        <div class="dash-card dash-card-flush">
+        <SectionEyebrow>Recent campaigns</SectionEyebrow>
+        <Card padding="none">
           <AppRecentCampaignsTable v-if="recentCampaigns.length" :campaigns="recentCampaigns" />
           <p v-else class="dash-empty">No campaigns sent yet. Your sent campaigns will show up here.</p>
-        </div>
+        </Card>
       </div>
       <AppActivityFeed v-if="activityEvents.length" :events="activityEvents" />
       <div v-else class="dash-section">
-        <div class="dash-eyebrow">
-          <span class="dash-eyebrow-dot" aria-hidden="true"></span>
-          <span>Recent activity</span>
-        </div>
-        <div class="dash-card">
+        <SectionEyebrow>Recent activity</SectionEyebrow>
+        <Card>
           <p class="dash-empty">No recent activity. Subscriber and email events will appear here once you start sending.</p>
-        </div>
+        </Card>
       </div>
     </section>
 
@@ -304,36 +293,6 @@ const quickActions = [
   font-size: var(--text-md);
   color: var(--color-ink-soft);
 }
-.dash-cta {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-3) var(--space-5);
-  background: var(--btn-primary-bg);
-  color: var(--btn-primary-fg);
-  font-family: var(--font-body);
-  font-size: var(--text-sm);
-  font-weight: 600;
-  border-radius: var(--radius-md);
-  text-decoration: none;
-  box-shadow: var(--shadow-sm);
-  transition: background-color var(--dur-base) var(--ease-out),
-              transform var(--dur-fast) var(--ease-out),
-              box-shadow var(--dur-base) var(--ease-out);
-  white-space: nowrap;
-}
-.dash-cta:hover {
-  background: var(--btn-primary-hover);
-  box-shadow: var(--shadow-md);
-}
-.dash-cta:active {
-  transform: translateY(1px);
-}
-.dash-cta:focus-visible {
-  outline: none;
-  box-shadow: var(--shadow-pop-glow);
-}
-
 /* KPI strip */
 .dash-kpis {
   display: grid;
@@ -353,34 +312,6 @@ const quickActions = [
   flex-direction: column;
   gap: var(--space-3);
 }
-.dash-eyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  font-family: var(--font-body);
-  font-size: var(--text-xs);
-  font-weight: 600;
-  letter-spacing: var(--tracking-wider);
-  text-transform: uppercase;
-  color: var(--color-ink-dim);
-}
-.dash-eyebrow-dot {
-  display: inline-block;
-  width: var(--space-2);
-  height: var(--space-2);
-  background: var(--color-pop);
-  border-radius: var(--radius-pill);
-  box-shadow: 0 0 0 3px var(--color-pop-glow);
-}
-.dash-card {
-  background: var(--color-surface);
-  border: 1px solid var(--color-rule);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
-  overflow: hidden;
-}
-.dash-card-flush { padding: 0; }
-
 /* Empty-state copy inside a card (no data yet — pre-send-pipeline). */
 .dash-empty {
   margin: 0;

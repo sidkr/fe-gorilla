@@ -46,9 +46,9 @@ onMounted(load);
 // Filter tabs. "all" shows everything; "saved" = org templates; "standard" =
 // system starters. Counts stay in sync with the live data.
 const tabs = computed(() => [
-  { value: "all", label: "All", count: system.value.length + org.value.length },
-  { value: "saved", label: "Saved by me", count: org.value.length },
-  { value: "standard", label: "Standard", count: system.value.length },
+  { value: "all", label: `All (${system.value.length + org.value.length})` },
+  { value: "saved", label: `Saved by me (${org.value.length})` },
+  { value: "standard", label: `Standard (${system.value.length})` },
 ]);
 
 const activeTab = ref("all");
@@ -116,39 +116,28 @@ async function onDelete(id, name) {
         <h1>Templates</h1>
         <p class="tpl-lede">Reusable email layouts. Save current designs or start from a curated set.</p>
       </div>
-      <NuxtLink to="/app/templates/new" class="tpl-cta">
-        <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
-          <path d="M7 2.5 V11.5 M2.5 7 H11.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
-        </svg>
-        <span>New template</span>
-      </NuxtLink>
+      <Button variant="primary" to="/app/templates/new">
+        <template #leading><Icon name="plus" size="sm" /></template>
+        New template
+      </Button>
     </header>
 
     <!-- 2. Filter tabs -->
-    <div class="tpl-tabs" role="tablist" aria-label="Filter templates">
-      <button
-        v-for="tab in tabs"
-        :key="tab.value"
-        role="tab"
-        type="button"
-        :aria-selected="activeTab === tab.value"
-        :class="['tpl-tab', { 'is-active': activeTab === tab.value }]"
-        @click="activeTab = tab.value"
-      >
-        <span>{{ tab.label }}</span>
-        <span class="tpl-tab-count">({{ tab.count }})</span>
-      </button>
-    </div>
+    <SegmentedControl
+      v-model="activeTab"
+      :options="tabs"
+      aria-label="Filter templates"
+      class="tpl-tabs"
+    />
 
     <!-- 3. States -->
     <p v-if="loadError" class="tpl-error" role="alert">{{ loadError }}</p>
     <p v-if="loading" class="tpl-empty">Loading templates…</p>
-    <p
+    <EmptyState
       v-else-if="visibleTemplates.length === 0"
-      class="tpl-empty"
-    >
-      {{ activeTab === "saved" ? "You haven't saved any templates yet. Use “Save as template” from the editor." : "No templates to show." }}
-    </p>
+      :title="activeTab === 'saved' ? 'No saved templates yet' : 'No templates to show'"
+      :subtitle="activeTab === 'saved' ? 'Use “Save as template” from the editor to add one here.' : undefined"
+    />
 
     <!-- 4. Gallery -->
     <section v-else class="tpl-grid" aria-label="Template gallery">
@@ -177,21 +166,21 @@ async function onDelete(id, name) {
           <!-- Actions. "Use this" for every template; edit + delete only for
                org-owned ("saved") templates. System templates are read-only. -->
           <div class="tpl-card-actions">
-            <button
-              type="button"
-              class="tpl-act tpl-act-primary"
+            <Button
+              variant="primary"
+              size="sm"
               :disabled="busyId === tpl.id"
               @click="onUse(tpl.id)"
             >
               {{ busyId === tpl.id ? "Working…" : "Use this" }}
-            </button>
+            </Button>
             <template v-if="tpl.kind === 'saved'">
-              <button type="button" class="tpl-act" :disabled="busyId === tpl.id" @click="onEdit(tpl.id)">
+              <Button variant="ghost" size="sm" :disabled="busyId === tpl.id" @click="onEdit(tpl.id)">
                 Edit
-              </button>
-              <button type="button" class="tpl-act tpl-act-danger" :disabled="busyId === tpl.id" @click="onDelete(tpl.id, tpl.name)">
+              </Button>
+              <Button variant="danger" size="sm" class="tpl-act-delete" :disabled="busyId === tpl.id" @click="onDelete(tpl.id, tpl.name)">
                 Delete
-              </button>
+              </Button>
             </template>
           </div>
         </div>
@@ -231,83 +220,9 @@ async function onDelete(id, name) {
   font-size: var(--text-md);
   color: var(--color-ink-soft);
 }
-.tpl-cta {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-3) var(--space-5);
-  background: var(--btn-primary-bg);
-  color: var(--btn-primary-fg);
-  font-family: var(--font-body);
-  font-size: var(--text-sm);
-  font-weight: 600;
-  border-radius: var(--radius-md);
-  text-decoration: none;
-  box-shadow: var(--shadow-sm);
-  transition: background-color var(--dur-base) var(--ease-out),
-              transform var(--dur-fast) var(--ease-out),
-              box-shadow var(--dur-base) var(--ease-out);
-  white-space: nowrap;
-}
-.tpl-cta:hover {
-  background: var(--btn-primary-hover);
-  box-shadow: var(--shadow-md);
-}
-.tpl-cta:active {
-  transform: translateY(1px);
-}
-.tpl-cta:focus-visible {
-  outline: none;
-  box-shadow: var(--shadow-pop-glow);
-}
-
-/* Filter tabs — segmented row. Idle tabs are quiet ink-soft on transparent;
-   active tab uses the soft coral background + deep coral text for a
-   strong, on-brand selection state. */
+/* Filter tabs — segmented row aligned to the start of the column. */
 .tpl-tabs {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  padding: var(--space-1);
-  background: var(--color-surface-2);
-  border: 1px solid var(--color-rule);
-  border-radius: var(--radius-pill);
   align-self: flex-start;
-}
-.tpl-tab {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1-5);
-  padding: var(--space-2) var(--space-4);
-  background: transparent;
-  border: none;
-  border-radius: var(--radius-pill);
-  font-family: var(--font-body);
-  font-size: var(--text-sm);
-  font-weight: 600;
-  color: var(--color-ink-soft);
-  cursor: pointer;
-  transition: background-color var(--dur-base) var(--ease-out),
-              color var(--dur-base) var(--ease-out);
-}
-.tpl-tab:hover {
-  color: var(--color-ink);
-}
-.tpl-tab.is-active {
-  background: var(--color-pop-bg);
-  color: var(--color-ink);
-}
-.tpl-tab.is-active .tpl-tab-count {
-  color: var(--color-pop-deep);
-}
-.tpl-tab:focus-visible {
-  outline: none;
-  box-shadow: var(--shadow-pop-glow);
-}
-.tpl-tab-count {
-  font-variant-numeric: tabular-nums;
-  font-weight: 500;
-  color: var(--color-ink-dim);
 }
 
 /* States */
@@ -401,47 +316,9 @@ async function onDelete(id, name) {
   margin-top: var(--space-2);
   flex-wrap: wrap;
 }
-.tpl-act {
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-md);
-  border: 1px solid var(--color-rule);
-  background: var(--color-surface);
-  color: var(--color-ink);
-  font-family: var(--font-body);
-  font-size: var(--text-sm);
-  font-weight: 600;
-  cursor: pointer;
-  transition: background-color var(--dur-base) var(--ease-out),
-              border-color var(--dur-base) var(--ease-out),
-              color var(--dur-base) var(--ease-out);
-}
-.tpl-act:hover:not(:disabled) {
-  border-color: var(--color-pop);
-}
-.tpl-act:disabled {
-  opacity: 0.6;
-  cursor: default;
-}
-.tpl-act:focus-visible {
-  outline: none;
-  box-shadow: var(--shadow-pop-glow);
-}
-.tpl-act-primary {
-  background: var(--btn-primary-bg);
-  border-color: var(--btn-primary-bg);
-  color: var(--btn-primary-fg);
-}
-.tpl-act-primary:hover:not(:disabled) {
-  background: var(--btn-primary-hover);
-  border-color: var(--btn-primary-hover);
-}
-.tpl-act-danger {
+/* Push Delete to the right edge of the action row, as before. */
+.tpl-act-delete {
   margin-left: auto;
-  color: var(--color-ink-soft);
-}
-.tpl-act-danger:hover:not(:disabled) {
-  border-color: var(--color-pop);
-  color: var(--color-pop-deep);
 }
 
 /* Gallery grid — 3 cols ≥1100, 2 cols 720-1100, 1 col below. */

@@ -48,7 +48,14 @@ function patch(k: keyof Props["blockProps"], v: unknown) {
 // ── Inline URL input (render mode, empty-state) ──────────────────────────
 const inlineOpen = ref(false);
 const inlineUrl = ref("");
+// The inline field is a shared <TextInput> whose root element IS the <input>,
+// so capture that DOM node via a function ref for focus()/select().
 const inlineInput = ref<HTMLInputElement | null>(null);
+function setInlineInput(el: unknown) {
+  inlineInput.value = (el && (el as { $el?: HTMLInputElement }).$el)
+    ? (el as { $el: HTMLInputElement }).$el
+    : (el as HTMLInputElement | null);
+}
 
 async function openInline(e?: Event) {
   e?.stopPropagation();
@@ -109,22 +116,21 @@ function commitInline(e?: Event) {
           </span>
         </button>
         <div v-else class="img-inline" @click.stop>
-          <input
-            ref="inlineInput"
+          <TextInput
+            :ref="setInlineInput"
             type="url"
-            class="img-inline-input"
+            size="sm"
             placeholder="https://…"
-            :value="inlineUrl"
-            @input="inlineUrl = ($event.target as HTMLInputElement).value"
+            v-model="inlineUrl"
             @keydown.enter.prevent="commitInline"
             @keydown.escape.prevent="cancelInline"
           />
-          <button type="button" class="img-inline-insert" @click="commitInline">
+          <Button variant="primary" size="sm" type="button" @click="commitInline">
             Insert
-          </button>
-          <button type="button" class="img-inline-cancel" @click="cancelInline">
+          </Button>
+          <Button variant="subtle" size="sm" type="button" @click="cancelInline">
             Cancel
-          </button>
+          </Button>
         </div>
       </template>
     </div>
@@ -258,54 +264,11 @@ function commitInline(e?: Event) {
   border-radius: var(--radius-sm);
   box-shadow: var(--shadow-xs);
 }
-.img-inline-input {
+/* The inline URL field (shared <TextInput>) flexes to fill the row; the
+   Insert/Cancel buttons keep their intrinsic width. */
+.img-inline > :first-child {
   flex: 1;
   min-width: 0;
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--field-border);
-  border-radius: var(--radius-sm);
-  background: var(--field-bg);
-  color: var(--field-text);
-  font-family: var(--font-body);
-  font-size: var(--text-sm);
-  outline: none;
-}
-.img-inline-input:focus {
-  border-color: var(--field-border-focus);
-  box-shadow: var(--shadow-pop-glow);
-}
-.img-inline-insert {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  white-space: nowrap;
-  padding: var(--space-2) var(--space-4);
-  border: 0;
-  border-radius: var(--radius-sm);
-  background: var(--btn-primary-bg);
-  color: var(--btn-primary-fg);
-  font-family: var(--font-body);
-  font-size: var(--text-xs);
-  font-weight: 600;
-  cursor: pointer;
-  transition: background var(--dur-fast) var(--ease-out);
-}
-.img-inline-insert:hover {
-  background: var(--btn-primary-hover);
-}
-.img-inline-cancel {
-  white-space: nowrap;
-  border: 0;
-  background: transparent;
-  color: var(--color-ink-soft);
-  font-family: var(--font-body);
-  font-size: var(--text-xs);
-  font-weight: 500;
-  cursor: pointer;
-  padding: var(--space-2);
-}
-.img-inline-cancel:hover {
-  color: var(--color-ink);
 }
 
 .img-inspect { display: grid; gap: var(--space-4); }

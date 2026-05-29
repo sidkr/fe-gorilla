@@ -3,8 +3,8 @@
 // the dashboard's RecentCampaignsTable: it has an Audience column, a
 // "Sent / created" column that carries both an absolute date and a relative
 // time secondary line, and routes Drafts to /edit while Sent/Scheduled go to
-// the read-only campaign detail route. Each row is a NuxtLink so the whole
-// row is the click target.
+// the read-only campaign detail route. Each row is the click target.
+// Built on the shared <TableShell>.
 import { computed } from "vue";
 
 const props = defineProps({
@@ -35,95 +35,42 @@ const rows = computed(() => props.campaigns);
 </script>
 
 <template>
-  <div class="ct">
-    <div class="ct-row ct-head" role="row">
-      <div class="ct-cell ct-cell-name">Name</div>
-      <div class="ct-cell ct-cell-status">Status</div>
-      <div class="ct-cell ct-cell-audience">Audience</div>
-      <div class="ct-cell ct-cell-date">Sent / created</div>
-      <div class="ct-cell ct-cell-num">Open rate</div>
-      <div class="ct-cell ct-cell-num">Click rate</div>
-    </div>
-
-    <template v-if="rows.length">
-      <NuxtLink
+  <TableShell v-if="rows.length">
+    <template #head>
+      <th class="ct-cell-name">Name</th>
+      <th>Status</th>
+      <th>Audience</th>
+      <th>Sent / created</th>
+      <th class="ct-cell-num">Open rate</th>
+      <th class="ct-cell-num">Click rate</th>
+    </template>
+    <template #body>
+      <tr
         v-for="c in rows"
         :key="c.id"
-        :to="rowHref(c)"
-        class="ct-row ct-body"
-        role="row"
+        class="ct-body"
+        @click="navigateTo(rowHref(c))"
       >
-        <div class="ct-cell ct-cell-name" :title="c.name">{{ truncate(c.name) }}</div>
-        <div class="ct-cell ct-cell-status">
+        <td class="ct-cell-name" :title="c.name">{{ truncate(c.name) }}</td>
+        <td>
           <AppStatusPill :status="c.status" />
-        </div>
-        <div class="ct-cell ct-cell-audience">
-          {{ c.audience || "—" }}
-        </div>
-        <div class="ct-cell ct-cell-date">
+        </td>
+        <td class="ct-cell-audience">{{ c.audience || "—" }}</td>
+        <td class="ct-cell-date">
           <span class="ct-date-primary tabular">{{ c.date }}</span>
           <span class="ct-date-secondary">{{ c.relative }}</span>
-        </div>
-        <div class="ct-cell ct-cell-num tabular">{{ c.openRate || "—" }}</div>
-        <div class="ct-cell ct-cell-num tabular">{{ c.clickRate || "—" }}</div>
-      </NuxtLink>
+        </td>
+        <td class="ct-cell-num tabular">{{ c.openRate || "—" }}</td>
+        <td class="ct-cell-num tabular">{{ c.clickRate || "—" }}</td>
+      </tr>
     </template>
-    <div v-else class="ct-empty">
-      No campaigns match this filter.
-    </div>
-  </div>
+  </TableShell>
+  <EmptyState v-else title="No campaigns" subtitle="No campaigns match this filter." />
 </template>
 
 <style scoped>
-.ct {
-  display: flex;
-  flex-direction: column;
-}
-.ct-row {
-  display: grid;
-  grid-template-columns:
-    minmax(0, 1.8fr)
-    minmax(96px, 0.6fr)
-    minmax(0, 1fr)
-    minmax(160px, 1fr)
-    minmax(96px, 0.6fr)
-    minmax(96px, 0.6fr);
-  align-items: center;
-  gap: var(--space-4);
-  padding: var(--space-4) var(--space-5);
-  text-decoration: none;
-  color: var(--color-ink);
-}
-.ct-head {
-  border-bottom: 1px solid var(--color-rule);
-  padding-top: var(--space-3);
-  padding-bottom: var(--space-3);
-}
-.ct-head .ct-cell {
-  font-family: var(--font-body);
-  font-size: var(--text-xs);
-  font-weight: 600;
-  letter-spacing: var(--tracking-wider);
-  text-transform: uppercase;
-  color: var(--color-ink-dim);
-}
 .ct-body {
-  border-bottom: 1px solid var(--color-rule);
-  transition: background-color var(--dur-fast) var(--ease-out);
   cursor: pointer;
-}
-.ct-body:last-child {
-  border-bottom: none;
-}
-.ct-body:hover {
-  background: var(--color-surface-2);
-}
-.ct-cell {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: var(--text-sm);
 }
 .ct-cell-name {
   font-weight: 600;
@@ -135,52 +82,30 @@ const rows = computed(() => props.campaigns);
   color: var(--color-ink-soft);
 }
 .ct-cell-date {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
   min-width: 0;
 }
 .ct-date-primary {
+  display: block;
   color: var(--color-ink);
   font-family: var(--font-mono);
   font-size: var(--text-sm);
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 .ct-date-secondary {
+  display: block;
+  margin-top: var(--space-1);
   color: var(--color-ink-dim);
   font-family: var(--font-body);
   font-size: var(--text-xs);
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 .ct-cell-num {
   color: var(--color-ink);
   font-family: var(--font-mono);
   text-align: right;
 }
+:deep(thead th.ct-cell-num) {
+  text-align: right;
+}
 .tabular {
   font-variant-numeric: tabular-nums;
-}
-.ct-empty {
-  padding: var(--space-7) var(--space-5);
-  text-align: center;
-  color: var(--color-ink-dim);
-  font-size: var(--text-sm);
-}
-
-@media (max-width: 960px) {
-  .ct-row {
-    grid-template-columns:
-      minmax(0, 1.6fr)
-      minmax(80px, 0.6fr)
-      minmax(140px, 1fr)
-      minmax(80px, 0.6fr);
-    gap: var(--space-3);
-  }
-  .ct-cell-audience,
-  .ct-cell-num:last-child {
-    display: none;
-  }
 }
 </style>

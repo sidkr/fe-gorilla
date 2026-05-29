@@ -60,12 +60,12 @@ async function onLogout() {
       </NuxtLink>
 
       <!-- ── Primary CTA ──────────────────────────────────────────── -->
-      <NuxtLink to="/app/campaigns/new" class="cta-new">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M12 5v14M5 12h14"/>
-        </svg>
-        <span>New campaign</span>
-      </NuxtLink>
+      <div class="cta-new-wrap">
+        <Button variant="primary" block to="/app/campaigns/new">
+          <template #leading><Icon name="plus" size="sm" /></template>
+          New campaign
+        </Button>
+      </div>
 
       <!-- ── Nav links ────────────────────────────────────────────── -->
       <nav class="nav" aria-label="App sections">
@@ -149,14 +149,16 @@ async function onLogout() {
             <span v-if="auth.username && auth.name" class="user-email">{{ auth.username }}</span>
           </div>
         </div>
-        <button type="button" class="logout" @click="onLogout">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M15 17l5-5-5-5"/>
-            <path d="M20 12H9"/>
-            <path d="M12 20H5V4h7"/>
-          </svg>
-          <span>Log out</span>
-        </button>
+        <Button variant="ghost" block @click="onLogout">
+          <template #leading>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M15 17l5-5-5-5"/>
+              <path d="M20 12H9"/>
+              <path d="M12 20H5V4h7"/>
+            </svg>
+          </template>
+          Log out
+        </Button>
       </div>
     </aside>
 
@@ -165,6 +167,9 @@ async function onLogout() {
         <slot />
       </div>
     </main>
+
+    <!-- Global toast host (design-system) — renders the useToast() queue. -->
+    <ToastHost />
   </div>
 </template>
 
@@ -239,34 +244,8 @@ async function onLogout() {
 }
 
 /* ── Primary CTA ──────────────────────────────────────────────── */
-.cta-new {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-2);
-  white-space: nowrap;
+.cta-new-wrap {
   margin: var(--space-3) var(--space-1) var(--space-4);
-  height: 40px;
-  background: var(--btn-primary-bg);
-  color: var(--btn-primary-fg);
-  border-radius: var(--radius-md);
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: var(--text-sm);
-  letter-spacing: var(--tracking-tight);
-  text-decoration: none;
-  transition: background var(--dur-base) var(--ease-out),
-              box-shadow var(--dur-base) var(--ease-out),
-              transform var(--dur-fast) var(--ease-out);
-}
-.cta-new:hover {
-  background: var(--btn-primary-hover);
-  box-shadow: var(--shadow-sm);
-}
-.cta-new:active { transform: translateY(1px); }
-.cta-new:focus-visible {
-  outline: none;
-  box-shadow: var(--shadow-pop-glow);
 }
 
 /* ── Nav list ─────────────────────────────────────────────────── */
@@ -382,33 +361,6 @@ async function onLogout() {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-/* ── Logout (ghost) ───────────────────────────────────────────── */
-.logout {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-2);
-  white-space: nowrap;
-  height: 36px;
-  padding: 0 var(--space-3);
-  border: 1px solid var(--btn-ghost-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-  color: var(--btn-ghost-fg);
-  font-family: var(--font-body);
-  font-weight: 600;
-  font-size: var(--text-sm);
-  letter-spacing: var(--tracking-tight);
-  cursor: pointer;
-  transition: background var(--dur-fast) var(--ease-out),
-              color var(--dur-fast) var(--ease-out);
-}
-.logout:hover { background: var(--btn-ghost-hover-bg); }
-.logout:focus-visible {
-  outline: none;
-  box-shadow: var(--shadow-pop-glow);
 }
 
 /* ── Main content ─────────────────────────────────────────────── */

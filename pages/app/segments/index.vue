@@ -140,12 +140,14 @@ onMounted(async () => {
         <h1>Segments</h1>
         <p class="seg-lede">Saved slices of your audiences, sendable like a list.</p>
       </div>
-      <NuxtLink to="/app/segments/new" class="seg-cta">
-        <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
-          <path d="M7 2.5 V11.5 M2.5 7 H11.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
-        </svg>
-        <span>New segment</span>
-      </NuxtLink>
+      <Button to="/app/segments/new" variant="primary">
+        <template #leading>
+          <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+            <path d="M7 2.5 V11.5 M2.5 7 H11.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+          </svg>
+        </template>
+        New segment
+      </Button>
     </header>
 
     <!-- 2. Brief explainer card -->
@@ -175,39 +177,43 @@ onMounted(async () => {
         <span>All segments &middot; {{ segments.length }}</span>
       </div>
       <p v-if="actionError" class="seg-state seg-state-error">{{ actionError }}</p>
-      <div class="seg-card seg-card-flush">
-        <p v-if="loading" class="seg-state">Loading segments…</p>
-        <p v-else-if="loadError" class="seg-state seg-state-error">{{ loadError }}</p>
-        <p v-else-if="segments.length === 0" class="seg-state">
-          No segments yet. Create your first to slice your audience.
-        </p>
-        <div v-else class="tbl">
-          <div class="tbl-row tbl-head" role="row">
-            <div class="tbl-cell tbl-name">Name</div>
-            <div class="tbl-cell tbl-type">Type</div>
-            <div class="tbl-cell tbl-rule">Rule</div>
-            <div class="tbl-cell tbl-num">Contacts</div>
-            <div class="tbl-cell tbl-last">Last used</div>
-            <div class="tbl-cell tbl-actions" aria-hidden="true"></div>
-          </div>
-          <div v-for="s in segments" :key="s.id" class="tbl-row tbl-body" role="row">
-            <NuxtLink :to="`/app/segments/${s.id}`" class="tbl-cell tbl-name tbl-link" :title="s.name">
-              {{ truncate(s.name, 30) }}
-            </NuxtLink>
-            <div class="tbl-cell tbl-type">
-              <span class="tbl-chip" :class="`tbl-chip-${s.kind}`">{{ s.kind }}</span>
-            </div>
-            <div class="tbl-cell tbl-rule" :title="s.rule">{{ truncate(s.rule, 50) }}</div>
-            <div class="tbl-cell tbl-num tabular">{{ fmtCount(s.count) }}</div>
-            <div class="tbl-cell tbl-last tabular" :class="{ 'tbl-empty': s.lastUsed === '—' }">{{ s.lastUsed }}</div>
-            <div class="tbl-cell tbl-actions">
-              <button type="button" class="tbl-act" :disabled="busyId === s.id" title="Edit" @click="edit(s.id)">Edit</button>
-              <button type="button" class="tbl-act" :disabled="busyId === s.id" title="Duplicate" @click="duplicate(s.raw)">Duplicate</button>
-              <button type="button" class="tbl-act tbl-act-danger" :disabled="busyId === s.id" title="Delete" @click="remove(s.raw)">Delete</button>
-            </div>
-          </div>
-        </div>
-      </div>
+      <p v-if="loading" class="seg-state">Loading segments…</p>
+      <p v-else-if="loadError" class="seg-state seg-state-error">{{ loadError }}</p>
+      <EmptyState
+        v-else-if="segments.length === 0"
+        title="No segments yet"
+        subtitle="Create your first to slice your audience."
+      />
+      <TableShell v-else>
+        <template #head>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Rule</th>
+          <th class="tbl-num">Contacts</th>
+          <th>Last used</th>
+          <th class="tbl-actions" aria-hidden="true"></th>
+        </template>
+        <template #body>
+          <tr v-for="s in segments" :key="s.id">
+            <td class="tbl-name">
+              <NuxtLink :to="`/app/segments/${s.id}`" class="tbl-link" :title="s.name">
+                {{ truncate(s.name, 30) }}
+              </NuxtLink>
+            </td>
+            <td>
+              <Pill :tone="s.kind === 'dynamic' ? 'brand' : 'neutral'">{{ s.kind }}</Pill>
+            </td>
+            <td class="tbl-rule" :title="s.rule">{{ truncate(s.rule, 50) }}</td>
+            <td class="tbl-num tabular">{{ fmtCount(s.count) }}</td>
+            <td class="tbl-last tabular" :class="{ 'tbl-empty': s.lastUsed === '—' }">{{ s.lastUsed }}</td>
+            <td class="tbl-actions">
+              <Button variant="ghost" size="sm" :disabled="busyId === s.id" @click="edit(s.id)">Edit</Button>
+              <Button variant="ghost" size="sm" :disabled="busyId === s.id" @click="duplicate(s.raw)">Duplicate</Button>
+              <Button variant="danger" size="sm" :disabled="busyId === s.id" @click="remove(s.raw)">Delete</Button>
+            </td>
+          </tr>
+        </template>
+      </TableShell>
     </section>
   </div>
 </template>
@@ -243,36 +249,6 @@ onMounted(async () => {
   font-size: var(--text-md);
   color: var(--color-ink-soft);
 }
-.seg-cta {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-3) var(--space-5);
-  background: var(--btn-primary-bg);
-  color: var(--btn-primary-fg);
-  font-family: var(--font-body);
-  font-size: var(--text-sm);
-  font-weight: 600;
-  border-radius: var(--radius-md);
-  text-decoration: none;
-  box-shadow: var(--shadow-sm);
-  transition: background-color var(--dur-base) var(--ease-out),
-              transform var(--dur-fast) var(--ease-out),
-              box-shadow var(--dur-base) var(--ease-out);
-  white-space: nowrap;
-}
-.seg-cta:hover {
-  background: var(--btn-primary-hover);
-  box-shadow: var(--shadow-md);
-}
-.seg-cta:active {
-  transform: translateY(1px);
-}
-.seg-cta:focus-visible {
-  outline: none;
-  box-shadow: var(--shadow-pop-glow);
-}
-
 /* Sections */
 .seg-section {
   display: flex;
@@ -299,17 +275,7 @@ onMounted(async () => {
   box-shadow: 0 0 0 3px var(--color-pop-glow);
 }
 
-/* Card surfaces */
-.seg-card {
-  background: var(--color-surface);
-  border: 1px solid var(--color-rule);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
-  overflow: hidden;
-}
-.seg-card-flush { padding: 0; }
-
-/* Loading / empty / error states inside the table card */
+/* Loading / error states above the table */
 .seg-state {
   margin: 0;
   padding: var(--space-6) var(--space-5);
@@ -322,102 +288,35 @@ onMounted(async () => {
   color: var(--color-danger, var(--color-ink));
 }
 
-/* Table (mirrors AppSegmentsTable, plus a Type chip + Actions column) */
-.tbl { display: flex; flex-direction: column; }
-.tbl-row {
-  display: grid;
-  grid-template-columns:
-    minmax(0, 1.3fr)
-    minmax(80px, 0.5fr)
-    minmax(0, 1.5fr)
-    minmax(80px, 0.5fr)
-    minmax(100px, 0.6fr)
-    minmax(200px, 0.9fr);
-  align-items: center;
-  gap: var(--space-4);
-  padding: var(--space-4) var(--space-5);
-  color: var(--color-ink);
-}
-.tbl-head {
-  border-bottom: 1px solid var(--color-rule);
-  padding-top: var(--space-3);
-  padding-bottom: var(--space-3);
-}
-.tbl-head .tbl-cell {
-  font-family: var(--font-body);
-  font-size: var(--text-xs);
-  font-weight: 600;
-  letter-spacing: var(--tracking-wider);
-  text-transform: uppercase;
-  color: var(--color-ink-dim);
-}
-.tbl-body {
-  border-bottom: 1px solid var(--color-rule);
-  transition: background-color var(--dur-fast) var(--ease-out);
-}
-.tbl-body:last-child { border-bottom: none; }
-.tbl-body:hover { background: var(--color-surface-2); }
-.tbl-cell {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: var(--text-sm);
-}
+/* Cell content styling (chrome comes from <TableShell>) */
 .tbl-name {
   font-weight: 600;
-  color: var(--color-ink);
   font-family: var(--font-display);
   letter-spacing: var(--tracking-tight);
 }
-.tbl-link { text-decoration: none; }
+.tbl-link {
+  text-decoration: none;
+  color: var(--color-ink);
+}
 .tbl-link:hover { color: var(--color-pop); }
 .tbl-rule {
   font-family: var(--font-mono);
   color: var(--color-ink-soft);
+  max-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .tbl-num, .tbl-last { font-family: var(--font-mono); }
 .tbl-num { color: var(--color-ink); }
 .tbl-last { color: var(--color-ink-soft); }
 .tbl-empty { color: var(--color-ink-dim); }
 .tabular { font-variant-numeric: tabular-nums; }
-.tbl-chip {
-  display: inline-flex;
-  align-items: center;
-  padding: var(--space-1) var(--space-3);
-  font-family: var(--font-body);
-  font-size: var(--text-xs);
-  font-weight: 600;
-  letter-spacing: var(--tracking-wide);
-  border-radius: var(--radius-pill);
-  text-transform: capitalize;
-}
-.tbl-chip-dynamic { background: var(--color-pop-glow); color: var(--color-pop); }
-.tbl-chip-static { background: var(--color-surface-2); color: var(--color-ink-soft); }
 .tbl-actions {
-  display: inline-flex;
+  display: flex;
   gap: var(--space-2);
   justify-content: flex-end;
-  overflow: visible;
-}
-.tbl-act {
-  font-family: var(--font-body);
-  font-size: var(--text-xs);
-  font-weight: 600;
-  color: var(--color-ink-soft);
-  background: transparent;
-  border: 1px solid var(--color-rule);
-  border-radius: var(--radius-md);
-  padding: var(--space-1) var(--space-3);
-  cursor: pointer;
-  transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
-}
-.tbl-act:hover:not(:disabled) { background: var(--color-surface); border-color: var(--color-ink-dim); color: var(--color-ink); }
-.tbl-act:disabled { opacity: 0.5; cursor: not-allowed; }
-.tbl-act-danger:hover:not(:disabled) {
-  background: var(--color-danger-bg);
-  border-color: var(--color-danger);
-  color: var(--color-danger);
+  white-space: nowrap;
 }
 
 /* Explainer card */

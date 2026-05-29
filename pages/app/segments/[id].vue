@@ -146,10 +146,10 @@ const fmtCount = (n: number) => new Intl.NumberFormat("en-US").format(n);
         <h1>{{ isNew ? "New segment" : "Edit segment" }}</h1>
       </div>
       <div class="se-header-actions">
-        <button type="button" class="se-btn se-btn-ghost" @click="cancel">Cancel</button>
-        <button type="button" class="se-btn se-btn-primary" :disabled="!canSave" @click="save">
+        <Button variant="ghost" @click="cancel">Cancel</Button>
+        <Button variant="primary" :disabled="!canSave" :loading="saving" @click="save">
           {{ saving ? "Saving…" : (isNew ? "Create segment" : "Save changes") }}
-        </button>
+        </Button>
       </div>
     </header>
 
