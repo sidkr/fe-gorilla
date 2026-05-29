@@ -83,6 +83,7 @@ describe("templates feature", () => {
   it("seeded system templates are global (no org) with public-read ACL and valid blocks", async () => {
     const rows = await new Parse.Query("Template")
       .equalTo("isSystem", true)
+      .limit(2000) // library has grown past Parse's default 100-row find cap
       .find({ useMasterKey: true });
     expect(rows.length).toBe(systemCount);
     for (const t of rows) {

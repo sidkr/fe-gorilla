@@ -160,6 +160,17 @@ const SYSTEM_TEMPLATES = [].concat(
   require("./templates/ecommerce"),
   require("./templates/reengagement"),
   require("./templates/seasonal"),
+  // Expanded library — 100 additional templates across 10 category packs.
+  require("./templates/newsletters-pack"),
+  require("./templates/launches-pack"),
+  require("./templates/onboarding-pack"),
+  require("./templates/promotions-pack"),
+  require("./templates/events-pack"),
+  require("./templates/ecommerce-pack"),
+  require("./templates/reengagement-pack"),
+  require("./templates/seasonal-pack"),
+  require("./templates/transactional-pack"),
+  require("./templates/community-pack"),
 );
 
 // Pull the first image block's src out of a template body so the gallery can
@@ -312,6 +323,8 @@ Parse.Cloud.define("listTemplates", async (request) => {
     "E-commerce",
     "Re-engagement & surveys",
     "Seasonal & holiday",
+    "Transactional & notifications",
+    "Nonprofit & community",
   ];
   const rank = (c) => {
     const i = CAT_ORDER.indexOf(c);

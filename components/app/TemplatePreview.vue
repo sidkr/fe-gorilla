@@ -212,11 +212,13 @@ function footerLinks(p) {
   user-select: none;
 }
 
-/* Rendered at full email width, then scaled. Origin top-center pins the email's
-   top edge so the card shows the top of the email. */
+/* Rendered at full email width, then scaled to fill the wrapper. Scale is
+   clientWidth / contentWidth, so the scaled sheet width equals the wrapper
+   width exactly — anchoring the top-LEFT corner makes it fill edge-to-edge
+   (i.e. perfectly centered). `margin: 0 auto` does NOT center an element wider
+   than its container, which left the scaled preview shifted right. */
 .tpre-sheet {
-  transform-origin: top center;
-  margin: 0 auto;
+  transform-origin: top left;
 }
 
 /* The white "email" card — ~600px content with comfortable padding. */

@@ -27,7 +27,9 @@ export interface TemplateSummary {
   previewText: string | null;
   isSystem: boolean;
   seedKey: string | null;
+  category: string;
   thumbnail: string | null;
+  thumbUrl: string | null;
   // Full block tree the gallery uses to render a miniature email preview.
   body: TemplateBody;
   createdAt: string | null;

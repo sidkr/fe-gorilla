@@ -43,36 +43,62 @@ async function load() {
 
 onMounted(load);
 
-// Filter tabs. "all" shows everything; "saved" = org templates; "standard" =
-// system starters. Counts stay in sync with the live data.
-const tabs = computed(() => [
-  { value: "all", label: `All (${system.value.length + org.value.length})` },
-  { value: "saved", label: `Saved by me (${org.value.length})` },
-  { value: "standard", label: `Standard (${system.value.length})` },
-]);
-
-const activeTab = ref("all");
-
 // Normalize a raw cloud template into the card view-model. `kind` drives the
 // card chrome + which actions show. `blocks` is the template's full block tree,
 // rendered as a miniature email preview in the thumbnail (AppTemplatePreview).
+// The org's own templates surface under a "Saved" category facet.
 function toCard(t, kind) {
   return {
     id: t.id,
     name: t.name,
     kind,
     blocks: t.body?.blocks || [],
-    category: t.category || (kind === "standard" ? "Standard" : "Saved"),
+    category: t.category || (kind === "standard" ? "Basics" : "Saved"),
   };
 }
 
-const visibleTemplates = computed(() => {
-  const sys = system.value.map((t) => toCard(t, "standard"));
-  const own = org.value.map((t) => toCard(t, "saved"));
-  if (activeTab.value === "standard") return sys;
-  if (activeTab.value === "saved") return own;
-  return [...sys, ...own];
+// Every template as a card (system starters + the org's saved templates).
+const allCards = computed(() => [
+  ...system.value.map((t) => toCard(t, "standard")),
+  ...org.value.map((t) => toCard(t, "saved")),
+]);
+
+// Category filter — a clean chip row built from the LIVE data, so new
+// categories appear automatically. Ordered to match the server's gallery
+// order; unknown categories sort after; the user's "Saved" facet sits last.
+const CAT_ORDER = [
+  "Basics", "Newsletters", "Announcements", "Product launches",
+  "Welcome & onboarding", "Promotions & sales", "Events & webinars",
+  "E-commerce", "Re-engagement & surveys", "Seasonal & holiday",
+  "Transactional & notifications", "Nonprofit & community",
+];
+const activeCategory = ref("All");
+
+const categories = computed(() => {
+  const counts = {};
+  for (const c of allCards.value) counts[c.category] = (counts[c.category] || 0) + 1;
+  const known = CAT_ORDER.filter((c) => counts[c]);
+  const extra = Object.keys(counts)
+    .filter((c) => !CAT_ORDER.includes(c) && c !== "Saved")
+    .sort();
+  const ordered = [...known, ...extra];
+  if (counts["Saved"]) ordered.push("Saved");
+  return [
+    { value: "All", label: "All", count: allCards.value.length },
+    ...ordered.map((c) => ({ value: c, label: c, count: counts[c] })),
+  ];
 });
+
+// If the active facet disappears (e.g. last saved template deleted), fall back to All.
+watch(categories, (cats) => {
+  if (!cats.some((c) => c.value === activeCategory.value)) activeCategory.value = "All";
+});
+
+const visibleTemplates = computed(() =>
+  activeCategory.value === "All"
+    ? allCards.value
+    : allCards.value.filter((c) => c.category === activeCategory.value),
+);
 
 // "Use this" → fork into a new Campaign draft → open the editor.
 async function onUse(id) {
@@ -122,21 +148,29 @@ async function onDelete(id, name) {
       </Button>
     </header>
 
-    <!-- 2. Filter tabs -->
-    <SegmentedControl
-      v-model="activeTab"
-      :options="tabs"
-      aria-label="Filter templates"
-      class="tpl-tabs"
-    />
+    <!-- 2. Category filter -->
+    <div v-if="!loading && !loadError" class="tpl-filter" role="tablist" aria-label="Filter templates by category">
+      <button
+        v-for="c in categories"
+        :key="c.value"
+        type="button"
+        role="tab"
+        :aria-selected="activeCategory === c.value"
+        class="tpl-chip"
+        :class="{ 'is-active': activeCategory === c.value }"
+        @click="activeCategory = c.value"
+      >
+        {{ c.label }}<span class="tpl-chip-count">{{ c.count }}</span>
+      </button>
+    </div>
 
     <!-- 3. States -->
     <p v-if="loadError" class="tpl-error" role="alert">{{ loadError }}</p>
     <p v-if="loading" class="tpl-empty">Loading templates…</p>
     <EmptyState
       v-else-if="visibleTemplates.length === 0"
-      :title="activeTab === 'saved' ? 'No saved templates yet' : 'No templates to show'"
-      :subtitle="activeTab === 'saved' ? 'Use “Save as template” from the editor to add one here.' : undefined"
+      :title="activeCategory === 'Saved' ? 'No saved templates yet' : 'No templates to show'"
+      :subtitle="activeCategory === 'Saved' ? 'Use “Save as template” from the editor to add one here.' : undefined"
     />
 
     <!-- 4. Gallery -->
@@ -221,8 +255,48 @@ async function onDelete(id, name) {
   color: var(--color-ink-soft);
 }
 /* Filter tabs — segmented row aligned to the start of the column. */
-.tpl-tabs {
-  align-self: flex-start;
+/* Category filter — wrapping row of pill chips. */
+.tpl-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+.tpl-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1-5) var(--space-3);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  color: var(--color-ink-soft);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-out),
+              border-color var(--dur-fast) var(--ease-out),
+              color var(--dur-fast) var(--ease-out);
+}
+.tpl-chip:hover {
+  border-color: var(--color-rule-strong);
+  color: var(--color-ink);
+}
+.tpl-chip.is-active {
+  background: var(--color-pop);
+  border-color: var(--color-pop);
+  color: var(--color-ink-on-pop);
+}
+.tpl-chip:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-pop-glow);
+}
+.tpl-chip-count {
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-xs);
+  opacity: 0.7;
 }
 
 /* States */
