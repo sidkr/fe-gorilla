@@ -50,6 +50,11 @@ async function start() {
     next();
   });
 
+  // Custom Express routes (tracking endpoints, SES webhook ingestion).
+  // Mounted BEFORE Parse so any /api/* paths we want to intercept (e.g.
+  // /api/webhooks/ses) take precedence over Parse's class router.
+  require("./routes").mount(app);
+
   app.use("/api", api.app);
 
   const distDir = path.join(__dirname, "../dist");
