@@ -24,11 +24,11 @@ import EditorTestSendPopover from "./EditorTestSendPopover.vue";
 import EditorTopBar from "./EditorTopBar.vue";
 import PreflightChecklist from "./PreflightChecklist.vue";
 import {
-  MOCK_AUDIENCES,
   type PreflightCheck,
   type SetupField,
   type SetupValues,
 } from "./editor-types";
+import { useAudiences, type Audience } from "~/composables/app/useAudiences";
 import {
   type Block,
   type BlockType,
@@ -61,6 +61,19 @@ const audienceId = ref<string | null>(props.campaign.get("audienceId") ?? null);
 // Stored as a hex string on the Campaign. Empty string → use the
 // default (--color-surface-2) — resolved in the canvas via a v-bind.
 const bodyBg = ref<string>(props.campaign.get("bodyBg") ?? "");
+
+// Real audiences (replaces the former MOCK_AUDIENCES constant). Loaded once on
+// mount; used to resolve the selected audience's name + contact count for the
+// pre-flight checklist + recipient count. Failure is non-fatal — the checklist
+// just reports "no audience" until it loads.
+const audiences = ref<Audience[]>([]);
+onMounted(async () => {
+  try {
+    audiences.value = await useAudiences().listAudiences();
+  } catch (_) {
+    /* non-fatal: pre-flight will show the audience check as unmet */
+  }
+});
 
 const dirty = ref(false);
 const saving = ref(false);
@@ -583,13 +596,13 @@ const preflightChecks = computed<PreflightCheck[]>(() => {
     fixField: "fromEmail",
   });
   // Audience
-  const aud = MOCK_AUDIENCES.find((a) => a.id === audienceId.value);
+  const aud = audiences.value.find((a) => a.id === audienceId.value);
   checks.push({
     id: "audience",
     status: aud ? "ok" : "fail",
     label: "Audience selected",
     description: aud
-      ? `${aud.name} · ${aud.count.toLocaleString("en-US")} contacts`
+      ? `${aud.name} · ${aud.contactCount.toLocaleString("en-US")} contacts`
       : "Pick who this email goes to.",
     fixField: "audience",
   });
@@ -620,8 +633,8 @@ const preflightChecks = computed<PreflightCheck[]>(() => {
 });
 
 const preflightRecipientCount = computed(() => {
-  const aud = MOCK_AUDIENCES.find((a) => a.id === audienceId.value);
-  return aud?.count ?? null;
+  const aud = audiences.value.find((a) => a.id === audienceId.value);
+  return aud?.contactCount ?? null;
 });
 
 function onOpenSend() {

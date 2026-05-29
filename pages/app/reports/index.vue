@@ -1,5 +1,6 @@
 <script setup>
-import { ref } from "vue";
+import { computed, onMounted } from "vue";
+import { useReports } from "~/composables/app/useReports";
 
 definePageMeta({
   layout: "app",
@@ -8,45 +9,62 @@ definePageMeta({
 
 useHead({ title: "Reports" });
 
-// All values below are mock data. The Parse send pipeline isn't live yet;
-// when it lands we'll swap these for real queries / cloud functions.
+// Real per-campaign reports from the F-25 cloud function, fetched for the org's
+// sent campaigns. Empty for a fresh org / before any sends — the page renders
+// graceful empty states (the KPIs read 0, the table shows a placeholder, the
+// trend chart is hidden until there's a series to plot). No numbers are faked.
+const { reports: campaignReports, loading, error, loadSentCampaignReports } = useReports();
+onMounted(() => loadSentCampaignReports());
 
-const timeRanges = [
-  { id: "7d",   label: "Last 7 days" },
-  { id: "30d",  label: "Last 30 days" },
-  { id: "90d",  label: "Last 90 days" },
-  { id: "year", label: "This year" },
-];
-// Visual filter only — the underlying mock data is static.
-const activeRange = ref("30d");
+// ── Formatters ────────────────────────────────────────────────────────────--
+function fmtNum(n) {
+  return Number(n || 0).toLocaleString("en-US");
+}
+function fmtPct(fraction) {
+  return `${((fraction || 0) * 100).toFixed(1)}%`;
+}
+function fmtDate(iso) {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+}
 
-const kpis = [
-  { label: "Campaigns sent",  value: "28",    delta: "+4 vs prev 30d",     deltaDirection: "up" },
-  { label: "Avg open rate",   value: "44.8%", delta: "+2.1pp vs prev 30d", deltaDirection: "up" },
-  { label: "Avg click rate",  value: "7.9%",  delta: "−0.3pp vs prev 30d", deltaDirection: "down" },
-  { label: "Total clicks",    value: "3,247", delta: "+412 vs prev 30d",   deltaDirection: "up" },
-];
+// ── KPI strip ─────────────────────────────────────────────────────────────--
+// Aggregate across the loaded campaign reports. Open/click rates are computed
+// from summed counts (a weighted average by delivered/sent), not an average of
+// per-campaign rates, so they stay honest. All 0 for a fresh org.
+const agg = computed(() => {
+  const acc = { sent: 0, delivered: 0, opens: 0, clicks: 0 };
+  for (const r of campaignReports.value) {
+    acc.sent += r.counts.sent;
+    acc.delivered += r.counts.delivered;
+    acc.opens += r.counts.opens;
+    acc.clicks += r.counts.clicks;
+  }
+  return acc;
+});
+const kpis = computed(() => {
+  const a = agg.value;
+  return [
+    { label: "Campaigns sent", value: fmtNum(campaignReports.value.length), delta: "all time", deltaDirection: "neutral" },
+    { label: "Avg open rate",  value: fmtPct(a.delivered ? a.opens / a.delivered : 0), delta: "weighted", deltaDirection: "neutral" },
+    { label: "Avg click rate", value: fmtPct(a.delivered ? a.clicks / a.delivered : 0), delta: "weighted", deltaDirection: "neutral" },
+    { label: "Total clicks",   value: fmtNum(a.clicks), delta: "all time", deltaDirection: "neutral" },
+  ];
+});
 
-const openRateSeries = [
-  42.1, 43.5, 41.8, 44.2, 45.0, 43.7, 42.9, 45.6, 46.1, 44.4,
-  43.2, 45.8, 47.0, 46.3, 44.9, 43.5, 45.1, 46.7, 45.3, 44.8,
-  46.0, 45.5, 44.7, 45.9, 46.8, 45.4, 44.2, 45.0, 46.5, 47.2,
-];
-const clickRateSeries = [
-  7.2, 7.5, 7.0, 7.8, 8.1, 7.6, 7.4, 8.3, 8.5, 8.0,
-  7.3, 8.1, 8.7, 8.4, 7.9, 7.5, 7.8, 8.2, 8.0, 7.9,
-  8.1, 8.0, 7.6, 7.9, 8.3, 8.0, 7.7, 7.9, 8.2, 8.4,
-];
-
-const reports = [
-  { id: "c_01", name: "Spring Sale 2026 — Early Access", sent: "May 18, 2026", recipients: 12612, openRate: "46.4%", clickRate: "8.9%",  bounceRate: "1.8%", unsubRate: "0.14%" },
-  { id: "c_04", name: "April Refresh",                   sent: "Apr 22, 2026", recipients: 12504, openRate: "41.2%", clickRate: "7.6%",  bounceRate: "2.1%", unsubRate: "0.18%" },
-  { id: "c_05", name: "Member-only Drop",                sent: "Mar 30, 2026", recipients: 8123,  openRate: "52.1%", clickRate: "11.4%", bounceRate: "1.4%", unsubRate: "0.09%" },
-  { id: "c_06", name: "Loyalty Program Update",          sent: "Mar 15, 2026", recipients: 401,   openRate: "38.7%", clickRate: "5.2%",  bounceRate: "0.7%", unsubRate: "0.25%" },
-  { id: "c_07", name: "February Newsletter",             sent: "Feb 14, 2026", recipients: 12388, openRate: "44.3%", clickRate: "8.1%",  bounceRate: "1.9%", unsubRate: "0.16%" },
-  { id: "c_09", name: "New Year Sale",                   sent: "Jan 3, 2026",  recipients: 12211, openRate: "49.6%", clickRate: "10.2%", bounceRate: "2.0%", unsubRate: "0.21%" },
-  { id: "c_10", name: "Holiday Gift Guide",              sent: "Dec 12, 2025", recipients: 8009,  openRate: "47.8%", clickRate: "9.4%",  bounceRate: "1.6%", unsubRate: "0.12%" },
-];
+// Per-campaign rows for the table.
+const reports = computed(() =>
+  campaignReports.value.map((r) => ({
+    id: r.id,
+    name: r.name || "(untitled)",
+    sent: fmtDate(r.sentAt),
+    recipients: r.counts.sent,
+    openRate: fmtPct(r.rates.open),
+    clickRate: fmtPct(r.rates.click),
+    bounceRate: fmtPct(r.rates.bounce),
+    unsubRate: fmtPct(r.rates.unsubscribe),
+  })),
+);
 
 // Truncate long campaign names so the row doesn't blow up on small screens.
 function truncate(s, max = 36) {
@@ -97,19 +115,8 @@ function onExport() {
       </button>
     </header>
 
-    <!-- 2. Time-range chip row -->
-    <div class="rep-chips" role="tablist" aria-label="Time range">
-      <button
-        v-for="r in timeRanges"
-        :key="r.id"
-        type="button"
-        role="tab"
-        :aria-selected="activeRange === r.id"
-        class="rep-chip"
-        :class="{ 'is-active': activeRange === r.id }"
-        @click="activeRange = r.id"
-      >{{ r.label }}</button>
-    </div>
+    <!-- Error banner (non-fatal). -->
+    <p v-if="error" class="rep-error">{{ error }}</p>
 
     <!-- 3. KPI strip -->
     <section class="rep-kpis" aria-label="Key performance indicators">
@@ -123,12 +130,6 @@ function onExport() {
       />
     </section>
 
-    <!-- 4. Performance trend -->
-    <AppPerformanceTrendChart
-      :open-rate-series="openRateSeries"
-      :click-rate-series="clickRateSeries"
-    />
-
     <!-- 5. Recent campaign reports table -->
     <section class="rep-section">
       <div class="rep-eyebrow">
@@ -136,7 +137,11 @@ function onExport() {
         <span>Recent campaign reports</span>
       </div>
 
-      <div class="rep-card">
+      <div v-if="!loading && !reports.length" class="rep-card">
+        <p class="rep-empty">No campaign reports yet. Once you send a campaign, its performance will appear here.</p>
+      </div>
+
+      <div v-else class="rep-card">
         <div class="rcr">
           <div class="rcr-row rcr-head" role="row">
             <div class="rcr-cell rcr-cell-name">Campaign</div>
@@ -312,6 +317,23 @@ function onExport() {
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
   overflow: hidden;
+}
+.rep-empty {
+  margin: 0;
+  padding: var(--space-6) var(--space-5);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  color: var(--color-ink-soft);
+  text-align: center;
+}
+.rep-error {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  color: var(--color-danger);
+  background: var(--color-danger-bg);
+  border-radius: var(--radius-md);
 }
 
 /* Recent campaign reports table */

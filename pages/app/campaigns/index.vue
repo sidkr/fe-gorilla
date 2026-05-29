@@ -1,5 +1,6 @@
 <script setup>
-import { ref, computed } from "vue";
+import { ref, computed, onMounted } from "vue";
+import { useCampaigns } from "~/composables/app/useCampaigns";
 
 definePageMeta({
   layout: "app",
@@ -8,45 +9,74 @@ definePageMeta({
 
 useHead({ title: "Campaigns" });
 
-// All values below are mock data. The Parse query pipeline isn't wired yet;
-// when it lands we'll swap these for `new Parse.Query("Campaign")` results
-// and a client-side filter against `status`.
-const campaigns = [
-  { id: "c_01", name: "Spring Sale 2026 — Early Access", status: "sent",       audience: "Engaged subscribers", date: "May 18, 2026",         relative: "3 days ago",    openRate: "46.4%", clickRate: "8.9%"  },
-  { id: "c_02", name: "May 2026 Newsletter",             status: "draft",      audience: null,                   date: "Created May 21, 2026", relative: "today",         openRate: null,    clickRate: null    },
-  { id: "c_03", name: "Membership Renewal Reminder",     status: "scheduled",  audience: "VIP Members",         date: "Sends May 25, 2026",   relative: "in 4 days",     openRate: null,    clickRate: null    },
-  { id: "c_04", name: "April Refresh",                    status: "sent",       audience: "All subscribers",     date: "Apr 22, 2026",         relative: "1 month ago",   openRate: "41.2%", clickRate: "7.6%"  },
-  { id: "c_05", name: "Member-only Drop",                 status: "sent",       audience: "Engaged subscribers", date: "Mar 30, 2026",         relative: "2 months ago",  openRate: "52.1%", clickRate: "11.4%" },
-  { id: "c_06", name: "Loyalty Program Update",           status: "sent",       audience: "VIP Members",         date: "Mar 15, 2026",         relative: "2 months ago",  openRate: "38.7%", clickRate: "5.2%"  },
-  { id: "c_07", name: "February Newsletter",              status: "sent",       audience: "All subscribers",     date: "Feb 14, 2026",         relative: "3 months ago",  openRate: "44.3%", clickRate: "8.1%"  },
-  { id: "c_08", name: "Welcome Series — Email 1",         status: "draft",      audience: null,                   date: "Created Feb 8, 2026",  relative: "3 months ago",  openRate: null,    clickRate: null    },
-  { id: "c_09", name: "New Year Sale",                    status: "sent",       audience: "All subscribers",     date: "Jan 3, 2026",          relative: "5 months ago",  openRate: "49.6%", clickRate: "10.2%" },
-  { id: "c_10", name: "Holiday Gift Guide",               status: "sent",       audience: "Engaged subscribers", date: "Dec 12, 2025",         relative: "5 months ago",  openRate: "47.8%", clickRate: "9.4%"  },
-];
+// Live data from listCampaigns (server/cloud/campaigns.js), org-scoped. Status
+// filtering happens client-side against `status`; KPIs come back precomputed.
+const { listCampaigns } = useCampaigns();
 
-// Summary KPI strip — values are derived from the mock data above so the
-// counts stay consistent if the mock gets edited.
-const kpis = [
-  { label: "Total campaigns",    value: "10",    delta: "+2 this month",         deltaDirection: "up" },
-  { label: "Avg open rate",      value: "45.2%", delta: "+1.8pp vs last quarter", deltaDirection: "up" },
-  { label: "Drafts",             value: "2",     delta: "Ready to ship",         deltaDirection: "neutral" },
-];
+const campaigns = ref([]);
+const summary = ref(null);
+const loading = ref(true);
+const loadError = ref(null);
 
-// Tab definitions. "sending" intentionally omitted — 0 in mock and surfacing
-// an empty tab is just visual noise. Counts are derived from `campaigns`.
+async function load() {
+  loading.value = true;
+  loadError.value = null;
+  try {
+    const res = await listCampaigns();
+    campaigns.value = res.campaigns ?? [];
+    summary.value = res.kpis ?? null;
+  } catch (e) {
+    loadError.value = e?.message || "Could not load campaigns.";
+    campaigns.value = [];
+    summary.value = null;
+  } finally {
+    loading.value = false;
+  }
+}
+
+onMounted(load);
+
+// Summary KPI strip — derived from the cloud-computed kpis. Avg open rate is
+// null until at least one campaign has sent.
+const kpis = computed(() => {
+  const s = summary.value;
+  return [
+    {
+      label: "Total campaigns",
+      value: String(s?.total ?? 0),
+      delta: `${s?.sent ?? 0} sent`,
+      deltaDirection: "neutral",
+    },
+    {
+      label: "Avg open rate",
+      value: s?.avgOpenRate ?? "—",
+      delta: s?.avgOpenRate ? "Across sent campaigns" : "No sends yet",
+      deltaDirection: s?.avgOpenRate ? "up" : "neutral",
+    },
+    {
+      label: "Drafts",
+      value: String(s?.drafts ?? 0),
+      delta: (s?.drafts ?? 0) > 0 ? "Ready to ship" : "All sent",
+      deltaDirection: "neutral",
+    },
+  ];
+});
+
+// Tab definitions. "sending"/"paused" omitted from the rail to avoid empty-tab
+// noise; those campaigns still show under "All". Counts derive from results.
 const tabs = computed(() => [
-  { id: "all",       label: "All",       count: campaigns.length },
-  { id: "draft",     label: "Drafts",    count: campaigns.filter((c) => c.status === "draft").length },
-  { id: "scheduled", label: "Scheduled", count: campaigns.filter((c) => c.status === "scheduled").length },
-  { id: "sent",      label: "Sent",      count: campaigns.filter((c) => c.status === "sent").length },
+  { id: "all",       label: "All",       count: campaigns.value.length },
+  { id: "draft",     label: "Drafts",    count: campaigns.value.filter((c) => c.status === "draft").length },
+  { id: "scheduled", label: "Scheduled", count: campaigns.value.filter((c) => c.status === "scheduled").length },
+  { id: "sent",      label: "Sent",      count: campaigns.value.filter((c) => c.status === "sent").length },
 ]);
 
 const activeTab = ref("all");
 
 const filtered = computed(() =>
   activeTab.value === "all"
-    ? campaigns
-    : campaigns.filter((c) => c.status === activeTab.value),
+    ? campaigns.value
+    : campaigns.value.filter((c) => c.status === activeTab.value),
 );
 </script>
 
@@ -101,7 +131,9 @@ const filtered = computed(() =>
       </div>
 
       <div class="cmp-card cmp-card-flush">
-        <AppCampaignsTable :campaigns="filtered" />
+        <div v-if="loading" class="cmp-state">Loading campaigns…</div>
+        <div v-else-if="loadError" class="cmp-state cmp-state--error">{{ loadError }}</div>
+        <AppCampaignsTable v-else :campaigns="filtered" />
       </div>
     </section>
   </div>
@@ -280,4 +312,15 @@ const filtered = computed(() =>
   overflow: hidden;
 }
 .cmp-card-flush { padding: 0; }
+
+/* Loading / error states inside the table card */
+.cmp-state {
+  padding: var(--space-7) var(--space-5);
+  text-align: center;
+  color: var(--color-ink-dim);
+  font-size: var(--text-sm);
+}
+.cmp-state--error {
+  color: var(--color-danger, var(--color-ink-soft));
+}
 </style>

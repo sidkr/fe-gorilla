@@ -1,14 +1,16 @@
 <script setup>
-// /app/templates — Templates gallery.
+// /app/templates — Templates gallery (F-13 / F-14).
 //
-// Authed surface; CSR via the /app/* group route rules. Mock data only —
-// real Parse `Template` class lands in a later phase. When it does, the
-// `templates` ref will swap to a live `Parse.Query` and the filter tabs
-// will hit `equalTo("kind", …)` server-side.
+// Authed surface; CSR via the /app/* group route rules. Wired to the real
+// `Template` class via the `listTemplates` cloud function (useTemplates):
+//   - System tab  → global starter templates (read-only; "Use this" forks
+//                   them into a new Campaign draft and opens the editor).
+//   - Saved tab   → the org's own templates ("Use this" + edit + delete).
 //
-// Thumbnails are hand-authored inline SVGs keyed by template id so each
-// card visually communicates a different email layout (newsletter,
-// plain-text, promo, etc.). Colors strictly via tokens.
+// Thumbnails are hand-authored inline SVGs. System templates select their SVG
+// by `seedKey` (stable across reseeds); org templates fall through to a neutral
+// fallback layout. Colors strictly via tokens.
+import { useTemplates } from "~/composables/app/useTemplates";
 
 definePageMeta({
   layout: "app",
@@ -17,36 +19,95 @@ definePageMeta({
 
 useHead({ title: "Templates" });
 
-const templates = [
-  { id: "t_01", name: "Standard newsletter",   kind: "standard", lastEdited: "Default",       relative: "system",        usedIn: 12 },
-  { id: "t_02", name: "Product announcement",  kind: "saved",    lastEdited: "May 14, 2026",  relative: "1 week ago",    usedIn: 8  },
-  { id: "t_03", name: "Welcome email",         kind: "saved",    lastEdited: "Apr 22, 2026",  relative: "1 month ago",   usedIn: 3  },
-  { id: "t_04", name: "Promotional sale",      kind: "saved",    lastEdited: "Mar 30, 2026",  relative: "2 months ago",  usedIn: 6  },
-  { id: "t_05", name: "Plain text update",     kind: "standard", lastEdited: "Default",       relative: "system",        usedIn: 4  },
-  { id: "t_06", name: "Re-engagement",         kind: "saved",    lastEdited: "Feb 14, 2026",  relative: "3 months ago",  usedIn: 2  },
-  { id: "t_07", name: "Event invite",          kind: "saved",    lastEdited: "Jan 22, 2026",  relative: "4 months ago",  usedIn: 5  },
-  { id: "t_08", name: "Member-only digest",    kind: "standard", lastEdited: "Default",       relative: "system",        usedIn: 9  },
-];
+const { listTemplates, useTemplate: forkTemplate, deleteTemplate } = useTemplates();
 
-// Filter tabs. Counts are derived from the mock so they stay in sync if the
-// list ever changes. The "value" matches the `kind` field for non-"all" tabs
-// so filtering is a single equality check below.
-const tabs = computed(() => {
-  const saved = templates.filter((t) => t.kind === "saved").length;
-  const standard = templates.filter((t) => t.kind === "standard").length;
-  return [
-    { value: "all",      label: "All",          count: templates.length },
-    { value: "saved",    label: "Saved by me",  count: saved },
-    { value: "standard", label: "Standard",     count: standard },
-  ];
-});
+const system = ref([]);
+const org = ref([]);
+const loading = ref(true);
+const loadError = ref(null);
+const busyId = ref(null); // id of a template currently being forked/deleted
+
+async function load() {
+  loading.value = true;
+  loadError.value = null;
+  try {
+    const res = await listTemplates();
+    system.value = res.system || [];
+    org.value = res.org || [];
+  } catch (e) {
+    loadError.value = e?.message || "Could not load templates.";
+  } finally {
+    loading.value = false;
+  }
+}
+
+onMounted(load);
+
+// Filter tabs. "all" shows everything; "saved" = org templates; "standard" =
+// system starters. Counts stay in sync with the live data.
+const tabs = computed(() => [
+  { value: "all", label: "All", count: system.value.length + org.value.length },
+  { value: "saved", label: "Saved by me", count: org.value.length },
+  { value: "standard", label: "Standard", count: system.value.length },
+]);
 
 const activeTab = ref("all");
 
+// Normalize a raw cloud template into the card view-model. `kind` drives the
+// card chrome + which actions show; `thumbKey` selects the SVG.
+function toCard(t, kind) {
+  return {
+    id: t.id,
+    name: t.name,
+    kind,
+    thumbKey: kind === "standard" ? t.seedKey : null,
+    // Real hero image (first image block of the template) → richer thumbnail
+    // than the wireframe SVGs. Falls back to the SVGs when absent.
+    thumbUrl: t.thumbUrl || null,
+    category: t.category || (kind === "standard" ? "Standard" : "Saved"),
+  };
+}
+
 const visibleTemplates = computed(() => {
-  if (activeTab.value === "all") return templates;
-  return templates.filter((t) => t.kind === activeTab.value);
+  const sys = system.value.map((t) => toCard(t, "standard"));
+  const own = org.value.map((t) => toCard(t, "saved"));
+  if (activeTab.value === "standard") return sys;
+  if (activeTab.value === "saved") return own;
+  return [...sys, ...own];
 });
+
+// "Use this" → fork into a new Campaign draft → open the editor.
+async function onUse(id) {
+  if (busyId.value) return;
+  busyId.value = id;
+  try {
+    const { campaignId } = await forkTemplate(id);
+    await navigateTo(`/app/campaigns/${campaignId}/edit`);
+  } catch (e) {
+    loadError.value = e?.message || "Could not start from this template.";
+    busyId.value = null;
+  }
+}
+
+// Edit an org template → opens the template editor route (lands later phase).
+function onEdit(id) {
+  return navigateTo(`/app/templates/${id}/edit`);
+}
+
+// Delete an org template (with confirm). System templates never expose this.
+async function onDelete(id, name) {
+  if (busyId.value) return;
+  if (!window.confirm(`Delete the template "${name}"? This can't be undone.`)) return;
+  busyId.value = id;
+  try {
+    await deleteTemplate(id);
+    org.value = org.value.filter((t) => t.id !== id);
+  } catch (e) {
+    loadError.value = e?.message || "Could not delete the template.";
+  } finally {
+    busyId.value = null;
+  }
+}
 </script>
 
 <template>
@@ -81,25 +142,34 @@ const visibleTemplates = computed(() => {
       </button>
     </div>
 
-    <!-- 3. Gallery -->
-    <section class="tpl-grid" aria-label="Template gallery">
-      <AppTemplateCard
-        v-for="tpl in visibleTemplates"
-        :key="tpl.id"
-        :id="tpl.id"
-        :name="tpl.name"
-        :kind="tpl.kind"
-        :last-edited="tpl.lastEdited"
-        :relative="tpl.relative"
-        :used-in="tpl.usedIn"
-      >
-        <template #thumb>
-          <!-- Inline SVG per template id. viewBox is 3:4 to match the card
-               thumbnail aspect ratio. Strictly token colors only. -->
+    <!-- 3. States -->
+    <p v-if="loadError" class="tpl-error" role="alert">{{ loadError }}</p>
+    <p v-if="loading" class="tpl-empty">Loading templates…</p>
+    <p
+      v-else-if="visibleTemplates.length === 0"
+      class="tpl-empty"
+    >
+      {{ activeTab === "saved" ? "You haven't saved any templates yet. Use “Save as template” from the editor." : "No templates to show." }}
+    </p>
 
-          <!-- Standard newsletter: header + 3 paragraphs + image + 2 paragraphs + button + footer.
-               Long-form layout that reads as a content-heavy newsletter. -->
-          <svg v-if="tpl.id === 't_01'" viewBox="0 0 240 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Newsletter layout preview">
+    <!-- 4. Gallery -->
+    <section v-else class="tpl-grid" aria-label="Template gallery">
+      <!-- Cards are rendered inline (not via AppTemplateCard) because each card
+           now carries interactive actions — "Use this" for all, plus edit/delete
+           for org templates — which a single-link card can't host. The thumbnail
+           design + chrome match the original card styling. -->
+      <article v-for="tpl in visibleTemplates" :key="tpl.id" class="tpl-card">
+        <div class="tpl-card-thumb">
+          <!-- Preferred: the template's real hero image (first image block).
+               Far more compelling than a wireframe; falls back to the SVGs
+               below for templates with no image. -->
+          <img v-if="tpl.thumbUrl" :src="tpl.thumbUrl" :alt="tpl.name" class="tpl-thumb-img" loading="lazy" />
+
+          <!-- Inline SVG per system template (keyed by seedKey). viewBox is 3:4
+               to match the card thumbnail aspect ratio. Token colors only. -->
+
+          <!-- Standard newsletter -->
+          <svg v-else-if="tpl.thumbKey === 'system/newsletter'" viewBox="0 0 240 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Newsletter layout preview">
             <rect x="20" y="20"  width="200" height="14" rx="2" fill="var(--color-pop)" />
             <rect x="20" y="48"  width="160" height="6"  rx="2" fill="var(--color-rule)" />
             <rect x="20" y="62"  width="200" height="6"  rx="2" fill="var(--color-rule)" />
@@ -113,9 +183,8 @@ const visibleTemplates = computed(() => {
             <rect x="20" y="292" width="80"  height="4"  rx="2" fill="var(--color-ink-soft)" opacity="0.4" />
           </svg>
 
-          <!-- Product announcement: header + hero image + headline + body + button + footer.
-               Hero-driven product reveal layout. -->
-          <svg v-else-if="tpl.id === 't_02'" viewBox="0 0 240 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Product announcement preview">
+          <!-- Product announcement -->
+          <svg v-else-if="tpl.thumbKey === 'system/product-announcement'" viewBox="0 0 240 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Product announcement preview">
             <rect x="20" y="20"  width="200" height="14" rx="2" fill="var(--color-pop)" />
             <rect x="20" y="48"  width="200" height="100" rx="3" fill="var(--color-surface-2)" stroke="var(--color-rule)" stroke-width="1" />
             <circle cx="120" cy="98" r="18" fill="var(--color-pop-bg)" />
@@ -128,8 +197,8 @@ const visibleTemplates = computed(() => {
             <rect x="20" y="292" width="100" height="4"  rx="2" fill="var(--color-ink-soft)" opacity="0.4" />
           </svg>
 
-          <!-- Welcome email: header + image + headline + 2 paragraphs + 2 small buttons side by side. -->
-          <svg v-else-if="tpl.id === 't_03'" viewBox="0 0 240 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Welcome email preview">
+          <!-- Welcome email -->
+          <svg v-else-if="tpl.thumbKey === 'system/welcome'" viewBox="0 0 240 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Welcome email preview">
             <rect x="20" y="20"  width="200" height="14" rx="2" fill="var(--color-pop)" />
             <rect x="20" y="48"  width="200" height="80" rx="3" fill="var(--color-surface-2)" stroke="var(--color-rule)" stroke-width="1" />
             <path d="M120 76 L132 96 H108 Z" fill="var(--color-pop-bg)" />
@@ -143,20 +212,8 @@ const visibleTemplates = computed(() => {
             <rect x="20" y="290" width="90" height="4"  rx="2" fill="var(--color-ink-soft)" opacity="0.4" />
           </svg>
 
-          <!-- Promotional sale: large image (60% of card) + headline + paragraph + large button. -->
-          <svg v-else-if="tpl.id === 't_04'" viewBox="0 0 240 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Promotional sale preview">
-            <rect x="20" y="20"  width="200" height="14" rx="2" fill="var(--color-pop)" />
-            <rect x="20" y="48"  width="200" height="170" rx="3" fill="var(--color-surface-2)" stroke="var(--color-rule)" stroke-width="1" />
-            <rect x="44" y="100" width="152" height="14" rx="2" fill="var(--color-pop)" opacity="0.85" />
-            <rect x="60" y="124" width="120" height="32" rx="3" fill="var(--color-pop-bg)" />
-            <rect x="70" y="134" width="100" height="12" rx="2" fill="var(--color-pop-deep)" />
-            <rect x="20" y="230" width="180" height="10" rx="2" fill="var(--color-ink-soft)" opacity="0.6" />
-            <rect x="20" y="250" width="200" height="6"  rx="2" fill="var(--color-rule)" />
-            <rect x="40" y="276" width="160" height="28" rx="4" fill="var(--color-pop)" />
-          </svg>
-
-          <!-- Plain text update: header + 5 paragraphs + footer hairline. No image, no button. -->
-          <svg v-else-if="tpl.id === 't_05'" viewBox="0 0 240 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Plain text update preview">
+          <!-- Plain text update -->
+          <svg v-else-if="tpl.thumbKey === 'system/plain-text'" viewBox="0 0 240 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Plain text update preview">
             <rect x="20" y="20"  width="200" height="14" rx="2" fill="var(--color-pop)" />
             <rect x="20" y="56"  width="200" height="6"  rx="2" fill="var(--color-rule)" />
             <rect x="20" y="70"  width="180" height="6"  rx="2" fill="var(--color-rule)" />
@@ -174,74 +231,25 @@ const visibleTemplates = computed(() => {
             <line x1="20" y1="296" x2="220" y2="296" stroke="var(--color-rule)" stroke-width="1" />
           </svg>
 
-          <!-- Re-engagement: header + headline + paragraph + two CTAs side by side. -->
-          <svg v-else-if="tpl.id === 't_06'" viewBox="0 0 240 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Re-engagement preview">
+          <!-- Basic header, body & CTA -->
+          <svg v-else-if="tpl.thumbKey === 'system/basic'" viewBox="0 0 240 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Basic header, body and CTA preview">
             <rect x="20" y="20"  width="200" height="14" rx="2" fill="var(--color-pop)" />
-            <rect x="20" y="68"  width="200" height="14" rx="2" fill="var(--color-ink-soft)" opacity="0.6" />
-            <rect x="20" y="90"  width="170" height="14" rx="2" fill="var(--color-ink-soft)" opacity="0.6" />
-            <rect x="20" y="128" width="200" height="6"  rx="2" fill="var(--color-rule)" />
-            <rect x="20" y="142" width="200" height="6"  rx="2" fill="var(--color-rule)" />
-            <rect x="20" y="156" width="180" height="6"  rx="2" fill="var(--color-rule)" />
-            <rect x="20" y="170" width="160" height="6"  rx="2" fill="var(--color-rule)" />
-            <rect x="20" y="208" width="90"  height="28" rx="4" fill="var(--color-pop)" />
-            <rect x="118" y="208" width="90" height="28" rx="4" fill="var(--color-surface)" stroke="var(--color-pop)" stroke-width="1.5" />
-            <line x1="20" y1="278" x2="220" y2="278" stroke="var(--color-rule)" stroke-width="1" />
-            <rect x="20" y="290" width="100" height="4"  rx="2" fill="var(--color-ink-soft)" opacity="0.4" />
+            <rect x="20" y="74"  width="200" height="14" rx="2" fill="var(--color-ink-soft)" opacity="0.6" />
+            <rect x="20" y="96"  width="170" height="14" rx="2" fill="var(--color-ink-soft)" opacity="0.6" />
+            <rect x="20" y="134" width="200" height="6"  rx="2" fill="var(--color-rule)" />
+            <rect x="20" y="148" width="200" height="6"  rx="2" fill="var(--color-rule)" />
+            <rect x="20" y="162" width="160" height="6"  rx="2" fill="var(--color-rule)" />
+            <rect x="60" y="206" width="120" height="28" rx="4" fill="var(--color-pop)" />
+            <line x1="20" y1="290" x2="220" y2="290" stroke="var(--color-rule)" stroke-width="1" />
           </svg>
 
-          <!-- Event invite: header + image + headline + 3 metadata rows (date/time/location) + CTA. -->
-          <svg v-else-if="tpl.id === 't_07'" viewBox="0 0 240 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Event invite preview">
-            <rect x="20" y="20"  width="200" height="14" rx="2" fill="var(--color-pop)" />
-            <rect x="20" y="48"  width="200" height="78" rx="3" fill="var(--color-surface-2)" stroke="var(--color-rule)" stroke-width="1" />
-            <rect x="52" y="68"  width="136" height="38" rx="3" fill="var(--color-pop-bg)" />
-            <rect x="68" y="76"  width="104" height="8" rx="2" fill="var(--color-pop-deep)" />
-            <rect x="80" y="90"  width="80"  height="6" rx="2" fill="var(--color-pop-deep)" opacity="0.6" />
-            <rect x="20" y="140" width="160" height="12" rx="2" fill="var(--color-ink-soft)" opacity="0.7" />
-            <!-- Metadata rows: small swatch + line -->
-            <rect x="20" y="168" width="10" height="10" rx="2" fill="var(--color-pop)" />
-            <rect x="38" y="170" width="150" height="6" rx="2" fill="var(--color-rule)" />
-            <rect x="20" y="188" width="10" height="10" rx="2" fill="var(--color-pop)" />
-            <rect x="38" y="190" width="130" height="6" rx="2" fill="var(--color-rule)" />
-            <rect x="20" y="208" width="10" height="10" rx="2" fill="var(--color-pop)" />
-            <rect x="38" y="210" width="160" height="6" rx="2" fill="var(--color-rule)" />
-            <rect x="20" y="242" width="130" height="28" rx="4" fill="var(--color-pop)" />
-            <line x1="20" y1="294" x2="220" y2="294" stroke="var(--color-rule)" stroke-width="1" />
+          <!-- Blank -->
+          <svg v-else-if="tpl.thumbKey === 'system/blank'" viewBox="0 0 240 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Blank template preview">
+            <rect x="20" y="20" width="200" height="280" rx="4" fill="var(--color-surface-2)" stroke="var(--color-rule)" stroke-width="1" stroke-dasharray="6 6" />
+            <path d="M120 140 V180 M100 160 H140" stroke="var(--color-ink-soft)" stroke-width="2" stroke-linecap="round" opacity="0.5" />
           </svg>
 
-          <!-- Member-only digest: header + 4 small section blocks (image + paragraph + "read more"). -->
-          <svg v-else-if="tpl.id === 't_08'" viewBox="0 0 240 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Member-only digest preview">
-            <rect x="20" y="20" width="200" height="14" rx="2" fill="var(--color-pop)" />
-
-            <!-- Section 1 -->
-            <rect x="20" y="48" width="48" height="40" rx="3" fill="var(--color-surface-2)" stroke="var(--color-rule)" stroke-width="1" />
-            <rect x="76" y="52" width="140" height="8" rx="2" fill="var(--color-ink-soft)" opacity="0.65" />
-            <rect x="76" y="66" width="120" height="5" rx="2" fill="var(--color-rule)" />
-            <rect x="76" y="76" width="60"  height="5" rx="2" fill="var(--color-pop)" opacity="0.85" />
-
-            <!-- Section 2 -->
-            <rect x="20" y="104" width="48" height="40" rx="3" fill="var(--color-surface-2)" stroke="var(--color-rule)" stroke-width="1" />
-            <rect x="76" y="108" width="130" height="8" rx="2" fill="var(--color-ink-soft)" opacity="0.65" />
-            <rect x="76" y="122" width="140" height="5" rx="2" fill="var(--color-rule)" />
-            <rect x="76" y="132" width="60"  height="5" rx="2" fill="var(--color-pop)" opacity="0.85" />
-
-            <!-- Section 3 -->
-            <rect x="20" y="160" width="48" height="40" rx="3" fill="var(--color-surface-2)" stroke="var(--color-rule)" stroke-width="1" />
-            <rect x="76" y="164" width="120" height="8" rx="2" fill="var(--color-ink-soft)" opacity="0.65" />
-            <rect x="76" y="178" width="135" height="5" rx="2" fill="var(--color-rule)" />
-            <rect x="76" y="188" width="60"  height="5" rx="2" fill="var(--color-pop)" opacity="0.85" />
-
-            <!-- Section 4 -->
-            <rect x="20" y="216" width="48" height="40" rx="3" fill="var(--color-surface-2)" stroke="var(--color-rule)" stroke-width="1" />
-            <rect x="76" y="220" width="140" height="8" rx="2" fill="var(--color-ink-soft)" opacity="0.65" />
-            <rect x="76" y="234" width="120" height="5" rx="2" fill="var(--color-rule)" />
-            <rect x="76" y="244" width="60"  height="5" rx="2" fill="var(--color-pop)" opacity="0.85" />
-
-            <line x1="20" y1="278" x2="220" y2="278" stroke="var(--color-rule)" stroke-width="1" />
-            <rect x="20" y="290" width="100" height="4" rx="2" fill="var(--color-ink-soft)" opacity="0.4" />
-          </svg>
-
-          <!-- Fallback: a neutral plain layout. Only triggers if a new template
-               id slips in without a matching SVG above. -->
+          <!-- Fallback (org templates + any unknown key): neutral plain layout. -->
           <svg v-else viewBox="0 0 240 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Template preview">
             <rect x="20" y="20"  width="200" height="14" rx="2" fill="var(--color-pop)" />
             <rect x="20" y="48"  width="180" height="6"  rx="2" fill="var(--color-rule)" />
@@ -249,8 +257,40 @@ const visibleTemplates = computed(() => {
             <rect x="20" y="82"  width="200" height="80" rx="3" fill="var(--color-surface-2)" stroke="var(--color-rule)" stroke-width="1" />
             <rect x="20" y="180" width="100" height="22" rx="4" fill="var(--color-pop)" />
           </svg>
-        </template>
-      </AppTemplateCard>
+        </div>
+
+        <!-- Body: name + tag chip -->
+        <div class="tpl-card-body">
+          <div class="tpl-card-head">
+            <h3 class="tpl-card-name">{{ tpl.name }}</h3>
+            <span class="tpl-card-tag">{{ tpl.category }}</span>
+          </div>
+          <p class="tpl-card-meta">
+            {{ tpl.kind === "standard" ? "Starter template" : "Saved by your team" }}
+          </p>
+
+          <!-- Actions. "Use this" for every template; edit + delete only for
+               org-owned ("saved") templates. System templates are read-only. -->
+          <div class="tpl-card-actions">
+            <button
+              type="button"
+              class="tpl-act tpl-act-primary"
+              :disabled="busyId === tpl.id"
+              @click="onUse(tpl.id)"
+            >
+              {{ busyId === tpl.id ? "Working…" : "Use this" }}
+            </button>
+            <template v-if="tpl.kind === 'saved'">
+              <button type="button" class="tpl-act" :disabled="busyId === tpl.id" @click="onEdit(tpl.id)">
+                Edit
+              </button>
+              <button type="button" class="tpl-act tpl-act-danger" :disabled="busyId === tpl.id" @click="onDelete(tpl.id, tpl.name)">
+                Delete
+              </button>
+            </template>
+          </div>
+        </div>
+      </article>
     </section>
   </div>
 </template>
@@ -363,6 +403,152 @@ const visibleTemplates = computed(() => {
   font-variant-numeric: tabular-nums;
   font-weight: 500;
   color: var(--color-ink-dim);
+}
+
+/* States */
+.tpl-error {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-pop-bg);
+  color: var(--color-pop-deep);
+  font-size: var(--text-sm);
+}
+.tpl-empty {
+  margin: 0;
+  color: var(--color-ink-soft);
+  font-size: var(--text-sm);
+}
+
+/* Card — surface, hover border, thumbnail (3:4), body, actions. Mirrors the
+   original AppTemplateCard chrome (now inlined so the card can host buttons). */
+.tpl-card {
+  display: flex;
+  flex-direction: column;
+  background: var(--color-surface);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  transition: border-color var(--dur-base) var(--ease-out),
+              box-shadow var(--dur-base) var(--ease-out);
+}
+.tpl-card:hover {
+  border-color: var(--color-pop);
+  box-shadow: var(--shadow-md);
+}
+.tpl-card-thumb {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  background: var(--color-surface-2);
+  border-bottom: 1px solid var(--color-rule);
+  overflow: hidden;
+}
+.tpl-card-thumb svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.tpl-thumb-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top center;
+}
+.tpl-card-body {
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.tpl-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.tpl-card-name {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: 700;
+  letter-spacing: var(--tracking-tight);
+  line-height: var(--leading-tight);
+  color: var(--color-ink);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.tpl-card-tag {
+  flex: none;
+  padding: var(--space-1) var(--space-3);
+  background: var(--color-pop-bg);
+  color: var(--color-pop-deep);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-wide);
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.tpl-card-meta {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  color: var(--color-ink-soft);
+}
+.tpl-card-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  flex-wrap: wrap;
+}
+.tpl-act {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-rule);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--dur-base) var(--ease-out),
+              border-color var(--dur-base) var(--ease-out),
+              color var(--dur-base) var(--ease-out);
+}
+.tpl-act:hover:not(:disabled) {
+  border-color: var(--color-pop);
+}
+.tpl-act:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.tpl-act:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-pop-glow);
+}
+.tpl-act-primary {
+  background: var(--btn-primary-bg);
+  border-color: var(--btn-primary-bg);
+  color: var(--btn-primary-fg);
+}
+.tpl-act-primary:hover:not(:disabled) {
+  background: var(--btn-primary-hover);
+  border-color: var(--btn-primary-hover);
+}
+.tpl-act-danger {
+  margin-left: auto;
+  color: var(--color-ink-soft);
+}
+.tpl-act-danger:hover:not(:disabled) {
+  border-color: var(--color-pop);
+  color: var(--color-pop-deep);
 }
 
 /* Gallery grid — 3 cols ≥1100, 2 cols 720-1100, 1 col below. */

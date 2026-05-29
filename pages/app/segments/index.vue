@@ -1,4 +1,6 @@
-<script setup>
+<script setup lang="ts">
+import { useSegments, type Segment, type SegmentRules } from "~/composables/app/useSegments";
+
 definePageMeta({
   layout: "app",
   middleware: "auth-required",
@@ -6,18 +8,95 @@ definePageMeta({
 
 useHead({ title: "Segments" });
 
-// All values below are mock data. The Parse-backed segment evaluator isn't
-// live yet; when it lands we'll swap these for real queries.
-const segments = [
-  { id: "s_01", name: "Recent buyers (30d)",     audience: "All subscribers", rule: "purchased: in last 30d",                              count: 1247, lastUsed: "May 18, 2026" },
-  { id: "s_02", name: "High-value (LTV > $500)", audience: "All subscribers", rule: "ltv > 500",                                            count: 412,  lastUsed: "May 14, 2026" },
-  { id: "s_03", name: "Cart abandoners",         audience: "All subscribers", rule: "added_to_cart AND NOT purchased: in 24h",              count: 287,  lastUsed: "May 21, 2026" },
-  { id: "s_04", name: "Active in last 7d",       audience: "All subscribers", rule: "opened OR clicked: in last 7d",                        count: 3845, lastUsed: "May 21, 2026" },
-  { id: "s_05", name: "Unengaged (30d)",         audience: "All subscribers", rule: "no opens AND no clicks: in last 30d",                  count: 4613, lastUsed: "May 10, 2026" },
-  { id: "s_06", name: "Birthday this month",     audience: "All subscribers", rule: "birthday: in May",                                     count: 178,  lastUsed: "May 1, 2026"  },
-  { id: "s_07", name: "Lapsed VIPs",             audience: "VIP Members",     rule: "tier = vip AND no purchase: in last 90d",              count: 23,   lastUsed: "—"        },
-  { id: "s_08", name: "New this week",           audience: "All subscribers", rule: "createdAt: in last 7d",                                count: 89,   lastUsed: "May 19, 2026" },
-];
+const { listSegments } = useSegments();
+
+const loading = ref(true);
+const loadError = ref("");
+const rawSegments = ref<Segment[]>([]);
+
+// Render a rule tree into the compact mono string the table column shows.
+// e.g. { op:"and", conditions:[{field:"email",operator:"contains",value:"@gmail.com"}] }
+//      → "email contains \"@gmail.com\""
+const OP_LABELS: Record<string, string> = {
+  eq: "=",
+  neq: "≠",
+  contains: "contains",
+  starts_with: "starts with",
+  ends_with: "ends with",
+  is_empty: "is empty",
+  is_not_empty: "is not empty",
+  gt: ">",
+  gte: "≥",
+  lt: "<",
+  lte: "≤",
+  in: "in",
+  not_in: "not in",
+  before: "before",
+  after: "after",
+  between: "between",
+  last_n_days: "in last N days",
+};
+
+function summarizeCondition(c: { field: string; operator: string; value?: unknown }): string {
+  const op = OP_LABELS[c.operator] || c.operator;
+  if (c.operator === "is_empty" || c.operator === "is_not_empty") {
+    return `${c.field} ${op}`;
+  }
+  if (c.operator === "last_n_days") {
+    return `${c.field} in last ${c.value} days`;
+  }
+  const v =
+    typeof c.value === "string" ? `"${c.value}"` : JSON.stringify(c.value);
+  return `${c.field} ${op} ${v}`;
+}
+
+function summarizeRules(rules: SegmentRules | null): string {
+  if (!rules || !Array.isArray(rules.conditions) || rules.conditions.length === 0) {
+    return "all contacts";
+  }
+  const joiner = rules.op === "or" ? " OR " : " AND ";
+  return rules.conditions
+    .map((c) =>
+      "op" in c && (c.op === "and" || c.op === "or")
+        ? `(${summarizeRules(c as SegmentRules)})`
+        : summarizeCondition(c as { field: string; operator: string; value?: unknown }),
+    )
+    .join(joiner);
+}
+
+function formatDate(d: string | Date | null): string {
+  if (!d) return "—";
+  const date = typeof d === "string" ? new Date(d) : d;
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+// Map the cloud-fn shape → the row shape AppSegmentsTable expects:
+// { id, name, audience, rule, count, lastUsed }.
+const segments = computed(() =>
+  rawSegments.value.map((s) => ({
+    id: s.id,
+    name: s.name,
+    audience: s.list ? s.listName || "List" : "All subscribers",
+    rule: summarizeRules(s.rules),
+    count: s.lastCount ?? 0,
+    lastUsed: formatDate(s.lastEvaluatedAt),
+  })),
+);
+
+onMounted(async () => {
+  try {
+    rawSegments.value = await listSegments();
+  } catch (err) {
+    loadError.value = (err as Error)?.message || "Failed to load segments.";
+  } finally {
+    loading.value = false;
+  }
+});
 </script>
 
 <template>
@@ -63,7 +142,12 @@ const segments = [
         <span>All segments &middot; {{ segments.length }}</span>
       </div>
       <div class="seg-card seg-card-flush">
-        <AppSegmentsTable :segments="segments" />
+        <p v-if="loading" class="seg-state">Loading segments…</p>
+        <p v-else-if="loadError" class="seg-state seg-state-error">{{ loadError }}</p>
+        <p v-else-if="segments.length === 0" class="seg-state">
+          No segments yet. Create your first to slice your audience.
+        </p>
+        <AppSegmentsTable v-else :segments="segments" />
       </div>
     </section>
   </div>
@@ -165,6 +249,19 @@ const segments = [
   overflow: hidden;
 }
 .seg-card-flush { padding: 0; }
+
+/* Loading / empty / error states inside the table card */
+.seg-state {
+  margin: 0;
+  padding: var(--space-6) var(--space-5);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  color: var(--color-ink-soft);
+  text-align: center;
+}
+.seg-state-error {
+  color: var(--color-danger, var(--color-ink));
+}
 
 /* Explainer card */
 .seg-explainer {

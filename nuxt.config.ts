@@ -5,6 +5,14 @@ export default defineNuxtConfig({
 
   modules: ["@pinia/nuxt"],
 
+  // The `server/` directory is the standalone Express + Parse backend (run as
+  // its own `node ./server/index.js` process), NOT Nitro server routes. Without
+  // this, Nitro auto-scans `server/routes/*.js` and registers them as its own
+  // handlers — they export `{ mount }` (not an event handler), so the matched
+  // route (e.g. `/` ← server/routes/index.js) 500s with "Invalid lazy handler
+  // result". Ignoring the tree keeps Nitro out of the backend entirely.
+  ignore: ["server/**"],
+
   css: ["~/assets/css/tokens.css"],
 
   // Auto-import components by directory. Subdirectory prefixes self-document
@@ -54,18 +62,28 @@ export default defineNuxtConfig({
   //
   // One routeRule covers the whole boundary: every new authed page lands
   // under /app/* and inherits CSR + the noindex meta on the layout.
+  // Marketing pages are prerendered for SEO via `nitro.prerender.routes`
+  // (below) rather than per-route `prerender: true` rules — equivalent static
+  // output at build, and it keeps the dev SSR path simple. (The historical
+  // `/` 500 was NOT a prerender issue — it was Nitro scanning the Express
+  // `server/` dir; see the `ignore` option above.)
   routeRules: {
-    "/":          { prerender: true },
-    "/signup":    { prerender: true },
-    "/login":     { prerender: true },
-
     "/app":       { ssr: false },
     "/app/**":    { ssr: false },
 
-    // Proxy /api/* to the Express+Parse server on :8080. Works in both dev
-    // and prod via Nitro. In dev, Parse is started by the concurrent
+    // Proxy /api/* to the Express+Parse server. Works in both dev and prod via
+    // Nitro. Port is env-driven (PARSE_PORT) so the API can move off :8080 when
+    // it's taken; defaults to 8080. In dev, Parse is started by the concurrent
     // `node ./server/index.js`; in prod, run that process separately.
-    "/api/**":    { proxy: "http://localhost:8080/api/**" },
+    "/api/**":    { proxy: `http://localhost:${process.env.PARSE_PORT || 8080}/api/**` },
+  },
+
+  // Marketing pages prerendered to static HTML at build time (SEO + speed),
+  // replacing the per-route `prerender: true` rules (see routeRules note above).
+  nitro: {
+    prerender: {
+      routes: ["/", "/login", "/signup"],
+    },
   },
 
   vite: {
@@ -80,6 +98,15 @@ export default defineNuxtConfig({
     // fails to resolve <AppFoo />. Polling is more CPU but reliable.
     // Remove this if/when this project moves off WSL2.
     server: {
+      // Vite 7 blocks requests from unknown hosts by default; the cloudflared
+      // quick tunnel serves a random *.trycloudflare.com origin, so allow any
+      // host in dev. (Dev-only; prod is prerendered + the Express server.)
+      allowedHosts: true,
+      // When served through the tunnel (NUXT_TUNNEL_HMR=1), the HMR websocket
+      // must reconnect over the tunnel's HTTPS/443, not the local dev port — so
+      // live updates reach the public URL. Unset → Vite default, so plain
+      // localhost:3001 HMR is unaffected on normal `npm run dev`.
+      hmr: process.env.NUXT_TUNNEL_HMR ? { protocol: "wss", clientPort: 443 } : true,
       watch: {
         usePolling: true,
         interval: 500,

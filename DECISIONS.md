@@ -150,4 +150,51 @@ Full rationale in `Sending.md` §10.
 
 ---
 
+## #9 — Canonical Parse class names (2026-05-29)
+
+**Context.** Features.md and Architecture.md drifted on class names (e.g. `AudienceList`, `CampaignRecipient`, `SenderIdentity`). Five agents are about to build features on these classes; they need one canonical set.
+
+**Choice.** The per-tenant classes are exactly:
+`List`, `Contact`, `Segment`, `Campaign`, `Template`, `CampaignSend`, `EmailEvent`, `Suppression` — plus `Organization` (tenant root) and the built-in `_User` / `_Role`.
+
+Features.md's `AudienceList` (→ `List`), `CampaignRecipient` (→ `CampaignSend`), and `SenderIdentity` (→ future `SendingDomain`) names are **superseded** by this entry.
+
+**Why.** `List` matches the editor + `editor-types.ts`, which already reference `List`, and the editor already writes a `Campaign` object client-side. Keeping the names the code already uses avoids a rename churn across five agents.
+
+**Cost of changing later.** Medium — a class rename is a data migration + every query. Locked now to avoid exactly that.
+
+The canonical list is exported as `PER_TENANT_CLASSES` from `server/cloud/lib/tenancy.js`; bootstrap, stamping hooks, and CLPs all iterate that one array.
+
+---
+
+## #10 — Multi-tenant via Organization + role ACL + beforeSave stamping (2026-05-29)
+
+**Context.** Multi-tenant from day one (Architecture.md §2.1). Need isolation that feature agents can't accidentally bypass and that requires zero per-feature boilerplate.
+
+**Choice.** Three moving parts:
+1. **`signUpWithOrg` cloud function** (`server/cloud/organizations.js`): the only signup path. While the caller is anonymous it creates the `_User`, an `Organization` (unique slug, `plan:"free"`, defaults), and a `_Role` named `org_<orgId>_members` containing the user; sets `user.organization` + `user.role="owner"`; returns a `sessionToken`. Best-effort cleanup if a step fails. Duplicate username/email → Parse.Error 202.
+2. **`beforeSave` stamping** (`server/cloud/tenantHooks.js`): registered for every class in `PER_TENANT_CLASSES`. On NEW objects it requires an authenticated user (rejects anonymous), resolves their org, stamps the `organization` pointer if unset, and stamps an ACL granting r+w to `role:org_<orgId>_members` only (no public) if no explicit ACL was set. On UPDATES it leaves org/ACL alone and rejects moving a row to a different org. Master-key writes (workers) bypass the user requirement and may set org themselves.
+3. **CLPs that disable public access** (`server/cloud/lib/bootstrapSchemas.js`): every per-tenant class requires authentication for all ops; row-level isolation is then the ACL's job. Bootstrap is idempotent and never crashes boot on a benign schema/index error.
+
+**Why the editor needs no changes.** The editor creates a `Campaign` client-side as a logged-in user with no `organization`/ACL set. The `beforeSave` hook stamps both automatically, so the object is tenant-isolated without the editor knowing tenancy exists. Same for any feature cloud function: just create + save as the logged-in user; resolve the caller's org for explicit filters via `getUserOrg(request.user, { useMasterKey: true })`.
+
+**Cost of changing later.** High — this is the isolation contract every class depends on. Designed to be the thing we don't change.
+
+---
+
+## #11 — Per-org custom-field registry + rich Contact (2026-05-29)
+
+**Context.** Advanced segmentation and personalization need arbitrary, per-tenant data points (e.g. "Plan Tier", "Lifetime Value", "Signup Source") plus a richer set of standard contact attributes than the bare email/name we started with. The contact-capture form, the segment rule builder, and the editor merge-tag picker all need to agree on what data points exist and what type each one is — without each re-inventing a shape.
+
+**Options considered.**
+- Schemaless free-for-all: let any key land in `Contact.customFields`. No registry. Cheapest to write, but segments can't enumerate filterable fields, merge-tags can't be offered, and a typo'd key silently creates a phantom data point — no type coercion, no validation.
+- Hardcoded standard fields only: add a fixed column set and stop. Covers the common case but not tenant-specific data (the whole point of advanced segments).
+- Per-org `CustomField` registry + extended standard fields: a tenant-scoped registry of typed data-point definitions, plus first-class standard columns for the common attributes.
+
+**Choice.** Option 3. A new per-tenant `CustomField` class (`{ key, label, type, enumValues, required, order }`, `type ∈ text|number|date|boolean|enum`, unique `(organization, key)`) is the org's data-point registry. Contact gains standard columns `company, phone, city, country, timezone, tags, consent` alongside the existing `customFields` Object bag for registry-defined values. Shared coercion/validation lives in `server/cloud/lib/customFields.js` (`slugifyKey`, `coerceValue`, `validateCustomFields`) so contacts.* cleans a contact's `customFields` against the registry on save, segments validates rule RHS by type, and the editor reads the registry for merge-tags. The frontend mirrors the shape in `composables/app/useCustomFields.ts`. `CustomField` is in `PER_TENANT_CLASSES`, so org+ACL stamping is automatic.
+
+**Why.** One typed registry per org is the minimum that makes the three consumers coherent: segments can list filterable fields, merge-tags can be offered, and values get coerced/validated to a declared type instead of being arbitrary strings. Standard columns stay first-class (indexable, no Object-bag overhead) for the attributes every tenant uses. Key + type are immutable post-create (changing either is a migration), which keeps stored contact values consistent with their definition.
+
+**Cost of changing later.** Medium. Adding field types or standard columns is additive. Renaming a key or changing a type is a per-contact data migration (deliberately disallowed in `updateCustomField`). Dropping the registry entirely would orphan every `customFields` value and break segments/merge-tags.
+
 <!-- Append new entries below this line. Keep the numbering monotonic. -->

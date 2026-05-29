@@ -1,5 +1,7 @@
 <script setup>
+import { computed, onMounted } from "vue";
 import { useAuthStore } from "~/stores/auth";
+import { useDashboard } from "~/composables/app/useDashboard";
 
 definePageMeta({
   layout: "app",
@@ -10,61 +12,81 @@ useHead({ title: "Dashboard" });
 
 const auth = useAuthStore();
 
-// All values below are mock data. The Parse send pipeline isn't live yet;
-// when it lands we'll swap these for real queries / cloud functions.
-const kpis = [
-  { label: "Active campaigns",    value: "3",      delta: "+1 vs last week",      deltaDirection: "up" },
-  { label: "Subscribers",         value: "12,847", delta: "+342 in last 30d",     deltaDirection: "up" },
-  { label: "Avg open rate (30d)", value: "46.4%",  delta: "+2.1pp vs prev 30d",   deltaDirection: "up" },
-  { label: "Avg click rate (30d)",value: "8.9%",   delta: "−0.3pp vs prev 30d", deltaDirection: "down" },
-];
+// Real org-scoped metrics from the `getDashboardMetrics` cloud function.
+// Audiences / contacts / campaigns-by-status are real from day one; engagement
+// totals (sent/opens/clicks) are 0 until the send pipeline lands — the widgets
+// below render graceful empty states in that case.
+const { metrics, loading, error, load } = useDashboard();
+onMounted(load);
 
-const funnelStages = [
-  { name: "Sent",      count: 12847, pct: "100%" },
-  { name: "Delivered", count: 12612, pct: "98.2%" },
-  { name: "Opened",    count: 5847,  pct: "45.5%" },
-  { name: "Clicked",   count: 1124,  pct: "8.7%" },
-  { name: "Converted", count: 287,   pct: "2.2%" },
-];
+// ── Formatters ────────────────────────────────────────────────────────────--
+function fmtNum(n) {
+  return Number(n || 0).toLocaleString("en-US");
+}
+function fmtPct(fraction) {
+  return `${((fraction || 0) * 100).toFixed(1)}%`;
+}
 
-const recentCampaigns = [
-  { id: "c_1", name: "Spring Sale 2026 — Early Access", status: "Sent", sent: "May 18, 2026", openRate: "46.4%", clickRate: "8.9%" },
-  { id: "c_2", name: "April Refresh",                          status: "Sent", sent: "Apr 22, 2026", openRate: "41.2%", clickRate: "7.6%" },
-  { id: "c_3", name: "Member-only Drop",                       status: "Sent", sent: "Mar 30, 2026", openRate: "52.1%", clickRate: "11.4%" },
-  { id: "c_4", name: "Loyalty Program Update",                 status: "Sent", sent: "Mar 15, 2026", openRate: "38.7%", clickRate: "5.2%" },
-  { id: "c_5", name: "February Newsletter",                    status: "Sent", sent: "Feb 14, 2026", openRate: "44.3%", clickRate: "8.1%" },
-];
+// ── KPI strip ─────────────────────────────────────────────────────────────--
+// Active campaigns = sending + scheduled. Subscribers = subscribed contacts.
+// Open/click rates are lifetime, computed by the cloud fn; show "—" delta since
+// we have no prior-period comparison until the pipeline records history.
+const kpis = computed(() => {
+  const m = metrics.value;
+  const byStatus = m?.campaigns?.byStatus || {};
+  const active = (byStatus.sending || 0) + (byStatus.scheduled || 0);
+  return [
+    { label: "Active campaigns",     value: fmtNum(active),                          delta: `${fmtNum(m?.campaigns?.total || 0)} total`, deltaDirection: "neutral" },
+    { label: "Subscribers",          value: fmtNum(m?.contacts?.subscribed || 0),    delta: `${fmtNum(m?.contacts?.total || 0)} contacts`, deltaDirection: "neutral" },
+    { label: "Avg open rate",        value: fmtPct(m?.rates?.open),                  delta: "lifetime", deltaDirection: "neutral" },
+    { label: "Avg click rate",       value: fmtPct(m?.rates?.click),                 delta: "lifetime", deltaDirection: "neutral" },
+  ];
+});
 
-// 30 daily subscriber counts, oldest → newest. Mostly upward trend with
-// small day-to-day jitter so the chart reads as organic, not synthetic.
-const audienceGrowthPoints = [
-  12505, 12511, 12518, 12522, 12530, 12537, 12541, 12548, 12554, 12559,
-  12568, 12575, 12579, 12586, 12591, 12597, 12606, 12612, 12618, 12626,
-  12633, 12641, 12649, 12658, 12664, 12671, 12679, 12695, 12731, 12847,
-];
+// ── Funnel ───────────────────────────────────────────────────────────────--
+// Built from lifetime totals. The component derives step rates + bar heights;
+// at all-zero it renders the empty bars cleanly (MIN_BAR_HEIGHT_PCT floor).
+const funnelStages = computed(() => {
+  const t = metrics.value?.totals || { sent: 0, delivered: 0, opens: 0, clicks: 0 };
+  const pctOfSent = (n) => (t.sent ? `${((n / t.sent) * 100).toFixed(1)}%` : "0%");
+  return [
+    { name: "Sent",      count: t.sent,      pct: pctOfSent(t.sent) },
+    { name: "Delivered", count: t.delivered, pct: pctOfSent(t.delivered) },
+    { name: "Opened",    count: t.opens,     pct: pctOfSent(t.opens) },
+    { name: "Clicked",   count: t.clicks,    pct: pctOfSent(t.clicks) },
+  ];
+});
 
-const engagementSlices = [
-  { label: "Engaged",          count: 8234, countLabel: "8,234", pct: 64, kind: "pop" },
-  { label: "Unengaged",        count: 3201, countLabel: "3,201", pct: 25, kind: "soft" },
-  { label: "New (last 30d)",   count: 1412, countLabel: "1,412", pct: 11, kind: "new" },
-];
+// ── Audience growth ─────────────────────────────────────────────────────────
+// Per-day subscriber history needs an events rollup that doesn't exist yet, so
+// we render a flat line at the current subscriber count (honest: no synthetic
+// trend). When the rollup lands this becomes a real series. deltaAbs is blank
+// because we have no prior point to diff against.
+const subscriberCount = computed(() => metrics.value?.contacts?.subscribed || 0);
+const audienceGrowthPoints = computed(() => Array(30).fill(subscriberCount.value));
 
-const activityEvents = [
-  { initials: "MR", kind: "subscribed",   actor: "Maria Rodriguez", action: "subscribed",   detail: "via /pricing",                time: "12m ago" },
-  { initials: "AC", kind: "clicked",      actor: "Alex Chen",       action: "clicked",      detail: "Spring Sale → /featured",     time: "18m ago" },
-  { initials: "JW", kind: "bounced",      actor: "James Wright",    action: "bounced",      detail: "hard bounce · gmail.com",     time: "21m ago" },
-  { initials: "SK", kind: "opened",       actor: "Sienna Khan",     action: "opened",       detail: "\"February Newsletter\"",     time: "34m ago" },
-  { initials: "PD", kind: "unsubscribed", actor: "Priya Desai",     action: "unsubscribed", detail: "from \"Spring Sale\"",        time: "47m ago" },
-  { initials: "RT", kind: "clicked",      actor: "Ryan Tran",       action: "clicked",      detail: "\"/sale/under-50\"",          time: "51m ago" },
-  { initials: "ML", kind: "opened",       actor: "Maria Lopez",     action: "opened",       detail: "\"April Refresh\"",           time: "1h ago" },
-  { initials: "DT", kind: "subscribed",   actor: "David Tran",      action: "subscribed",   detail: "via /signup",                 time: "1h ago" },
-];
+// ── Engagement donut ─────────────────────────────────────────────────────────
+// Real split of subscribed vs everyone else. Engaged/unengaged segmentation
+// needs per-contact engagement scoring (pipeline), so for now we show
+// Subscribed vs Other (unsubscribed/bounced/etc.) — both real counts.
+const engagementSlices = computed(() => {
+  const total = metrics.value?.contacts?.total || 0;
+  const subscribed = metrics.value?.contacts?.subscribed || 0;
+  const other = Math.max(total - subscribed, 0);
+  const pct = (n) => (total ? Math.round((n / total) * 100) : 0);
+  return [
+    { label: "Subscribed", count: subscribed, countLabel: fmtNum(subscribed), pct: pct(subscribed), kind: "pop" },
+    { label: "Other",      count: other,      countLabel: fmtNum(other),      pct: pct(other),      kind: "soft" },
+  ];
+});
+const engagementTotal = computed(() => fmtNum(metrics.value?.contacts?.total || 0));
 
-const topCampaigns = [
-  { rank: 1, name: "Member-only Drop",                    openRate: 52.1 },
-  { rank: 2, name: "Spring Sale 2026 — Early Access",     openRate: 46.4 },
-  { rank: 3, name: "February Newsletter",                 openRate: 44.3 },
-];
+// Recent campaigns + activity feed + top performers need per-campaign report
+// rows and an event stream — all empty until sends happen. Show empty arrays so
+// the components render their empty states rather than fabricated rows.
+const recentCampaigns = [];
+const activityEvents = [];
+const topCampaigns = [];
 
 const quickActions = [
   { to: "/app/campaigns/new", icon: "paper-plane", label: "New campaign",     desc: "Compose and send a fresh email" },
@@ -102,17 +124,25 @@ const quickActions = [
       />
     </section>
 
+    <!-- Error banner (non-fatal; widgets still render their zero states) -->
+    <p v-if="error" class="dash-error">{{ error }}</p>
+
     <!-- 3. Audience growth + engagement donut -->
     <section class="dash-split dash-split-66-34">
-      <AppAudienceGrowthChart :points="audienceGrowthPoints" />
-      <AppEngagementDonut :slices="engagementSlices" total="12,847" />
+      <AppAudienceGrowthChart
+        :points="audienceGrowthPoints"
+        :total="fmtNum(subscriberCount)"
+        delta-abs="—"
+        delta-pct="no history yet"
+      />
+      <AppEngagementDonut :slices="engagementSlices" :total="engagementTotal" />
     </section>
 
     <!-- 4. Funnel -->
     <section class="dash-section">
       <div class="dash-eyebrow">
         <span class="dash-eyebrow-dot" aria-hidden="true"></span>
-        <span>Last 30 days &middot; campaign performance</span>
+        <span>Lifetime &middot; campaign performance</span>
       </div>
       <div class="dash-card">
         <AppCampaignFunnel :stages="funnelStages" />
@@ -127,14 +157,24 @@ const quickActions = [
           <span>Recent campaigns</span>
         </div>
         <div class="dash-card dash-card-flush">
-          <AppRecentCampaignsTable :campaigns="recentCampaigns" />
+          <AppRecentCampaignsTable v-if="recentCampaigns.length" :campaigns="recentCampaigns" />
+          <p v-else class="dash-empty">No campaigns sent yet. Your sent campaigns will show up here.</p>
         </div>
       </div>
-      <AppActivityFeed :events="activityEvents" />
+      <AppActivityFeed v-if="activityEvents.length" :events="activityEvents" />
+      <div v-else class="dash-section">
+        <div class="dash-eyebrow">
+          <span class="dash-eyebrow-dot" aria-hidden="true"></span>
+          <span>Recent activity</span>
+        </div>
+        <div class="dash-card">
+          <p class="dash-empty">No recent activity. Subscriber and email events will appear here once you start sending.</p>
+        </div>
+      </div>
     </section>
 
     <!-- 6. Top performing campaigns -->
-    <AppTopPerformingCampaigns :campaigns="topCampaigns" />
+    <AppTopPerformingCampaigns v-if="topCampaigns.length" :campaigns="topCampaigns" />
 
     <!-- 7. Quick actions -->
     <AppQuickActions :actions="quickActions" />
@@ -248,6 +288,25 @@ const quickActions = [
   overflow: hidden;
 }
 .dash-card-flush { padding: 0; }
+
+/* Empty-state copy inside a card (no data yet — pre-send-pipeline). */
+.dash-empty {
+  margin: 0;
+  padding: var(--space-6) var(--space-5);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  color: var(--color-ink-soft);
+  text-align: center;
+}
+.dash-error {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  color: var(--color-danger);
+  background: var(--color-danger-bg);
+  border-radius: var(--radius-md);
+}
 
 /* Two-column rows. Stack below 960px to match the KPI breakpoint. */
 .dash-split {
