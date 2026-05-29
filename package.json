@@ -1,0 +1,30 @@
+{
+  "name": "fe-gorilla",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A mailchimp-like email marketing platform",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently --names server,web --prefix-colors magenta,cyan --kill-others-on-fail \"node ./server/index.js\" \"nuxt dev\"",
+    "build": "nuxt build",
+    "generate": "nuxt generate",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare",
+    "server": "NODE_ENV=production node ./server/index.js",
+    "start": "NODE_ENV=production pm2 start ./server/index.js --name gorilla",
+    "mocks": "node ./scripts/mocks-server.cjs"
+  },
+  "dependencies": {
+    "@pinia/nuxt": "^0.5.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "parse": "^5.3.0",
+    "parse-server": "^7.3.0",
+    "pinia": "^2.2.4"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "nuxt": "^3.13.0",
+    "sass": "^1.77.0"
+  }
+}

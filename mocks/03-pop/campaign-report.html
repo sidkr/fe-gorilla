@@ -1,0 +1,894 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=1440" />
+<title>Spring Sale 2026 — Early Access · Gorilla</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Manrope:wght@700;800&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg:        #FFFFFF;
+    --surface:   #FFFFFF;
+    --surface-2: #FBF8F7;
+    --ink:       #18181B;
+    --ink-soft:  #56565E;
+    --ink-dim:   #8E8E93;
+    --rule:      #E5E5E7;
+    --pop:       #FF4E4E;
+    --pop-bg:    #FFE8E8;
+    --pop-deep:  #C53030;
+    --lemon:     #FFD93D;
+    --ok:        #16A34A;
+    --warn:      #EA580C;
+    --danger:    #B91C1C;
+
+    --radius-card: 12px;
+    --radius-btn:  10px;
+    --shadow: 0 2px 4px rgba(24, 24, 27, 0.04), 0 12px 32px -16px rgba(255, 78, 78, 0.08);
+    --ease: 160ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--ink); }
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  .tabnum { font-variant-numeric: tabular-nums; }
+
+  /* ---------- TOP NAV ---------- */
+  .nav {
+    height: 64px;
+    border-bottom: 1px solid var(--rule);
+    background: var(--surface);
+    display: flex;
+    align-items: center;
+    padding: 0 32px;
+    gap: 40px;
+  }
+  .wordmark {
+    font-family: 'Manrope', sans-serif;
+    font-weight: 800;
+    font-size: 22px;
+    letter-spacing: -0.04em;
+    color: var(--ink);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .wordmark-dot {
+    width: 10px; height: 10px;
+    background: var(--pop);
+    border-radius: 50%;
+    display: inline-block;
+  }
+  .nav-items {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex: 1;
+  }
+  .nav-item {
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--ink-soft);
+    cursor: pointer;
+    transition: background var(--ease), color var(--ease);
+    position: relative;
+  }
+  .nav-item:hover { color: var(--ink); background: var(--surface-2); }
+  .nav-item.active {
+    color: var(--ink);
+    font-weight: 600;
+  }
+  .nav-item.active::after {
+    content: "";
+    position: absolute;
+    left: 14px; right: 14px;
+    bottom: -22px;
+    height: 2px;
+    background: var(--pop);
+    border-radius: 2px;
+  }
+  .nav-right { display: flex; align-items: center; gap: 14px; }
+  .icon-btn {
+    width: 36px; height: 36px;
+    border-radius: 8px;
+    display: inline-flex; align-items: center; justify-content: center;
+    color: var(--ink-soft);
+    cursor: pointer;
+    transition: background var(--ease);
+  }
+  .icon-btn:hover { background: var(--surface-2); color: var(--ink); }
+  .avatar {
+    width: 34px; height: 34px;
+    border-radius: 50%;
+    background: var(--ink);
+    color: #fff;
+    font-weight: 600;
+    font-size: 12px;
+    display: inline-flex; align-items: center; justify-content: center;
+    letter-spacing: 0.02em;
+  }
+
+  /* ---------- BUTTONS ---------- */
+  .btn {
+    height: 38px;
+    padding: 0 16px;
+    border-radius: var(--radius-btn);
+    font-family: 'Inter', sans-serif;
+    font-weight: 600;
+    font-size: 13.5px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--ink);
+    cursor: pointer;
+    display: inline-flex; align-items: center; gap: 6px;
+    transition: background var(--ease), border-color var(--ease), color var(--ease), transform var(--ease);
+    white-space: nowrap;
+  }
+  .btn:active { transform: translateY(1px); }
+  .btn-primary {
+    background: var(--pop);
+    color: #fff;
+  }
+  .btn-primary:hover { background: var(--pop-deep); }
+  .btn-secondary {
+    background: var(--surface);
+    border-color: var(--ink);
+    color: var(--ink);
+  }
+  .btn-secondary:hover { background: var(--ink); color: #fff; }
+  .btn-ghost {
+    background: transparent;
+    color: var(--ink);
+    border-color: transparent;
+  }
+  .btn-ghost:hover { background: rgba(24, 24, 27, 0.05); }
+  .btn-ghost-on-pop {
+    background: transparent;
+    color: var(--ink);
+    border-color: rgba(24, 24, 27, 0.18);
+  }
+  .btn-ghost-on-pop:hover { background: rgba(255, 255, 255, 0.5); border-color: var(--ink); }
+
+  /* ---------- BREADCRUMB ---------- */
+  .breadcrumb {
+    padding: 18px 32px 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 13px;
+    color: var(--ink-soft);
+  }
+  .breadcrumb a { color: var(--ink-soft); text-decoration: none; transition: color var(--ease); }
+  .breadcrumb a:hover { color: var(--ink); }
+  .breadcrumb .sep { color: var(--ink-dim); }
+  .breadcrumb .here { color: var(--ink); font-weight: 500; }
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 10px 3px 8px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    line-height: 1;
+    height: 22px;
+  }
+  .pill .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+  }
+  .pill-sent {
+    background: var(--pop);
+    color: #fff;
+  }
+  .pill-sent .dot { background: #fff; }
+
+  /* ---------- HERO BAND ---------- */
+  .hero {
+    background: var(--pop-bg);
+    padding: 40px 32px 48px;
+    width: 100%;
+  }
+  .hero-inner {
+    max-width: 1376px;
+    margin: 0 auto;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 32px;
+  }
+  .hero-left { min-width: 0; flex: 1; }
+  .hero-eyebrow {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--pop-deep);
+    margin-bottom: 12px;
+  }
+  h1.hero-title {
+    font-family: 'Manrope', sans-serif;
+    font-weight: 800;
+    font-size: 48px;
+    line-height: 1.05;
+    letter-spacing: -0.025em;
+    color: var(--ink);
+    margin: 0 0 14px;
+  }
+  .hero-meta {
+    font-size: 14px;
+    color: var(--ink-soft);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .hero-meta .meta-dot {
+    width: 3px; height: 3px;
+    border-radius: 50%;
+    background: var(--ink-dim);
+    display: inline-block;
+  }
+  .hero-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-shrink: 0;
+  }
+
+  /* ---------- PAGE BODY ---------- */
+  .page {
+    max-width: 1376px;
+    margin: 0 auto;
+    padding: 32px;
+  }
+
+  /* ---------- KPI STRIP ---------- */
+  .kpis {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 16px;
+    margin-bottom: 32px;
+  }
+  .kpi {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-card);
+    padding: 20px 20px 18px;
+    box-shadow: var(--shadow);
+    position: relative;
+    min-width: 0;
+  }
+  .kpi-label {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .kpi-value {
+    font-family: 'Manrope', sans-serif;
+    font-weight: 800;
+    font-size: 30px;
+    line-height: 1.1;
+    letter-spacing: -0.025em;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+    margin-bottom: 6px;
+  }
+  .kpi-value.is-pop { color: var(--pop); }
+  .kpi-sub {
+    font-size: 12.5px;
+    color: var(--ink-soft);
+    font-variant-numeric: tabular-nums;
+  }
+  .kpi-sub .pct { color: var(--ink); font-weight: 600; }
+  .lemon-dot {
+    width: 8px; height: 8px;
+    background: var(--lemon);
+    border-radius: 50%;
+    display: inline-block;
+    box-shadow: 0 0 0 3px rgba(255, 217, 61, 0.22);
+  }
+  .warn-dot {
+    width: 8px; height: 8px;
+    background: var(--warn);
+    border-radius: 50%;
+    display: inline-block;
+  }
+
+  /* ---------- TWO-COL GRID ---------- */
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 24px;
+    margin-bottom: 24px;
+  }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  .card-head {
+    padding: 22px 24px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .card-title {
+    font-family: 'Manrope', sans-serif;
+    font-weight: 800;
+    font-size: 18px;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+  }
+  .card-sub {
+    font-size: 12.5px;
+    color: var(--ink-soft);
+    margin-top: 2px;
+    font-weight: 500;
+  }
+  .card-body { padding: 8px 24px 24px; }
+
+  /* ---------- CHART ---------- */
+  .chart-meta {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    font-size: 12.5px;
+    color: var(--ink-soft);
+  }
+  .chart-legend {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .chart-legend-swatch {
+    width: 10px; height: 10px;
+    background: var(--pop);
+    border-radius: 2px;
+  }
+  .chart-wrap { padding: 8px 0 0; }
+  .chart-svg { display: block; width: 100%; height: 280px; }
+
+  /* ---------- TOP LINKS ---------- */
+  .links-list { display: flex; flex-direction: column; }
+  .link-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 8px 16px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--rule);
+    align-items: center;
+  }
+  .link-row:last-child { border-bottom: none; padding-bottom: 4px; }
+  .link-path {
+    font-family: 'Manrope', sans-serif;
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--ink);
+    letter-spacing: -0.01em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .link-path.is-footer {
+    font-family: 'Inter', sans-serif;
+    font-weight: 500;
+    color: var(--ink-soft);
+  }
+  .link-stats {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    font-variant-numeric: tabular-nums;
+    flex-shrink: 0;
+  }
+  .link-count {
+    font-family: 'Manrope', sans-serif;
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--ink);
+  }
+  .link-pct {
+    font-size: 12px;
+    color: var(--ink-dim);
+    font-weight: 500;
+    min-width: 44px;
+    text-align: right;
+  }
+  .link-bar {
+    grid-column: 1 / -1;
+    height: 4px;
+    background: var(--surface-2);
+    border-radius: 999px;
+    overflow: hidden;
+    border: 1px solid var(--rule);
+  }
+  .link-bar > span {
+    display: block;
+    height: 100%;
+    background: var(--pop);
+    border-radius: 999px;
+  }
+
+  /* ---------- RECENT ACTIVITY ---------- */
+  .activity-list { display: flex; flex-direction: column; }
+  .activity-row {
+    display: grid;
+    grid-template-columns: 36px 1fr auto;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  .activity-row:last-child { border-bottom: none; padding-bottom: 4px; }
+  .activity-avatar {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background: var(--surface-2);
+    color: var(--ink);
+    font-weight: 600;
+    font-size: 11.5px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border: 1px solid var(--rule);
+    letter-spacing: 0.02em;
+  }
+  .activity-main { min-width: 0; }
+  .activity-email {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .activity-event {
+    font-size: 12.5px;
+    color: var(--ink-soft);
+    margin-top: 2px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .activity-event .ev-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    display: inline-block;
+    flex-shrink: 0;
+  }
+  .ev-open .ev-dot   { background: var(--ok); }
+  .ev-click .ev-dot  { background: var(--pop); }
+  .ev-bounce .ev-dot { background: var(--danger); }
+  .ev-unsub .ev-dot  { background: var(--danger); }
+  .ev-label { font-weight: 600; color: var(--ink); }
+  .ev-open .ev-label   { color: var(--ok); }
+  .ev-click .ev-label  { color: var(--pop-deep); }
+  .ev-bounce .ev-label { color: var(--danger); }
+  .ev-unsub .ev-label  { color: var(--danger); }
+  .ev-path {
+    font-family: 'Manrope', sans-serif;
+    font-weight: 700;
+    color: var(--ink);
+  }
+  .activity-time {
+    font-size: 12px;
+    color: var(--ink-dim);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+</style>
+</head>
+<body>
+
+<!-- ============ TOP NAV ============ -->
+<nav class="nav" role="navigation" aria-label="Primary">
+  <div class="wordmark">
+    <span class="wordmark-dot" aria-hidden="true"></span>
+    Gorilla
+  </div>
+  <div class="nav-items">
+    <div class="nav-item">Dashboard</div>
+    <div class="nav-item">Audiences</div>
+    <div class="nav-item active">Campaigns</div>
+    <div class="nav-item">Reports</div>
+    <div class="nav-item">Templates</div>
+  </div>
+  <div class="nav-right">
+    <div class="icon-btn" aria-label="Search">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+    </div>
+    <button class="btn btn-secondary">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+      New campaign
+    </button>
+    <div class="avatar" aria-label="Sienna K.">SK</div>
+  </div>
+</nav>
+
+<!-- ============ BREADCRUMB ============ -->
+<div class="breadcrumb">
+  <a href="#">Campaigns</a>
+  <span class="sep">›</span>
+  <span class="here">Spring Sale 2026 — Early Access</span>
+  <span class="pill pill-sent" aria-label="Status: Sent">
+    <span class="dot"></span>Sent
+  </span>
+</div>
+
+<!-- ============ HERO BAND ============ -->
+<section class="hero">
+  <div class="hero-inner">
+    <div class="hero-left">
+      <div class="hero-eyebrow">Campaign report</div>
+      <h1 class="hero-title">Spring Sale 2026 — Early Access</h1>
+      <div class="hero-meta tabnum">
+        <span>Sent May 18, 2026</span>
+        <span class="meta-dot"></span>
+        <span>9:00 AM PT</span>
+        <span class="meta-dot"></span>
+        <span>to Engaged Subscribers (12,847)</span>
+      </div>
+    </div>
+    <div class="hero-actions">
+      <button class="btn btn-ghost-on-pop">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg>
+        Duplicate
+      </button>
+      <button class="btn btn-ghost-on-pop">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+        Export report
+      </button>
+      <button class="btn btn-primary">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6.5A2.5 2.5 0 0 1 4.5 4h15A2.5 2.5 0 0 1 22 6.5v11a2.5 2.5 0 0 1-2.5 2.5h-15A2.5 2.5 0 0 1 2 17.5v-11Z"/><path d="m3 7 9 6 9-6"/></svg>
+        View email
+      </button>
+    </div>
+  </div>
+</section>
+
+<!-- ============ PAGE BODY ============ -->
+<main class="page">
+
+  <!-- ===== KPI STRIP ===== -->
+  <section class="kpis" aria-label="Key metrics">
+    <div class="kpi">
+      <div class="kpi-label">Sent</div>
+      <div class="kpi-value">12,847</div>
+      <div class="kpi-sub">recipients</div>
+    </div>
+
+    <div class="kpi">
+      <div class="kpi-label">
+        <span>Delivered</span>
+        <span class="lemon-dot" aria-hidden="true"></span>
+      </div>
+      <div class="kpi-value">12,612</div>
+      <div class="kpi-sub"><span class="pct">98.2%</span> of sent</div>
+    </div>
+
+    <div class="kpi">
+      <div class="kpi-label">Open rate</div>
+      <div class="kpi-value is-pop">46.4%</div>
+      <div class="kpi-sub">5,847 opens</div>
+    </div>
+
+    <div class="kpi">
+      <div class="kpi-label">Click rate</div>
+      <div class="kpi-value">8.9%</div>
+      <div class="kpi-sub">1,124 clicks</div>
+    </div>
+
+    <div class="kpi">
+      <div class="kpi-label">
+        <span>Bounce rate</span>
+        <span class="warn-dot" aria-hidden="true"></span>
+      </div>
+      <div class="kpi-value">1.8%</div>
+      <div class="kpi-sub">235 bounces</div>
+    </div>
+
+    <div class="kpi">
+      <div class="kpi-label">Unsubscribes</div>
+      <div class="kpi-value">0.14%</div>
+      <div class="kpi-sub">18 contacts</div>
+    </div>
+  </section>
+
+  <!-- ===== CHART + TOP LINKS ===== -->
+  <section class="grid-2">
+
+    <!-- Opens chart -->
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <div class="card-title">Opens · First 48 hours</div>
+          <div class="card-sub tabnum">5,847 opens · peak 720 at hour 2</div>
+        </div>
+        <div class="chart-meta">
+          <span class="chart-legend"><span class="chart-legend-swatch"></span>Opens / hour</span>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="chart-wrap">
+          <!--
+            Chart geometry:
+              SVG viewBox 800 x 280
+              plot area: x 56..784 (width 728), y 24..236 (height 212)
+              y-domain: 0..800
+              x-domain: 0..48 hours
+          -->
+          <svg class="chart-svg" viewBox="0 0 800 280" preserveAspectRatio="none" role="img" aria-label="Opens over first 48 hours, peaking at 720 at hour 2">
+
+            <!-- Gridlines -->
+            <g stroke="#E5E5E7" stroke-width="1" stroke-dasharray="3 4">
+              <line x1="56" y1="24"  x2="784" y2="24"/>
+              <line x1="56" y1="77"  x2="784" y2="77"/>
+              <line x1="56" y1="130" x2="784" y2="130"/>
+              <line x1="56" y1="183" x2="784" y2="183"/>
+            </g>
+            <!-- Baseline -->
+            <line x1="56" y1="236" x2="784" y2="236" stroke="#18181B" stroke-width="1"/>
+
+            <!-- Y labels -->
+            <g font-family="Manrope, sans-serif" font-size="11" font-weight="700" fill="#8E8E93" text-anchor="end">
+              <text x="46" y="240">0</text>
+              <text x="46" y="187">200</text>
+              <text x="46" y="134">400</text>
+              <text x="46" y="81">600</text>
+              <text x="46" y="28">800</text>
+            </g>
+
+            <!-- X labels (0h, 12h, 24h, 36h, 48h) -->
+            <g font-family="Manrope, sans-serif" font-size="11" font-weight="700" fill="#8E8E93" text-anchor="middle">
+              <text x="56"  y="256">0h</text>
+              <text x="238" y="256">12h</text>
+              <text x="420" y="256">24h</text>
+              <text x="602" y="256">36h</text>
+              <text x="784" y="256">48h</text>
+            </g>
+
+            <!--
+              Data points (49 anchors: hour 0..48)
+              opens by hour (approx, hand-tuned to brief):
+              h0: 180, h1: 520, h2: 720, h3: 640, h4: 540, h5: 450, h6: 380,
+              h7: 320, h8: 260, h9: 210, h10: 170, h11: 130, h12: 95,
+              h13: 70, h14: 55, h15: 45, h16: 40, h17: 50, h18: 65,
+              h19: 80, h20: 105, h21: 130, h22: 155, h23: 175,
+              h24: 180, h25: 165, h26: 140, h27: 115, h28: 90, h29: 70,
+              h30: 55, h31: 45, h32: 38, h33: 32, h34: 28, h35: 25,
+              h36: 22, h37: 20, h38: 18, h39: 16, h40: 14, h41: 12,
+              h42: 10, h43: 8, h44: 6, h45: 5, h46: 4, h47: 3, h48: 2
+
+              x(h) = 56 + h * (728/48) = 56 + h * 15.1667
+              y(v) = 236 - v * (212/800) = 236 - v * 0.265
+            -->
+
+            <!-- Area fill -->
+            <path fill="#FF4E4E" fill-opacity="0.14" d="M56,188.3 L71.17,98.2 L86.33,45.2 L101.5,66.4 L116.67,92.9 L131.83,116.75 L147,135.3 L162.17,151.2 L177.33,167.1 L192.5,180.35 L207.67,190.95 L222.83,201.55 L238,210.83 L253.17,217.45 L268.33,221.43 L283.5,224.08 L298.67,225.4 L313.83,222.75 L329,218.78 L344.17,214.8 L359.33,208.18 L374.5,201.55 L389.67,194.93 L404.83,189.63 L420,188.3 L435.17,192.28 L450.33,198.9 L465.5,205.53 L480.67,212.15 L495.83,217.45 L511,221.43 L526.17,224.08 L541.33,225.93 L556.5,227.52 L571.67,228.58 L586.83,229.38 L602,230.17 L617.17,230.7 L632.33,231.23 L647.5,231.76 L662.67,232.29 L677.83,232.82 L693,233.35 L708.17,233.88 L723.33,234.41 L738.5,234.68 L753.67,234.94 L768.83,235.21 L784,235.47 L784,236 L56,236 Z"/>
+
+            <!-- Line -->
+            <path fill="none" stroke="#FF4E4E" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" d="M56,188.3 L71.17,98.2 L86.33,45.2 L101.5,66.4 L116.67,92.9 L131.83,116.75 L147,135.3 L162.17,151.2 L177.33,167.1 L192.5,180.35 L207.67,190.95 L222.83,201.55 L238,210.83 L253.17,217.45 L268.33,221.43 L283.5,224.08 L298.67,225.4 L313.83,222.75 L329,218.78 L344.17,214.8 L359.33,208.18 L374.5,201.55 L389.67,194.93 L404.83,189.63 L420,188.3 L435.17,192.28 L450.33,198.9 L465.5,205.53 L480.67,212.15 L495.83,217.45 L511,221.43 L526.17,224.08 L541.33,225.93 L556.5,227.52 L571.67,228.58 L586.83,229.38 L602,230.17 L617.17,230.7 L632.33,231.23 L647.5,231.76 L662.67,232.29 L677.83,232.82 L693,233.35 L708.17,233.88 L723.33,234.41 L738.5,234.68 L753.67,234.94 L768.83,235.21 L784,235.47"/>
+
+            <!-- Peak marker at hour 2 (720) -->
+            <g transform="translate(86.33, 45.20)">
+              <circle r="6" fill="#FFFFFF" stroke="#FF4E4E" stroke-width="2.25"/>
+              <circle r="2.5" fill="#FF4E4E"/>
+            </g>
+            <!-- Peak label callout -->
+            <g transform="translate(86.33, 45.20)" font-family="Manrope, sans-serif" font-size="11" font-weight="800" fill="#C53030">
+              <text x="10" y="-6">720 opens</text>
+              <text x="10" y="6" font-weight="600" fill="#56565E">hour 2 — peak</text>
+            </g>
+
+            <!-- Hour 24 bump marker -->
+            <g transform="translate(420, 188.30)">
+              <circle r="3.5" fill="#FF4E4E"/>
+            </g>
+          </svg>
+        </div>
+      </div>
+    </div>
+
+    <!-- Top links -->
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <div class="card-title">Top links</div>
+          <div class="card-sub tabnum">1,124 total clicks</div>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="links-list">
+
+          <div class="link-row">
+            <div class="link-path" title="/spring-sale/featured">/spring-sale/featured</div>
+            <div class="link-stats">
+              <span class="link-count">412</span>
+              <span class="link-pct">36.7%</span>
+            </div>
+            <div class="link-bar"><span style="width: 100%"></span></div>
+          </div>
+
+          <div class="link-row">
+            <div class="link-path" title="/collections/new-arrivals">/collections/new-arrivals</div>
+            <div class="link-stats">
+              <span class="link-count">287</span>
+              <span class="link-pct">25.5%</span>
+            </div>
+            <div class="link-bar"><span style="width: 69.7%"></span></div>
+          </div>
+
+          <div class="link-row">
+            <div class="link-path" title="/sale/under-50">/sale/under-50</div>
+            <div class="link-stats">
+              <span class="link-count">198</span>
+              <span class="link-pct">17.6%</span>
+            </div>
+            <div class="link-bar"><span style="width: 48.1%"></span></div>
+          </div>
+
+          <div class="link-row">
+            <div class="link-path" title="/story-behind-the-collection">/story-behind-the-collection</div>
+            <div class="link-stats">
+              <span class="link-count">124</span>
+              <span class="link-pct">11.0%</span>
+            </div>
+            <div class="link-bar"><span style="width: 30.1%"></span></div>
+          </div>
+
+          <div class="link-row">
+            <div class="link-path is-footer" title="footer · Instagram">footer · Instagram</div>
+            <div class="link-stats">
+              <span class="link-count">103</span>
+              <span class="link-pct">9.2%</span>
+            </div>
+            <div class="link-bar"><span style="width: 25.0%"></span></div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== RECENT ACTIVITY ===== -->
+  <section class="card">
+    <div class="card-head">
+      <div>
+        <div class="card-title">Recent activity</div>
+        <div class="card-sub">Live · last updated just now</div>
+      </div>
+      <button class="btn btn-ghost">
+        View all
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>
+      </button>
+    </div>
+    <div class="card-body">
+      <div class="activity-list">
+
+        <div class="activity-row">
+          <div class="activity-avatar">AC</div>
+          <div class="activity-main">
+            <div class="activity-email">alex.chen@gmail.com</div>
+            <div class="activity-event ev-click">
+              <span class="ev-dot"></span>
+              <span class="ev-label">Clicked</span>
+              <span class="ev-path">/spring-sale/featured</span>
+            </div>
+          </div>
+          <div class="activity-time">2m ago</div>
+        </div>
+
+        <div class="activity-row">
+          <div class="activity-avatar">PS</div>
+          <div class="activity-main">
+            <div class="activity-email">priya.s@hotmail.com</div>
+            <div class="activity-event ev-open">
+              <span class="ev-dot"></span>
+              <span class="ev-label">Opened</span>
+            </div>
+          </div>
+          <div class="activity-time">4m ago</div>
+        </div>
+
+        <div class="activity-row">
+          <div class="activity-avatar">RD</div>
+          <div class="activity-main">
+            <div class="activity-email">ryan_d@outlook.com</div>
+            <div class="activity-event ev-click">
+              <span class="ev-dot"></span>
+              <span class="ev-label">Clicked</span>
+              <span class="ev-path">/collections/new-arrivals</span>
+            </div>
+          </div>
+          <div class="activity-time">6m ago</div>
+        </div>
+
+        <div class="activity-row">
+          <div class="activity-avatar">ML</div>
+          <div class="activity-main">
+            <div class="activity-email">maria.lopez@yahoo.com</div>
+            <div class="activity-event ev-open">
+              <span class="ev-dot"></span>
+              <span class="ev-label">Opened</span>
+            </div>
+          </div>
+          <div class="activity-time">8m ago</div>
+        </div>
+
+        <div class="activity-row">
+          <div class="activity-avatar">JW</div>
+          <div class="activity-main">
+            <div class="activity-email">james.wright@gmail.com</div>
+            <div class="activity-event ev-bounce">
+              <span class="ev-dot"></span>
+              <span class="ev-label">Bounced</span>
+              <span style="color: var(--ink-soft);">(hard)</span>
+            </div>
+          </div>
+          <div class="activity-time">11m ago</div>
+        </div>
+
+        <div class="activity-row">
+          <div class="activity-avatar">SK</div>
+          <div class="activity-main">
+            <div class="activity-email">sienna.k@gmail.com</div>
+            <div class="activity-event ev-open">
+              <span class="ev-dot"></span>
+              <span class="ev-label">Opened</span>
+            </div>
+          </div>
+          <div class="activity-time">12m ago</div>
+        </div>
+
+        <div class="activity-row">
+          <div class="activity-avatar">DT</div>
+          <div class="activity-main">
+            <div class="activity-email">david.tran@protonmail.com</div>
+            <div class="activity-event ev-unsub">
+              <span class="ev-dot"></span>
+              <span class="ev-label">Unsubscribed</span>
+            </div>
+          </div>
+          <div class="activity-time">14m ago</div>
+        </div>
+
+        <div class="activity-row">
+          <div class="activity-avatar">JA</div>
+          <div class="activity-main">
+            <div class="activity-email">jordan_a@gmail.com</div>
+            <div class="activity-event ev-open">
+              <span class="ev-dot"></span>
+              <span class="ev-label">Opened</span>
+            </div>
+          </div>
+          <div class="activity-time">15m ago</div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+</main>
+
+</body>
+</html>

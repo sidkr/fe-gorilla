@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gorilla · Mocks</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    /* Mocks chrome — canonical light theme. Used by index + any future
+       navigation / utility / docs pages under /mocks/. Direction mocks
+       (each /NN-name/ folder) define their own themes and are exempt. */
+    :root {
+      --bg:        #FAFAFB;
+      --surface:   #FFFFFF;
+      --surface-2: #F4F5F7;
+      --ink:       #0F1115;
+      --ink-soft:  #5A6068;
+      --ink-dim:   #8B919E;
+      --rule:      #E5E7EB;
+      --rule-strong: #D1D5DB;
+      --shadow-card: 0 1px 2px rgba(15, 17, 21, 0.04), 0 8px 24px -12px rgba(15, 17, 21, 0.06);
+      --shadow-card-hover: 0 1px 2px rgba(15, 17, 21, 0.06), 0 12px 32px -12px rgba(15, 17, 21, 0.10);
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; background: var(--bg); color: var(--ink); }
+    body { font-family: "Inter", system-ui, -apple-system, sans-serif; font-size: 15px; line-height: 1.55; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+    .mono { font-family: "JetBrains Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+
+    .wrap { max-width: 1080px; margin: 0 auto; padding: 64px 32px 96px; }
+
+    header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 8px; }
+    .brand { font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
+    .brand-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--ink); margin-right: 8px; vertical-align: middle; }
+    .build-info { font-size: 12px; color: var(--ink-dim); font-family: "JetBrains Mono", monospace; }
+
+    h1 { font-size: 36px; line-height: 1.15; letter-spacing: -0.02em; font-weight: 700; margin: 0 0 14px; max-width: 640px; color: var(--ink); }
+    .lede { font-size: 16px; color: var(--ink-soft); max-width: 620px; margin: 0 0 56px; }
+    .lede strong { color: var(--ink); font-weight: 600; }
+
+    .section-label { font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-dim); font-weight: 600; margin: 0 0 16px; display: flex; align-items: center; gap: 10px; }
+    .section-label::after { content: ""; flex: 1; height: 1px; background: var(--rule); }
+
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 56px; }
+    @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--rule);
+      border-radius: 8px;
+      padding: 22px 24px;
+      text-decoration: none;
+      color: inherit;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      box-shadow: var(--shadow-card);
+      transition: border-color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
+      position: relative;
+      overflow: hidden;
+    }
+    .card:hover { border-color: var(--rule-strong); box-shadow: var(--shadow-card-hover); }
+    .card:active { transform: translateY(1px); }
+
+    .card-head { display: flex; align-items: center; justify-content: space-between; }
+    .card-num { font-family: "JetBrains Mono", monospace; font-size: 11px; color: var(--ink-dim); letter-spacing: 0.05em; }
+    .card-name { font-size: 20px; font-weight: 700; letter-spacing: -0.01em; margin: 0; color: var(--ink); }
+
+    .swatches { display: flex; gap: 0; border-radius: 4px; overflow: hidden; height: 14px; width: 96px; border: 1px solid var(--rule); }
+    .swatch { flex: 1; }
+
+    .card-pitch { font-size: 14px; color: var(--ink-soft); margin: 0; line-height: 1.5; min-height: 42px; }
+    .card-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+    .tag { font-size: 11px; padding: 3px 8px; border-radius: 999px; background: var(--surface-2); color: var(--ink-soft); border: 1px solid var(--rule); font-family: "JetBrains Mono", monospace; }
+
+    .card-foot { display: flex; align-items: center; justify-content: space-between; margin-top: auto; padding-top: 12px; border-top: 1px solid var(--rule); }
+    .card-link { font-size: 13px; color: var(--ink); font-weight: 600; }
+    .card-link::after { content: " →"; transition: margin-left 140ms ease; display: inline-block; }
+    .card:hover .card-link::after { margin-left: 4px; }
+    .card-meta { font-size: 11px; color: var(--ink-dim); font-family: "JetBrains Mono", monospace; }
+
+    .notes { background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: 24px 28px; box-shadow: var(--shadow-card); }
+    .notes h2 { font-size: 14px; margin: 0 0 12px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-soft); font-weight: 600; }
+    .notes ul { margin: 0; padding-left: 20px; color: var(--ink-soft); font-size: 14px; line-height: 1.7; }
+    .notes code { font-family: "JetBrains Mono", monospace; font-size: 13px; background: var(--surface-2); padding: 1px 6px; border-radius: 4px; color: var(--ink); border: 1px solid var(--rule); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="brand"><span class="brand-dot"></span>Gorilla · Mocks</div>
+      <div class="build-info">campaign-report · v2</div>
+    </header>
+
+    <h1>Pop · product surfaces</h1>
+    <p class="lede">Direction locked to <strong>Pop</strong>. Shared design tokens live at <code style="font-family:JetBrains Mono,monospace;font-size:13px;background:var(--surface-2);padding:1px 6px;border-radius:4px;border:1px solid var(--rule);">/mocks/_pop/tokens.css</code> — every Pop mock consumes from there, so a single edit updates all downstream surfaces. Change a token, all Pop mocks update.</p>
+
+    <p class="section-label">Pop surfaces · live</p>
+
+    <section class="grid">
+
+      <a class="card" href="07-pop-home/index.html">
+        <div class="card-head">
+          <span class="card-num">07</span>
+          <span class="swatches" title="palette">
+            <span class="swatch" style="background:#FFFFFF"></span>
+            <span class="swatch" style="background:#FFE8E8"></span>
+            <span class="swatch" style="background:#FF4E4E"></span>
+            <span class="swatch" style="background:#C53030"></span>
+            <span class="swatch" style="background:#FFD93D"></span>
+            <span class="swatch" style="background:#18181B"></span>
+          </span>
+        </div>
+        <h2 class="card-name">Marketing homepage</h2>
+        <p class="card-pitch">Iron-gorilla brand identity. Hero in the coral architectural band, Fe26 periodic-table chip as a quiet pun, feature trio, dark inverted final CTA.</p>
+        <div class="card-tags">
+          <span class="tag">marketing</span>
+          <span class="tag">iron-gorilla</span>
+          <span class="tag">hero</span>
+        </div>
+        <div class="card-foot">
+          <span class="card-link">View mock</span>
+          <span class="card-meta">/ (landing)</span>
+        </div>
+      </a>
+
+      <a class="card" href="08-pop-signup/index.html">
+        <div class="card-head">
+          <span class="card-num">08</span>
+          <span class="swatches" title="palette">
+            <span class="swatch" style="background:#FFFFFF"></span>
+            <span class="swatch" style="background:#FFE8E8"></span>
+            <span class="swatch" style="background:#FF4E4E"></span>
+            <span class="swatch" style="background:#16A34A"></span>
+            <span class="swatch" style="background:#56565E"></span>
+            <span class="swatch" style="background:#18181B"></span>
+          </span>
+        </div>
+        <h2 class="card-name">Sign up</h2>
+        <p class="card-pitch">Two-column split — clean form on white, value-prop panel on coral. Pre-rendered validated state: email check, password strength 3/4, focus ring visible.</p>
+        <div class="card-tags">
+          <span class="tag">auth</span>
+          <span class="tag">form</span>
+          <span class="tag">split layout</span>
+        </div>
+        <div class="card-foot">
+          <span class="card-link">View mock</span>
+          <span class="card-meta">/signup</span>
+        </div>
+      </a>
+
+    </section>
+
+    <p class="section-label">Direction explorations · archived</p>
+
+    <section class="grid">
+
+      <a class="card" href="01-apollo/campaign-report.html">
+        <div class="card-head">
+          <span class="card-num">01</span>
+          <span class="swatches" title="palette">
+            <span class="swatch" style="background:#FFFFFF"></span>
+            <span class="swatch" style="background:#F7F7F8"></span>
+            <span class="swatch" style="background:#E5E5E7"></span>
+            <span class="swatch" style="background:#4F46E5"></span>
+            <span class="swatch" style="background:#525258"></span>
+            <span class="swatch" style="background:#0A0A0B"></span>
+          </span>
+        </div>
+        <h2 class="card-name">Apollo</h2>
+        <p class="card-pitch">Confident modern tech. Light surfaces, near-black ink, one electric indigo accent. Generous negative space, big type.</p>
+        <div class="card-tags">
+          <span class="tag">modern</span>
+          <span class="tag">geometric</span>
+          <span class="tag">opinionated</span>
+        </div>
+        <div class="card-foot">
+          <span class="card-link">View mock</span>
+          <span class="card-meta">Vercel-light</span>
+        </div>
+      </a>
+
+      <a class="card" href="02-tide/campaign-report.html">
+        <div class="card-head">
+          <span class="card-num">02</span>
+          <span class="swatches" title="palette">
+            <span class="swatch" style="background:#F8FAFB"></span>
+            <span class="swatch" style="background:#E1EEF7"></span>
+            <span class="swatch" style="background:#DCE5EB"></span>
+            <span class="swatch" style="background:#3B8FCB"></span>
+            <span class="swatch" style="background:#1E5A87"></span>
+            <span class="swatch" style="background:#0B1E2D"></span>
+          </span>
+        </div>
+        <h2 class="card-name">Tide</h2>
+        <p class="card-pitch">Premium calm. Cool ocean blue with soft gradients on key surfaces. Sophisticated fintech / modern productivity feel.</p>
+        <div class="card-tags">
+          <span class="tag">cool</span>
+          <span class="tag">gradient surfaces</span>
+          <span class="tag">premium</span>
+        </div>
+        <div class="card-foot">
+          <span class="card-link">View mock</span>
+          <span class="card-meta">Mercury · Notion</span>
+        </div>
+      </a>
+
+      <a class="card" href="03-pop/campaign-report.html">
+        <div class="card-head">
+          <span class="card-num">03</span>
+          <span class="swatches" title="palette">
+            <span class="swatch" style="background:#FFFFFF"></span>
+            <span class="swatch" style="background:#FBF8F7"></span>
+            <span class="swatch" style="background:#FFE8E8"></span>
+            <span class="swatch" style="background:#FFD93D"></span>
+            <span class="swatch" style="background:#FF4E4E"></span>
+            <span class="swatch" style="background:#18181B"></span>
+          </span>
+        </div>
+        <h2 class="card-name">Pop</h2>
+        <p class="card-pitch">Maximalist DTC brand. Hot coral as architectural color, not just an accent. Bold, confident, unmistakable.</p>
+        <div class="card-tags">
+          <span class="tag">maximalist</span>
+          <span class="tag">brand-forward</span>
+          <span class="tag">bold</span>
+        </div>
+        <div class="card-foot">
+          <span class="card-link">View mock</span>
+          <span class="card-meta">Lemonade · Glossier</span>
+        </div>
+      </a>
+
+      <a class="card" href="04-vapor/campaign-report.html">
+        <div class="card-head">
+          <span class="card-num">04</span>
+          <span class="swatches" title="palette">
+            <span class="swatch" style="background:#0E0E14"></span>
+            <span class="swatch" style="background:#16161E"></span>
+            <span class="swatch" style="background:#1F1F2A"></span>
+            <span class="swatch" style="background:#06B6D4"></span>
+            <span class="swatch" style="background:#EC4899"></span>
+            <span class="swatch" style="background:#8B5CF6"></span>
+          </span>
+        </div>
+        <h2 class="card-name">Vapor</h2>
+        <p class="card-pitch">AI-futurist. Aurora gradient as the primary brand element. Dark surface ladder, monochrome elsewhere — gradient sings.</p>
+        <div class="card-tags">
+          <span class="tag">aurora</span>
+          <span class="tag">AI-modern</span>
+          <span class="tag">gradient-led</span>
+        </div>
+        <div class="card-foot">
+          <span class="card-link">View mock</span>
+          <span class="card-meta">Linear AI · Perplexity</span>
+        </div>
+      </a>
+
+      <a class="card" href="05-press/campaign-report.html">
+        <div class="card-head">
+          <span class="card-num">05</span>
+          <span class="swatches" title="palette">
+            <span class="swatch" style="background:#FAFAF7"></span>
+            <span class="swatch" style="background:#FFFFFF"></span>
+            <span class="swatch" style="background:#F2F2EE"></span>
+            <span class="swatch" style="background:#B23A30"></span>
+            <span class="swatch" style="background:#5C5C5C"></span>
+            <span class="swatch" style="background:#131313"></span>
+          </span>
+        </div>
+        <h2 class="card-name">Press</h2>
+        <p class="card-pitch">Modern editorial. Big Fraunces serif headlines, asymmetric grid, deep editorial red. Magazine spread, not dashboard.</p>
+        <div class="card-tags">
+          <span class="tag">editorial</span>
+          <span class="tag">Fraunces serif</span>
+          <span class="tag">oversized type</span>
+        </div>
+        <div class="card-foot">
+          <span class="card-link">View mock</span>
+          <span class="card-meta">Stripe Press · The Verge</span>
+        </div>
+      </a>
+
+      <a class="card" href="06-tower/campaign-report.html">
+        <div class="card-head">
+          <span class="card-num">06</span>
+          <span class="swatches" title="palette">
+            <span class="swatch" style="background:#F4F1EC"></span>
+            <span class="swatch" style="background:#FFFFFF"></span>
+            <span class="swatch" style="background:#EBE7DF"></span>
+            <span class="swatch" style="background:#FF5C00"></span>
+            <span class="swatch" style="background:#555555"></span>
+            <span class="swatch" style="background:#1A1A1A"></span>
+          </span>
+        </div>
+        <h2 class="card-name">Tower</h2>
+        <p class="card-pitch">Architectural slab-bold. Strong ink-color borders, condensed display type, safety-orange annotations. Reads like a schematic.</p>
+        <div class="card-tags">
+          <span class="tag">architectural</span>
+          <span class="tag">slab display</span>
+          <span class="tag">strong rules</span>
+        </div>
+        <div class="card-foot">
+          <span class="card-link">View mock</span>
+          <span class="card-meta">blueprint · poster</span>
+        </div>
+      </a>
+
+    </section>
+
+    <p class="section-label">Notes</p>
+
+    <div class="notes">
+      <h2>About this directory</h2>
+      <ul>
+        <li>All mocks render the same canonical screen — a sent-campaign report — with identical fake data, so comparisons are direct.</li>
+        <li>Each mock is a single self-contained <code>.html</code> file. No build step, no dependencies beyond Google Fonts.</li>
+        <li>Chrome / navigation / utility pages use the canonical light theme defined in this file's <code>:root</code>. Direction mocks define their own themes.</li>
+        <li>Serve locally with <code>npm run mocks</code>.</li>
+      </ul>
+    </div>
+
+  </div>
+</body>
+</html>

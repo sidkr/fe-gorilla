@@ -1,0 +1,830 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=1440" />
+<title>Spring Sale 2026 — Early Access · Gorilla</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Inter+Tight:wght@600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --bg-0: #0E0E14;
+    --bg-1: #16161E;
+    --bg-2: #1F1F2A;
+    --ink: #ECECF2;
+    --ink-soft: #8B8B9A;
+    --ink-dim: #5A5A66;
+    --rule: #2A2A38;
+    --rule-strong: #383848;
+    --aurora-1: #8B5CF6;
+    --aurora-2: #EC4899;
+    --aurora-3: #06B6D4;
+    --aurora-warm: #F97316;
+    --gradient-aurora: linear-gradient(135deg, #8B5CF6 0%, #EC4899 50%, #06B6D4 100%);
+    --gradient-aurora-warm: linear-gradient(135deg, #8B5CF6 0%, #EC4899 50%, #F97316 100%);
+    --gradient-soft: linear-gradient(135deg, rgba(139,92,246,0.18) 0%, rgba(236,72,153,0.14) 50%, rgba(6,182,212,0.12) 100%);
+    --ok: #10B981;
+    --warn: #F59E0B;
+    --danger: #F43F5E;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg-0); color: var(--ink); }
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    min-height: 100vh;
+  }
+
+  .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+  .display { font-family: 'Inter Tight', sans-serif; letter-spacing: -0.01em; }
+  .num { font-variant-numeric: tabular-nums; }
+
+  /* ============ TOP NAV ============ */
+  .nav {
+    height: 56px;
+    border-bottom: 1px solid var(--rule);
+    display: flex;
+    align-items: center;
+    padding: 0 24px;
+    gap: 24px;
+    background: var(--bg-0);
+    position: sticky; top: 0; z-index: 10;
+  }
+  .brand {
+    display: flex; align-items: center; gap: 10px;
+    font-family: 'Inter Tight', sans-serif; font-weight: 700;
+    font-size: 16px; letter-spacing: -0.01em; color: var(--ink);
+  }
+  .brand-mark { width: 22px; height: 22px; }
+  .nav-items { display: flex; gap: 4px; margin-left: 16px; }
+  .nav-item {
+    padding: 8px 12px;
+    font-size: 13px; font-weight: 500;
+    color: var(--ink-soft);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: color 140ms ease-out, background 140ms ease-out;
+  }
+  .nav-item:hover { color: var(--ink); background: var(--bg-2); }
+  .nav-item.active { color: var(--ink); background: var(--bg-2); }
+  .nav-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+  .icon-btn {
+    width: 34px; height: 34px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 8px; color: var(--ink-soft);
+    cursor: pointer; background: transparent; border: 0;
+    transition: color 140ms ease-out, background 140ms ease-out;
+  }
+  .icon-btn:hover { color: var(--ink); background: var(--bg-2); }
+  .btn {
+    height: 34px; padding: 0 14px;
+    border-radius: 8px; border: 1px solid var(--rule-strong);
+    background: var(--bg-1); color: var(--ink);
+    font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 500;
+    display: inline-flex; align-items: center; gap: 6px;
+    cursor: pointer;
+    transition: background 140ms ease-out, border-color 140ms ease-out;
+  }
+  .btn:hover { background: var(--bg-2); border-color: var(--ink-dim); }
+  .btn-ghost {
+    background: transparent; border: 1px solid transparent;
+    color: var(--ink-soft);
+  }
+  .btn-ghost:hover { background: var(--bg-2); color: var(--ink); }
+  .btn-primary {
+    background: var(--gradient-aurora);
+    color: #fff; border: 0; font-weight: 600;
+    height: 36px; padding: 0 16px;
+  }
+  .btn-primary:hover { filter: brightness(1.08); }
+  .avatar {
+    width: 32px; height: 32px; border-radius: 999px;
+    background: var(--bg-2);
+    color: var(--ink); font-size: 12px; font-weight: 600;
+    display: inline-flex; align-items: center; justify-content: center;
+    border: 1px solid var(--rule);
+    letter-spacing: 0.02em;
+  }
+
+  /* ============ PAGE ============ */
+  .page {
+    max-width: 1320px;
+    margin: 0 auto;
+    padding: 28px 32px 80px;
+  }
+
+  .crumbs {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 12px; color: var(--ink-soft);
+    margin-bottom: 18px;
+  }
+  .crumbs .sep { color: var(--ink-dim); }
+  .crumbs a { color: var(--ink-soft); text-decoration: none; }
+  .crumbs a:hover { color: var(--ink); }
+  .crumb-current { color: var(--ink); }
+
+  .pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    height: 22px; padding: 0 10px;
+    border-radius: 999px;
+    font-size: 11px; font-weight: 500;
+    letter-spacing: 0.02em;
+    color: var(--ink);
+    background: var(--gradient-soft);
+    border: 1px solid rgba(236,72,153,0.22);
+  }
+  .pill .dot {
+    width: 6px; height: 6px; border-radius: 999px;
+    background: var(--ok);
+  }
+
+  /* ============ HEADER ============ */
+  .header {
+    display: flex; align-items: flex-start; gap: 24px;
+    padding-bottom: 28px;
+    margin-bottom: 28px;
+    border-bottom: 1px solid var(--rule);
+  }
+  .header-left {
+    position: relative;
+    padding-left: 18px;
+    flex: 1;
+  }
+  .header-left::before {
+    content: "";
+    position: absolute; left: 0; top: 6px; bottom: 14px;
+    width: 3px;
+    border-radius: 3px;
+    background: var(--gradient-aurora);
+    opacity: 0.85;
+  }
+  h1.title {
+    margin: 0 0 8px;
+    font-family: 'Inter Tight', sans-serif;
+    font-weight: 700;
+    font-size: 32px;
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+  }
+  .meta {
+    font-size: 13px; color: var(--ink-soft);
+  }
+  .meta .mono { color: var(--ink-soft); font-size: 12px; }
+  .header-actions {
+    display: flex; align-items: center; gap: 6px;
+    padding-top: 4px;
+  }
+
+  /* ============ KPI STRIP ============ */
+  .kpi-strip {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 0;
+    border: 1px solid var(--rule);
+    border-radius: 10px;
+    background: var(--bg-1);
+    overflow: hidden;
+    margin-bottom: 24px;
+  }
+  .kpi {
+    padding: 18px 20px 20px;
+    border-right: 1px solid var(--rule);
+    position: relative;
+  }
+  .kpi:last-child { border-right: 0; }
+  .kpi-label {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--ink-soft);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 12px;
+  }
+  .kpi-big {
+    font-family: 'Inter Tight', sans-serif;
+    font-weight: 700;
+    font-size: 30px;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+  }
+  .kpi-sub {
+    margin-top: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11.5px;
+    color: var(--ink-soft);
+    font-variant-numeric: tabular-nums;
+  }
+  .kpi-hero .kpi-big {
+    background: var(--gradient-aurora-warm);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+  }
+  .kpi-warn-dot {
+    display: inline-block;
+    width: 6px; height: 6px; border-radius: 999px;
+    background: var(--warn);
+    margin-right: 6px;
+    vertical-align: middle;
+    margin-bottom: 2px;
+  }
+
+  /* ============ SECTION GRID ============ */
+  .section-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 24px;
+    margin-bottom: 24px;
+  }
+  .card {
+    background: var(--bg-1);
+    border: 1px solid var(--rule);
+    border-radius: 10px;
+    padding: 22px 24px;
+  }
+  .card-head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    margin-bottom: 18px;
+  }
+  .card-title {
+    font-family: 'Inter Tight', sans-serif;
+    font-weight: 600;
+    font-size: 15px;
+    letter-spacing: -0.005em;
+    color: var(--ink);
+  }
+  .card-sub {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-soft);
+    letter-spacing: 0.02em;
+  }
+
+  /* ============ CHART ============ */
+  .chart-wrap { width: 100%; }
+  .chart-wrap svg { display: block; width: 100%; height: auto; }
+  .chart-legend {
+    display: flex; gap: 18px;
+    margin-top: 14px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-soft);
+  }
+  .chart-legend .swatch {
+    display: inline-block; width: 18px; height: 2px;
+    border-radius: 2px; vertical-align: middle;
+    margin-right: 8px;
+    background: linear-gradient(90deg, #8B5CF6 0%, #EC4899 50%, #06B6D4 100%);
+  }
+
+  /* ============ TOP LINKS ============ */
+  .link-row {
+    display: grid;
+    grid-template-columns: 1fr 56px 56px;
+    column-gap: 16px;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  .link-row:last-of-type { border-bottom: 0; }
+  .link-path {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12.5px;
+    color: var(--ink);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .link-count {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--ink);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  .link-pct {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--ink-soft);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  .link-bar {
+    grid-column: 1 / -1;
+    height: 3px;
+    background: var(--bg-2);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-top: 8px;
+  }
+  .link-bar > span {
+    display: block;
+    height: 100%;
+    background: var(--ink-soft);
+    border-radius: 3px;
+  }
+
+  /* ============ ACTIVITY ============ */
+  .activity-row {
+    display: grid;
+    grid-template-columns: 32px 1fr auto;
+    column-gap: 14px;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  .activity-row:last-child { border-bottom: 0; }
+  .activity-avatar {
+    width: 32px; height: 32px; border-radius: 999px;
+    background: var(--bg-2);
+    color: var(--ink); font-size: 11px; font-weight: 600;
+    display: inline-flex; align-items: center; justify-content: center;
+    border: 1px solid var(--rule);
+    letter-spacing: 0.02em;
+  }
+  .activity-main { min-width: 0; }
+  .activity-email {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--ink);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .activity-event {
+    font-size: 12px;
+    color: var(--ink-soft);
+    margin-top: 2px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .activity-event .ev-dot {
+    width: 6px; height: 6px; border-radius: 999px;
+    background: var(--ink-dim);
+    flex-shrink: 0;
+  }
+  .activity-event .ev-dot.ok { background: var(--ok); }
+  .activity-event .ev-dot.danger { background: var(--danger); }
+  .activity-event .ev-dot.warn { background: var(--warn); }
+  .activity-event .ev-path {
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--ink);
+  }
+  .activity-event .ev-kind {
+    color: var(--ink-soft);
+  }
+  .activity-event .ev-kind.danger { color: var(--danger); }
+  .activity-time {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-dim);
+    white-space: nowrap;
+  }
+
+  .search-input {
+    height: 34px; width: 220px;
+    background: var(--bg-1);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    color: var(--ink);
+    font-family: 'Inter', sans-serif;
+    font-size: 12.5px;
+    padding: 0 10px 0 32px;
+    outline: none;
+    transition: border-color 140ms ease-out;
+  }
+  .search-input::placeholder { color: var(--ink-dim); }
+  .search-input:focus { border-color: var(--rule-strong); }
+  .search-wrap { position: relative; display: inline-flex; align-items: center; }
+  .search-wrap svg { position: absolute; left: 10px; color: var(--ink-dim); pointer-events: none; }
+
+</style>
+</head>
+<body>
+
+<!-- ============ TOP NAV ============ -->
+<nav class="nav">
+  <div class="brand">
+    <svg class="brand-mark" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="brandGrad" x1="0" y1="0" x2="22" y2="22" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stop-color="#8B5CF6"/>
+          <stop offset="0.5" stop-color="#EC4899"/>
+          <stop offset="1" stop-color="#06B6D4"/>
+        </linearGradient>
+      </defs>
+      <path d="M11 1.5 L20 6.5 V15.5 L11 20.5 L2 15.5 V6.5 Z" fill="url(#brandGrad)"/>
+      <path d="M11 5 L16.5 8 V14 L11 17 L5.5 14 V8 Z" fill="#0E0E14"/>
+      <circle cx="11" cy="11" r="2.6" fill="url(#brandGrad)"/>
+    </svg>
+    <span>Gorilla</span>
+  </div>
+  <div class="nav-items">
+    <div class="nav-item">Dashboard</div>
+    <div class="nav-item">Audiences</div>
+    <div class="nav-item active">Campaigns</div>
+    <div class="nav-item">Reports</div>
+    <div class="nav-item">Templates</div>
+  </div>
+  <div class="nav-right">
+    <div class="search-wrap">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+      </svg>
+      <input class="search-input" placeholder="Search campaigns, audiences, reports" />
+    </div>
+    <button class="btn">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+      </svg>
+      New campaign
+    </button>
+    <div class="avatar" title="Sienna Kim">SK</div>
+  </div>
+</nav>
+
+<!-- ============ PAGE ============ -->
+<main class="page">
+
+  <div class="crumbs">
+    <a href="#">Campaigns</a>
+    <span class="sep">/</span>
+    <span class="crumb-current">Spring Sale 2026 — Early Access</span>
+    <span class="pill" style="margin-left: 4px;"><span class="dot"></span>Sent</span>
+  </div>
+
+  <header class="header">
+    <div class="header-left">
+      <h1 class="title">Spring Sale 2026 — Early Access</h1>
+      <div class="meta">
+        Sent <span class="mono">May 18, 2026 · 9:00 AM PT</span> · to Engaged Subscribers <span class="mono">(12,847)</span>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-ghost">Duplicate</button>
+      <button class="btn btn-ghost">Export report</button>
+      <button class="btn btn-primary">View email</button>
+    </div>
+  </header>
+
+  <!-- ============ KPI STRIP ============ -->
+  <section class="kpi-strip">
+    <div class="kpi">
+      <div class="kpi-label">Sent</div>
+      <div class="kpi-big">12,847</div>
+      <div class="kpi-sub">recipients</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Delivered</div>
+      <div class="kpi-big">12,612</div>
+      <div class="kpi-sub">98.2% delivered</div>
+    </div>
+    <div class="kpi kpi-hero">
+      <div class="kpi-label">Open rate</div>
+      <div class="kpi-big">46.4%</div>
+      <div class="kpi-sub">5,847 opens</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Click rate</div>
+      <div class="kpi-big">8.9%</div>
+      <div class="kpi-sub">1,124 clicks</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Bounce rate</div>
+      <div class="kpi-big">1.8%</div>
+      <div class="kpi-sub"><span class="kpi-warn-dot"></span>235 bounces</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Unsubscribes</div>
+      <div class="kpi-big">0.14%</div>
+      <div class="kpi-sub">18 contacts</div>
+    </div>
+  </section>
+
+  <!-- ============ CHART + LINKS ============ -->
+  <section class="section-grid">
+
+    <!-- ----- OPENS CHART ----- -->
+    <div class="card">
+      <div class="card-head">
+        <div class="card-title">Opens · First 48 hours</div>
+        <div class="card-sub">May 18 09:00 — May 20 09:00 PT</div>
+      </div>
+      <div class="chart-wrap">
+        <svg viewBox="0 0 1000 240" preserveAspectRatio="none" role="img" aria-label="Opens over time, first 48 hours">
+          <defs>
+            <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#EC4899" stop-opacity="0.22"/>
+              <stop offset="0.5" stop-color="#8B5CF6" stop-opacity="0.14"/>
+              <stop offset="1" stop-color="#06B6D4" stop-opacity="0.02"/>
+            </linearGradient>
+            <linearGradient id="lineGrad" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0" stop-color="#8B5CF6"/>
+              <stop offset="0.5" stop-color="#EC4899"/>
+              <stop offset="1" stop-color="#06B6D4"/>
+            </linearGradient>
+          </defs>
+
+          <!-- gridlines (y) -->
+          <g stroke="#2A2A38" stroke-width="1">
+            <line x1="48" y1="12"  x2="984" y2="12"  stroke-dasharray="2 4"/>
+            <line x1="48" y1="57"  x2="984" y2="57"  stroke-dasharray="2 4"/>
+            <line x1="48" y1="102" x2="984" y2="102" stroke-dasharray="2 4"/>
+            <line x1="48" y1="147" x2="984" y2="147" stroke-dasharray="2 4"/>
+            <line x1="48" y1="192" x2="984" y2="192"/>
+          </g>
+
+          <!-- y-axis labels -->
+          <g font-family="JetBrains Mono, monospace" font-size="10" fill="#5A5A66">
+            <text x="40" y="16"  text-anchor="end">800</text>
+            <text x="40" y="61"  text-anchor="end">600</text>
+            <text x="40" y="106" text-anchor="end">400</text>
+            <text x="40" y="151" text-anchor="end">200</text>
+            <text x="40" y="196" text-anchor="end">0</text>
+          </g>
+
+          <!-- area fill -->
+          <path d="
+            M 48,178.5
+            L 67.5,106.5
+            L 87,30
+            L 106.5,61.5
+            L 126,106.5
+            L 145.5,138
+            L 165,156
+            L 184.5,165
+            L 204,171.75
+            L 223.5,176.25
+            L 243,179.625
+            L 262.5,181.875
+            L 282,183
+            L 301.5,183.45
+            L 321,183.45
+            L 340.5,183
+            L 360,181.875
+            L 379.5,180.3
+            L 399,178.05
+            L 418.5,174.45
+            L 438,169.5
+            L 457.5,162.75
+            L 477,156
+            L 496.5,152.625
+            L 516,151.5
+            L 535.5,154.2
+            L 555,159.375
+            L 574.5,166.125
+            L 594,172.2
+            L 613.5,176.7
+            L 633,180.3
+            L 652.5,182.55
+            L 672,184.35
+            L 691.5,185.7
+            L 711,186.6
+            L 730.5,187.5
+            L 750,188.175
+            L 769.5,188.85
+            L 789,189.3
+            L 808.5,189.75
+            L 828,190.2
+            L 847.5,190.425
+            L 867,190.65
+            L 886.5,190.875
+            L 906,191.1
+            L 925.5,191.325
+            L 945,191.55
+            L 964.5,191.775
+            L 984,192
+            L 984,192 L 48,192 Z" fill="url(#areaGrad)"/>
+
+          <!-- line -->
+          <path d="
+            M 48,178.5
+            L 67.5,106.5
+            L 87,30
+            L 106.5,61.5
+            L 126,106.5
+            L 145.5,138
+            L 165,156
+            L 184.5,165
+            L 204,171.75
+            L 223.5,176.25
+            L 243,179.625
+            L 262.5,181.875
+            L 282,183
+            L 301.5,183.45
+            L 321,183.45
+            L 340.5,183
+            L 360,181.875
+            L 379.5,180.3
+            L 399,178.05
+            L 418.5,174.45
+            L 438,169.5
+            L 457.5,162.75
+            L 477,156
+            L 496.5,152.625
+            L 516,151.5
+            L 535.5,154.2
+            L 555,159.375
+            L 574.5,166.125
+            L 594,172.2
+            L 613.5,176.7
+            L 633,180.3
+            L 652.5,182.55
+            L 672,184.35
+            L 691.5,185.7
+            L 711,186.6
+            L 730.5,187.5
+            L 750,188.175
+            L 769.5,188.85
+            L 789,189.3
+            L 808.5,189.75
+            L 828,190.2
+            L 847.5,190.425
+            L 867,190.65
+            L 886.5,190.875
+            L 906,191.1
+            L 925.5,191.325
+            L 945,191.55
+            L 964.5,191.775
+            L 984,192"
+            fill="none" stroke="url(#lineGrad)" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+
+          <!-- x ticks -->
+          <g font-family="JetBrains Mono, monospace" font-size="10" fill="#5A5A66">
+            <text x="48"  y="212" text-anchor="middle">0h</text>
+            <text x="282" y="212" text-anchor="middle">12h</text>
+            <text x="516" y="212" text-anchor="middle">24h</text>
+            <text x="750" y="212" text-anchor="middle">36h</text>
+            <text x="984" y="212" text-anchor="middle">48h</text>
+          </g>
+
+          <!-- peak marker -->
+          <circle cx="87" cy="30" r="3" fill="#0E0E14" stroke="url(#lineGrad)" stroke-width="1.5"/>
+          <text x="95" y="26" font-family="JetBrains Mono, monospace" font-size="10" fill="#ECECF2">720 opens · 11:00 AM</text>
+
+          <!-- 24h marker -->
+          <circle cx="516" cy="151.5" r="2.5" fill="#0E0E14" stroke="#8B8B9A" stroke-width="1"/>
+        </svg>
+      </div>
+      <div class="chart-legend">
+        <span><span class="swatch"></span>Hourly opens</span>
+        <span style="margin-left:auto">Peak <span class="mono" style="color:var(--ink)">720</span> at hour 2 · 24h re-engagement bump <span class="mono" style="color:var(--ink)">180</span></span>
+      </div>
+    </div>
+
+    <!-- ----- TOP LINKS ----- -->
+    <div class="card">
+      <div class="card-head">
+        <div class="card-title">Top links</div>
+        <div class="card-sub">1,124 clicks</div>
+      </div>
+
+      <div class="link-row">
+        <div class="link-path">/spring-sale/featured</div>
+        <div class="link-count">412</div>
+        <div class="link-pct">36.7%</div>
+        <div class="link-bar"><span style="width:36.7%;"></span></div>
+      </div>
+      <div class="link-row">
+        <div class="link-path">/collections/new-arrivals</div>
+        <div class="link-count">287</div>
+        <div class="link-pct">25.5%</div>
+        <div class="link-bar"><span style="width:25.5%;"></span></div>
+      </div>
+      <div class="link-row">
+        <div class="link-path">/sale/under-50</div>
+        <div class="link-count">198</div>
+        <div class="link-pct">17.6%</div>
+        <div class="link-bar"><span style="width:17.6%;"></span></div>
+      </div>
+      <div class="link-row">
+        <div class="link-path">/story-behind-the-collection</div>
+        <div class="link-count">124</div>
+        <div class="link-pct">11.0%</div>
+        <div class="link-bar"><span style="width:11.0%;"></span></div>
+      </div>
+      <div class="link-row">
+        <div class="link-path">footer · Instagram</div>
+        <div class="link-count">103</div>
+        <div class="link-pct">9.2%</div>
+        <div class="link-bar"><span style="width:9.2%;"></span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ ACTIVITY ============ -->
+  <section class="card">
+    <div class="card-head">
+      <div class="card-title">Recent activity</div>
+      <div class="card-sub">Live · last 15 minutes</div>
+    </div>
+
+    <div class="activity-row">
+      <div class="activity-avatar">AC</div>
+      <div class="activity-main">
+        <div class="activity-email">alex.chen@gmail.com</div>
+        <div class="activity-event">
+          <span class="ev-dot"></span>
+          <span class="ev-kind">Clicked</span>
+          <span class="ev-path">/spring-sale/featured</span>
+        </div>
+      </div>
+      <div class="activity-time">2m ago</div>
+    </div>
+
+    <div class="activity-row">
+      <div class="activity-avatar">PS</div>
+      <div class="activity-main">
+        <div class="activity-email">priya.s@hotmail.com</div>
+        <div class="activity-event">
+          <span class="ev-dot ok"></span>
+          <span class="ev-kind">Opened</span>
+        </div>
+      </div>
+      <div class="activity-time">4m ago</div>
+    </div>
+
+    <div class="activity-row">
+      <div class="activity-avatar">RD</div>
+      <div class="activity-main">
+        <div class="activity-email">ryan_d@outlook.com</div>
+        <div class="activity-event">
+          <span class="ev-dot"></span>
+          <span class="ev-kind">Clicked</span>
+          <span class="ev-path">/collections/new-arrivals</span>
+        </div>
+      </div>
+      <div class="activity-time">6m ago</div>
+    </div>
+
+    <div class="activity-row">
+      <div class="activity-avatar">ML</div>
+      <div class="activity-main">
+        <div class="activity-email">maria.lopez@yahoo.com</div>
+        <div class="activity-event">
+          <span class="ev-dot ok"></span>
+          <span class="ev-kind">Opened</span>
+        </div>
+      </div>
+      <div class="activity-time">8m ago</div>
+    </div>
+
+    <div class="activity-row">
+      <div class="activity-avatar">JW</div>
+      <div class="activity-main">
+        <div class="activity-email">james.wright@gmail.com</div>
+        <div class="activity-event">
+          <span class="ev-dot danger"></span>
+          <span class="ev-kind danger">Bounced (hard)</span>
+        </div>
+      </div>
+      <div class="activity-time">11m ago</div>
+    </div>
+
+    <div class="activity-row">
+      <div class="activity-avatar">SK</div>
+      <div class="activity-main">
+        <div class="activity-email">sienna.k@gmail.com</div>
+        <div class="activity-event">
+          <span class="ev-dot ok"></span>
+          <span class="ev-kind">Opened</span>
+        </div>
+      </div>
+      <div class="activity-time">12m ago</div>
+    </div>
+
+    <div class="activity-row">
+      <div class="activity-avatar">DT</div>
+      <div class="activity-main">
+        <div class="activity-email">david.tran@protonmail.com</div>
+        <div class="activity-event">
+          <span class="ev-dot danger"></span>
+          <span class="ev-kind danger">Unsubscribed</span>
+        </div>
+      </div>
+      <div class="activity-time">14m ago</div>
+    </div>
+
+    <div class="activity-row">
+      <div class="activity-avatar">JA</div>
+      <div class="activity-main">
+        <div class="activity-email">jordan_a@gmail.com</div>
+        <div class="activity-event">
+          <span class="ev-dot ok"></span>
+          <span class="ev-kind">Opened</span>
+        </div>
+      </div>
+      <div class="activity-time">15m ago</div>
+    </div>
+  </section>
+
+</main>
+
+</body>
+</html>

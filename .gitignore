@@ -1,0 +1,16 @@
+node_modules
+dist
+.nuxt
+.output
+.env
+.env.local
+server/.env
+server/local.env
+*.log
+logs
+coverage
+playwright-report
+test-results
+.DS_Store
+.vscode
+.idea
