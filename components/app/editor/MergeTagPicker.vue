@@ -137,6 +137,7 @@ onUnmounted(() => {
 .mtp-trigger {
   display: inline-flex;
   align-items: center;
+  white-space: nowrap;
   gap: var(--space-1);
   padding: var(--space-1) var(--space-2);
   border: 1px solid var(--color-rule);

@@ -275,6 +275,7 @@ defineExpose({ focus: () => triggerEl.value?.focus() });
 }
 .aud-trigger-placeholder {
   color: var(--field-placeholder);
+  white-space: nowrap;
 }
 .aud-caret {
   color: var(--color-ink-dim);

@@ -275,6 +275,7 @@ function onSchedule() {
 .pf-edit {
   display: inline-flex;
   align-items: center;
+  white-space: nowrap;
   gap: var(--space-1);
   padding: var(--space-1) var(--space-2);
   border: 0;
@@ -309,10 +310,15 @@ function onSchedule() {
   font-size: var(--text-sm);
   color: var(--link-color);
   cursor: pointer;
+  white-space: nowrap;
 }
 .pf-link:hover { color: var(--link-color-hover); text-decoration: underline; }
 
 .pf-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
   padding: var(--space-2) var(--space-4);
   border-radius: var(--radius-md);
   font-family: var(--font-body);

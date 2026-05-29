@@ -169,6 +169,7 @@ onUnmounted(() => {
 }
 .tsp-btn {
   padding: var(--space-2) var(--space-4);
+  white-space: nowrap;
   border-radius: var(--radius-md);
   font-family: var(--font-body);
   font-size: var(--text-sm);

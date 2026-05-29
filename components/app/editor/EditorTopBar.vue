@@ -319,6 +319,8 @@ function onSetupClick(e: MouseEvent) {
 .topbar-seg {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  white-space: nowrap;
   gap: var(--space-1-5);
   padding: var(--space-1-5) var(--space-3);
   background: var(--color-surface);
@@ -382,6 +384,8 @@ function onSetupClick(e: MouseEvent) {
 .btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  white-space: nowrap;
   gap: var(--space-2);
   padding: var(--space-2) var(--space-4);
   height: 36px;

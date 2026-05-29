@@ -9,6 +9,17 @@ import { useCloud } from "~/composables/app/useCloud";
 //   const { campaignId } = await useTemplate(id);  // → navigate to the editor
 // ─────────────────────────────────────────────────────────────────────────────
 
+export interface TemplateBlock {
+  id: string;
+  type: string;
+  props: Record<string, unknown>;
+}
+
+export interface TemplateBody {
+  version: number;
+  blocks: TemplateBlock[];
+}
+
 export interface TemplateSummary {
   id: string;
   name: string;
@@ -17,6 +28,8 @@ export interface TemplateSummary {
   isSystem: boolean;
   seedKey: string | null;
   thumbnail: string | null;
+  // Full block tree the gallery uses to render a miniature email preview.
+  body: TemplateBody;
   createdAt: string | null;
   updatedAt: string | null;
 }

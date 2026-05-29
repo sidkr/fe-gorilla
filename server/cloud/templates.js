@@ -183,6 +183,9 @@ function templateToJSON(tpl) {
     category: tpl.get("category") || (tpl.get("isSystem") ? "Basics" : "Saved"),
     thumbnail: tpl.get("thumbnail") || null,
     thumbUrl: firstImageSrc(tpl),
+    // Full block tree so the gallery can render a real miniature email preview
+    // (not just the hero image). Falls back to an empty body for safety.
+    body: tpl.get("body") || { version: 1, blocks: [] },
     createdAt: tpl.createdAt ? tpl.createdAt.toISOString() : null,
     updatedAt: tpl.updatedAt ? tpl.updatedAt.toISOString() : null,
   };

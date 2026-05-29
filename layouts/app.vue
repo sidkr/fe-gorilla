@@ -244,6 +244,7 @@ async function onLogout() {
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
+  white-space: nowrap;
   margin: var(--space-3) var(--space-1) var(--space-4);
   height: 40px;
   background: var(--btn-primary-bg);
@@ -281,6 +282,7 @@ async function onLogout() {
   gap: var(--space-3);
   height: 40px;
   padding: 0 var(--space-3);
+  white-space: nowrap;
   border-radius: var(--radius-sm);
   text-decoration: none;
   font-family: var(--font-body);
@@ -388,6 +390,7 @@ async function onLogout() {
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
+  white-space: nowrap;
   height: 36px;
   padding: 0 var(--space-3);
   border: 1px solid var(--btn-ghost-border);

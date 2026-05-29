@@ -381,6 +381,7 @@ async function onSubmit() {
     align-items: center;
     justify-content: center;
     gap: var(--space-2);
+    white-space: nowrap;
     border-radius: var(--radius-md);
     font-family: var(--font-display);
     font-weight: 700;

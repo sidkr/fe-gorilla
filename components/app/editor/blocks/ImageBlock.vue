@@ -277,6 +277,8 @@ function commitInline(e?: Event) {
 .img-inline-insert {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  white-space: nowrap;
   padding: var(--space-2) var(--space-4);
   border: 0;
   border-radius: var(--radius-sm);
@@ -292,6 +294,7 @@ function commitInline(e?: Event) {
   background: var(--btn-primary-hover);
 }
 .img-inline-cancel {
+  white-space: nowrap;
   border: 0;
   background: transparent;
   color: var(--color-ink-soft);

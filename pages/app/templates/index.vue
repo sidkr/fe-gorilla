@@ -54,16 +54,14 @@ const tabs = computed(() => [
 const activeTab = ref("all");
 
 // Normalize a raw cloud template into the card view-model. `kind` drives the
-// card chrome + which actions show; `thumbKey` selects the SVG.
+// card chrome + which actions show. `blocks` is the template's full block tree,
+// rendered as a miniature email preview in the thumbnail (AppTemplatePreview).
 function toCard(t, kind) {
   return {
     id: t.id,
     name: t.name,
     kind,
-    thumbKey: kind === "standard" ? t.seedKey : null,
-    // Real hero image (first image block of the template) → richer thumbnail
-    // than the wireframe SVGs. Falls back to the SVGs when absent.
-    thumbUrl: t.thumbUrl || null,
+    blocks: t.body?.blocks || [],
     category: t.category || (kind === "standard" ? "Standard" : "Saved"),
   };
 }
@@ -160,103 +158,10 @@ async function onDelete(id, name) {
            design + chrome match the original card styling. -->
       <article v-for="tpl in visibleTemplates" :key="tpl.id" class="tpl-card">
         <div class="tpl-card-thumb">
-          <!-- Preferred: the template's real hero image (first image block).
-               Far more compelling than a wireframe; falls back to the SVGs
-               below for templates with no image. -->
-          <img v-if="tpl.thumbUrl" :src="tpl.thumbUrl" :alt="tpl.name" class="tpl-thumb-img" loading="lazy" />
-
-          <!-- Inline SVG per system template (keyed by seedKey). viewBox is 3:4
-               to match the card thumbnail aspect ratio. Token colors only. -->
-
-          <!-- Standard newsletter -->
-          <svg v-else-if="tpl.thumbKey === 'system/newsletter'" viewBox="0 0 240 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Newsletter layout preview">
-            <rect x="20" y="20"  width="200" height="14" rx="2" fill="var(--color-pop)" />
-            <rect x="20" y="48"  width="160" height="6"  rx="2" fill="var(--color-rule)" />
-            <rect x="20" y="62"  width="200" height="6"  rx="2" fill="var(--color-rule)" />
-            <rect x="20" y="76"  width="180" height="6"  rx="2" fill="var(--color-rule)" />
-            <rect x="20" y="94"  width="200" height="70" rx="3" fill="var(--color-surface-2)" stroke="var(--color-rule)" stroke-width="1" />
-            <rect x="20" y="176" width="200" height="6"  rx="2" fill="var(--color-rule)" />
-            <rect x="20" y="190" width="170" height="6"  rx="2" fill="var(--color-rule)" />
-            <rect x="20" y="212" width="90"  height="22" rx="4" fill="var(--color-pop)" />
-            <line x1="20" y1="270" x2="220" y2="270" stroke="var(--color-rule)" stroke-width="1" />
-            <rect x="20" y="282" width="120" height="4"  rx="2" fill="var(--color-ink-soft)" opacity="0.4" />
-            <rect x="20" y="292" width="80"  height="4"  rx="2" fill="var(--color-ink-soft)" opacity="0.4" />
-          </svg>
-
-          <!-- Product announcement -->
-          <svg v-else-if="tpl.thumbKey === 'system/product-announcement'" viewBox="0 0 240 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Product announcement preview">
-            <rect x="20" y="20"  width="200" height="14" rx="2" fill="var(--color-pop)" />
-            <rect x="20" y="48"  width="200" height="100" rx="3" fill="var(--color-surface-2)" stroke="var(--color-rule)" stroke-width="1" />
-            <circle cx="120" cy="98" r="18" fill="var(--color-pop-bg)" />
-            <rect x="20" y="162" width="160" height="10" rx="2" fill="var(--color-ink-soft)" opacity="0.6" />
-            <rect x="20" y="184" width="200" height="6"  rx="2" fill="var(--color-rule)" />
-            <rect x="20" y="198" width="180" height="6"  rx="2" fill="var(--color-rule)" />
-            <rect x="20" y="212" width="150" height="6"  rx="2" fill="var(--color-rule)" />
-            <rect x="20" y="234" width="110" height="24" rx="4" fill="var(--color-pop)" />
-            <line x1="20" y1="280" x2="220" y2="280" stroke="var(--color-rule)" stroke-width="1" />
-            <rect x="20" y="292" width="100" height="4"  rx="2" fill="var(--color-ink-soft)" opacity="0.4" />
-          </svg>
-
-          <!-- Welcome email -->
-          <svg v-else-if="tpl.thumbKey === 'system/welcome'" viewBox="0 0 240 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Welcome email preview">
-            <rect x="20" y="20"  width="200" height="14" rx="2" fill="var(--color-pop)" />
-            <rect x="20" y="48"  width="200" height="80" rx="3" fill="var(--color-surface-2)" stroke="var(--color-rule)" stroke-width="1" />
-            <path d="M120 76 L132 96 H108 Z" fill="var(--color-pop-bg)" />
-            <rect x="20" y="142" width="150" height="10" rx="2" fill="var(--color-ink-soft)" opacity="0.6" />
-            <rect x="20" y="164" width="200" height="6"  rx="2" fill="var(--color-rule)" />
-            <rect x="20" y="178" width="180" height="6"  rx="2" fill="var(--color-rule)" />
-            <rect x="20" y="192" width="160" height="6"  rx="2" fill="var(--color-rule)" />
-            <rect x="20" y="216" width="86"  height="22" rx="4" fill="var(--color-pop)" />
-            <rect x="114" y="216" width="86" height="22" rx="4" fill="var(--color-surface)" stroke="var(--color-pop)" stroke-width="1.5" />
-            <line x1="20" y1="278" x2="220" y2="278" stroke="var(--color-rule)" stroke-width="1" />
-            <rect x="20" y="290" width="90" height="4"  rx="2" fill="var(--color-ink-soft)" opacity="0.4" />
-          </svg>
-
-          <!-- Plain text update -->
-          <svg v-else-if="tpl.thumbKey === 'system/plain-text'" viewBox="0 0 240 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Plain text update preview">
-            <rect x="20" y="20"  width="200" height="14" rx="2" fill="var(--color-pop)" />
-            <rect x="20" y="56"  width="200" height="6"  rx="2" fill="var(--color-rule)" />
-            <rect x="20" y="70"  width="180" height="6"  rx="2" fill="var(--color-rule)" />
-            <rect x="20" y="84"  width="200" height="6"  rx="2" fill="var(--color-rule)" />
-            <rect x="20" y="98"  width="160" height="6"  rx="2" fill="var(--color-rule)" />
-            <rect x="20" y="124" width="200" height="6"  rx="2" fill="var(--color-rule)" />
-            <rect x="20" y="138" width="190" height="6"  rx="2" fill="var(--color-rule)" />
-            <rect x="20" y="152" width="170" height="6"  rx="2" fill="var(--color-rule)" />
-            <rect x="20" y="178" width="200" height="6"  rx="2" fill="var(--color-rule)" />
-            <rect x="20" y="192" width="180" height="6"  rx="2" fill="var(--color-rule)" />
-            <rect x="20" y="218" width="200" height="6"  rx="2" fill="var(--color-rule)" />
-            <rect x="20" y="232" width="140" height="6"  rx="2" fill="var(--color-rule)" />
-            <rect x="20" y="258" width="160" height="6"  rx="2" fill="var(--color-rule)" />
-            <rect x="20" y="272" width="120" height="6"  rx="2" fill="var(--color-rule)" />
-            <line x1="20" y1="296" x2="220" y2="296" stroke="var(--color-rule)" stroke-width="1" />
-          </svg>
-
-          <!-- Basic header, body & CTA -->
-          <svg v-else-if="tpl.thumbKey === 'system/basic'" viewBox="0 0 240 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Basic header, body and CTA preview">
-            <rect x="20" y="20"  width="200" height="14" rx="2" fill="var(--color-pop)" />
-            <rect x="20" y="74"  width="200" height="14" rx="2" fill="var(--color-ink-soft)" opacity="0.6" />
-            <rect x="20" y="96"  width="170" height="14" rx="2" fill="var(--color-ink-soft)" opacity="0.6" />
-            <rect x="20" y="134" width="200" height="6"  rx="2" fill="var(--color-rule)" />
-            <rect x="20" y="148" width="200" height="6"  rx="2" fill="var(--color-rule)" />
-            <rect x="20" y="162" width="160" height="6"  rx="2" fill="var(--color-rule)" />
-            <rect x="60" y="206" width="120" height="28" rx="4" fill="var(--color-pop)" />
-            <line x1="20" y1="290" x2="220" y2="290" stroke="var(--color-rule)" stroke-width="1" />
-          </svg>
-
-          <!-- Blank -->
-          <svg v-else-if="tpl.thumbKey === 'system/blank'" viewBox="0 0 240 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Blank template preview">
-            <rect x="20" y="20" width="200" height="280" rx="4" fill="var(--color-surface-2)" stroke="var(--color-rule)" stroke-width="1" stroke-dasharray="6 6" />
-            <path d="M120 140 V180 M100 160 H140" stroke="var(--color-ink-soft)" stroke-width="2" stroke-linecap="round" opacity="0.5" />
-          </svg>
-
-          <!-- Fallback (org templates + any unknown key): neutral plain layout. -->
-          <svg v-else viewBox="0 0 240 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Template preview">
-            <rect x="20" y="20"  width="200" height="14" rx="2" fill="var(--color-pop)" />
-            <rect x="20" y="48"  width="180" height="6"  rx="2" fill="var(--color-rule)" />
-            <rect x="20" y="62"  width="200" height="6"  rx="2" fill="var(--color-rule)" />
-            <rect x="20" y="82"  width="200" height="80" rx="3" fill="var(--color-surface-2)" stroke="var(--color-rule)" stroke-width="1" />
-            <rect x="20" y="180" width="100" height="22" rx="4" fill="var(--color-pop)" />
-          </svg>
+          <!-- Full miniature email preview: renders the template's block tree as
+               a realistic mini email scaled to fit, clipped to the top. Far more
+               informative than a hero image — you can tell what the template is. -->
+          <AppTemplatePreview :blocks="tpl.blocks" />
         </div>
 
         <!-- Body: name + tag chip -->
@@ -444,18 +349,6 @@ async function onDelete(id, name) {
   background: var(--color-surface-2);
   border-bottom: 1px solid var(--color-rule);
   overflow: hidden;
-}
-.tpl-card-thumb svg {
-  display: block;
-  width: 100%;
-  height: 100%;
-}
-.tpl-thumb-img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: top center;
 }
 .tpl-card-body {
   padding: var(--space-4);
