@@ -133,12 +133,16 @@ async function remove(s: SenderIdentity) {
     <nav class="snd-tabs" aria-label="Settings sections">
       <NuxtLink to="/app/settings" class="snd-tab">General</NuxtLink>
       <NuxtLink to="/app/settings/senders" class="snd-tab">Sender identities</NuxtLink>
+      <NuxtLink to="/app/settings/domains" class="snd-tab">Domains</NuxtLink>
+      <NuxtLink to="/app/settings/suppression" class="snd-tab">Suppression</NuxtLink>
     </nav>
 
     <div class="snd-bar">
       <p class="snd-note">
-        Verification here is a placeholder for the MVP — a real confirmation
-        flow ships with the send pipeline.
+        Verifying the address here confirms the From identity. For best
+        deliverability, also authenticate the sending domain (DKIM/SPF/DMARC) on
+        the <NuxtLink to="/app/settings/domains" class="snd-link">Domains</NuxtLink>
+        page — domain verification is enforced at send time.
       </p>
       <Button type="button" variant="primary" @click="openCreate">
         <template #leading>

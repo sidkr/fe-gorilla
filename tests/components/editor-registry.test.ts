@@ -169,6 +169,14 @@ vi.mock("~/composables/app/useSending", () => ({
     cancelScheduledSend: vi.fn(),
   }),
 }));
+// EditorShell fetches the org timezone for the schedule picker (Phase 0 §0.3)
+// via useSettings → useCloud → useNuxtApp; mock the seam so setup() doesn't
+// reach the (unavailable-in-test) Nuxt app instance.
+vi.mock("~/composables/app/useSettings", () => ({
+  useSettings: () => ({
+    getOrgSettings: vi.fn().mockResolvedValue({ timezone: "UTC" }),
+  }),
+}));
 const toastPush = vi.fn();
 vi.mock("~/composables/shared/useToast", () => ({
   useToast: () => ({ push: toastPush }),

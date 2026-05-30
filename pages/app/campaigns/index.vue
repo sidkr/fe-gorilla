@@ -19,6 +19,8 @@ const {
   duplicateCampaign,
   archiveCampaign,
   deleteCampaign,
+  pauseCampaign,
+  resumeCampaign,
 } = useCampaigns();
 
 const campaigns = ref([]);
@@ -107,6 +109,10 @@ const EDITABLE = new Set(["draft", "scheduled", "paused"]);
 const canEdit = (c) => EDITABLE.has(c.status);      // rename / open editor
 const canArchive = (c) => c.status !== "sending" && c.status !== "archived";
 const canDelete = (c) => c.status !== "sending";    // sent → soft-archive
+// Pause only a live/scheduled send; resume only a paused one (mirrors the
+// server guards in pauseCampaign / resumeCampaign).
+const canPause = (c) => c.status === "sending" || c.status === "scheduled";
+const canResume = (c) => c.status === "paused";
 
 // ── Per-row action menu ──────────────────────────────────────────────────────
 const openMenuId = ref(null);
@@ -158,6 +164,36 @@ async function onArchive(c) {
     await load();
   } catch (e) {
     actionError.value = e?.message || "Could not archive campaign.";
+  } finally {
+    busyId.value = null;
+  }
+}
+
+async function onPause(c) {
+  closeMenu();
+  if (busyId.value) return;
+  busyId.value = c.id;
+  actionError.value = null;
+  try {
+    await pauseCampaign(c.id);
+    await load();
+  } catch (e) {
+    actionError.value = e?.message || "Could not pause campaign.";
+  } finally {
+    busyId.value = null;
+  }
+}
+
+async function onResume(c) {
+  closeMenu();
+  if (busyId.value) return;
+  busyId.value = c.id;
+  actionError.value = null;
+  try {
+    await resumeCampaign(c.id);
+    await load();
+  } catch (e) {
+    actionError.value = e?.message || "Could not resume campaign.";
   } finally {
     busyId.value = null;
   }
@@ -393,6 +429,24 @@ async function confirmDelete() {
                       @click="onDuplicate(c)"
                     >
                       Duplicate
+                    </button>
+                    <button
+                      v-if="canPause(c)"
+                      type="button"
+                      class="ct-menu-item"
+                      role="menuitem"
+                      @click="onPause(c)"
+                    >
+                      Pause
+                    </button>
+                    <button
+                      v-if="canResume(c)"
+                      type="button"
+                      class="ct-menu-item"
+                      role="menuitem"
+                      @click="onResume(c)"
+                    >
+                      Resume
                     </button>
                     <button
                       v-if="canArchive(c)"

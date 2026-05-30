@@ -9,4 +9,6 @@ module.exports = {
   CAMPAIGN_FANOUT: "campaign-fanout",
   SEND_EMAIL: "send-email",
   WEBHOOK_INGEST: "webhook-ingest",
+  IMPORT_CSV: "import-csv",
+  AUTOMATION_TICK: "automation-tick",
 };

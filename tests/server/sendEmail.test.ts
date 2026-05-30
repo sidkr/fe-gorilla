@@ -178,4 +178,62 @@ describe("send-email worker job", () => {
     const freshCampaign = await new Parse.Query("Campaign").get(campaign.id, MK);
     expect(freshCampaign.get("sentCount") || 0).toBe(0);
   });
+
+  // ── campaign finalize: sending → sent once every row leaves the queue ──────
+  async function makeSendingCampaign() {
+    const campaign = await makeCampaign();
+    campaign.set("status", "sending");
+    await campaign.save(null, MK);
+    return campaign;
+  }
+
+  it("flips a single-recipient campaign to sent + stamps sentAt", async () => {
+    const campaign = await makeSendingCampaign();
+    const send = await makeQueuedSend(campaign, "finalize-1@example.com");
+
+    await handle({ sendId: send.id, campaignId: campaign.id });
+
+    const fresh = await new Parse.Query("Campaign").get(campaign.id, MK);
+    expect(fresh.get("status")).toBe("sent");
+    expect(fresh.get("sentAt")).toBeInstanceOf(Date);
+  });
+
+  it("stays 'sending' until the last recipient leaves the queue", async () => {
+    const campaign = await makeSendingCampaign();
+    const a = await makeQueuedSend(campaign, "finalize-a@example.com");
+    const b = await makeQueuedSend(campaign, "finalize-b@example.com");
+
+    await handle({ sendId: a.id, campaignId: campaign.id });
+    let fresh = await new Parse.Query("Campaign").get(campaign.id, MK);
+    expect(fresh.get("status")).toBe("sending");
+
+    await handle({ sendId: b.id, campaignId: campaign.id });
+    fresh = await new Parse.Query("Campaign").get(campaign.id, MK);
+    expect(fresh.get("status")).toBe("sent");
+  });
+
+  it("finalizes even when the only recipient is suppressed", async () => {
+    const campaign = await makeSendingCampaign();
+    const email = "finalize-blocked@example.com";
+    await suppression.addSuppression({ organization: orgId, email, reason: "manual" });
+    const send = await makeQueuedSend(campaign, email);
+
+    await handle({ sendId: send.id, campaignId: campaign.id });
+
+    const fresh = await new Parse.Query("Campaign").get(campaign.id, MK);
+    expect(fresh.get("status")).toBe("sent");
+  });
+
+  it("does not finalize a campaign that isn't 'sending'", async () => {
+    const campaign = await makeCampaign();
+    campaign.set("status", "paused");
+    await campaign.save(null, MK);
+    const send = await makeQueuedSend(campaign, "finalize-paused@example.com");
+
+    await handle({ sendId: send.id, campaignId: campaign.id });
+
+    const fresh = await new Parse.Query("Campaign").get(campaign.id, MK);
+    expect(fresh.get("status")).toBe("paused");
+    expect(fresh.get("sentAt")).toBeFalsy();
+  });
 });

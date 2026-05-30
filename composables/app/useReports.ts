@@ -151,6 +151,19 @@ export function useReports() {
     return recipients.value;
   }
 
+  // Server-rendered CSV of one campaign's recipients (email, status, and the
+  // delivered/opened/clicked timestamps + bounce reason). `status` optionally
+  // filters to a single CampaignSend status. See exportCampaignRecipients.
+  async function exportCampaignRecipients(
+    campaignId: string,
+    opts: { status?: string } = {},
+  ) {
+    return runCloud<{ filename: string; csv: string }>(
+      "exportCampaignRecipients",
+      { campaignId, ...opts },
+    );
+  }
+
   return {
     reports,
     report,
@@ -163,5 +176,6 @@ export function useReports() {
     loadReport,
     loadLinkBreakdown,
     loadRecipients,
+    exportCampaignRecipients,
   };
 }

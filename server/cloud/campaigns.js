@@ -36,6 +36,8 @@ const Parse = require("parse/node");
 const mjml2html = require("mjml");
 const { getUserOrg } = require("./lib/tenancy");
 const { registerBeforeSave } = require("./tenantHooks");
+const { getAgenda } = require("../lib/agendaInstance");
+const { SEND_EMAIL } = require("../lib/jobNames");
 
 // ── HTML/attr escaping ──────────────────────────────────────────────────────
 // Mirrors the client-side escapeAttr in registry.ts so server output matches
@@ -584,4 +586,129 @@ Parse.Cloud.define("deleteCampaign", async (request) => {
 
   await c.destroy({ sessionToken });
   return { ok: true, deleted: true };
+});
+
+// ── pauseCampaign ──────────────────────────────────────────────────────────────
+// Halt an in-flight or scheduled send. Valid only when status is "sending" or
+// "scheduled" → flips to "paused". The send worker checks the campaign status
+// before each SES call and bails on "paused", so already-queued CampaignSend
+// rows simply stop being delivered (they stay "queued" and are re-enqueued on
+// resume). We snapshot the pre-pause status into `pausedFrom` so resumeCampaign
+// knows whether the campaign had started sending or was merely scheduled.
+//
+// Org-scope + ownership: loaded as the caller (ACL isolates cross-org →
+// OBJECT_NOT_FOUND); we also resolve the caller's org and verify the campaign's
+// organization matches, mirroring the defence-in-depth pattern in reports.js.
+//
+// Returns { ok, id, status }.
+Parse.Cloud.define("pauseCampaign", async (request) => {
+  const org = await getUserOrg(request.user, { useMasterKey: true });
+  const { campaignId } = request.params || {};
+  if (!campaignId) {
+    throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, "Missing campaignId.");
+  }
+  const sessionToken = request.user.getSessionToken();
+  const c = await new Parse.Query("Campaign").get(campaignId, { sessionToken });
+
+  const campOrg = c.get("organization");
+  if (campOrg && org && campOrg.id !== org.id) {
+    throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, "Campaign not found.");
+  }
+
+  const status = c.get("status") || "draft";
+  if (status !== "sending" && status !== "scheduled") {
+    throw new Parse.Error(
+      Parse.Error.OPERATION_FORBIDDEN,
+      `Only a sending or scheduled campaign can be paused (this one is ${status}).`,
+    );
+  }
+  c.set("pausedFrom", status);
+  c.set("status", "paused");
+  await c.save(null, { sessionToken });
+  return { ok: true, id: c.id, status: "paused" };
+});
+
+// ── resumeCampaign ─────────────────────────────────────────────────────────────
+// Reverse a pause. Valid only when status is "paused":
+//   - if the campaign had started sending (pausedFrom === "sending", or it has a
+//     recipientCount/sentAt): flip back to "sending" and re-enqueue every
+//     remaining "queued" CampaignSend row onto the SEND_EMAIL job.
+//   - otherwise (it was paused while still "scheduled"): restore "scheduled".
+//
+// Re-enqueue uses the same Agenda producer pattern the fanout worker uses
+// (agenda.now(SEND_EMAIL, { sendId, campaignId })). Idempotent: only "queued"
+// rows are re-enqueued, and the send worker upserts terminal states, so a row
+// already sent won't be re-sent.
+//
+// Returns { ok, id, status, requeued }.
+Parse.Cloud.define("resumeCampaign", async (request) => {
+  const org = await getUserOrg(request.user, { useMasterKey: true });
+  const { campaignId } = request.params || {};
+  if (!campaignId) {
+    throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, "Missing campaignId.");
+  }
+  const sessionToken = request.user.getSessionToken();
+  const c = await new Parse.Query("Campaign").get(campaignId, { sessionToken });
+
+  const campOrg = c.get("organization");
+  if (campOrg && org && campOrg.id !== org.id) {
+    throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, "Campaign not found.");
+  }
+
+  const status = c.get("status") || "draft";
+  if (status !== "paused") {
+    throw new Parse.Error(
+      Parse.Error.OPERATION_FORBIDDEN,
+      `Only a paused campaign can be resumed (this one is ${status}).`,
+    );
+  }
+
+  const pausedFrom = c.get("pausedFrom") || null;
+  const hadStarted =
+    pausedFrom === "sending" ||
+    !!c.get("sentAt") ||
+    (c.get("recipientCount") || 0) > 0;
+
+  if (!hadStarted) {
+    // Was paused while merely scheduled → just restore the scheduled status.
+    c.set("status", "scheduled");
+    c.unset("pausedFrom");
+    await c.save(null, { sessionToken });
+    return { ok: true, id: c.id, status: "scheduled", requeued: 0 };
+  }
+
+  // Resume the in-flight send: flip to "sending" and re-enqueue the leftovers.
+  c.set("status", "sending");
+  c.unset("pausedFrom");
+  await c.save(null, { sessionToken });
+
+  // Re-enqueue every still-"queued" CampaignSend for this campaign. Org-scoped
+  // (master key — the explicit organization filter + campaign pointer isolate).
+  // Page through with skip/limit so a large remaining set re-enqueues fully.
+  const agenda = await getAgenda();
+  const PAGE = 500;
+  let requeued = 0;
+  let skip = 0;
+  for (let guard = 0; guard < 1000; guard++) {
+    const q = new Parse.Query("CampaignSend");
+    q.equalTo("organization", org);
+    q.equalTo("campaign", c);
+    q.equalTo("status", "queued");
+    q.select([]); // ids only — we only need objectId to enqueue
+    q.ascending("createdAt");
+    q.limit(PAGE);
+    q.skip(skip);
+    const rows = await q.find({ useMasterKey: true });
+    if (!rows.length) break;
+    for (const send of rows) {
+      if (agenda) {
+        await agenda.now(SEND_EMAIL, { sendId: send.id, campaignId: c.id });
+      }
+      requeued++;
+    }
+    if (rows.length < PAGE) break;
+    skip += PAGE;
+  }
+
+  return { ok: true, id: c.id, status: "sending", requeued };
 });

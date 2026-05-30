@@ -43,6 +43,14 @@ const PER_TENANT_CLASSES = [
   "Suppression",
   "CustomField",
   "SenderIdentity",
+  "SendingDomain",
+  "SuppressionAuditLog",
+  "ImportJob",
+  "Form",
+  "FormSubmission",
+  "Automation",
+  "AutomationStep",
+  "AutomationEnrollment",
 ];
 
 // The per-org members role name. One role per organization; the user(s) of that

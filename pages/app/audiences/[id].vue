@@ -8,6 +8,7 @@ import { useRoute } from "vue-router";
 import { useAudiences } from "~/composables/app/useAudiences";
 import { useContacts } from "~/composables/app/useContacts";
 import { useCustomFields } from "~/composables/app/useCustomFields";
+import ImportWizard from "~/components/app/import/ImportWizard.vue";
 
 definePageMeta({
   layout: "app",
@@ -232,6 +233,15 @@ function resetStdForm(contact) {
   tagsText.value = (contact?.tags || []).join(", ");
 }
 
+// ── CSV import wizard (F-07) ────────────────────────────────────────────────--
+const showImport = ref(false);
+function openImport() {
+  showImport.value = true;
+}
+async function onImportDone() {
+  await Promise.all([loadContacts(), loadAudience()]);
+}
+
 function openAdd() {
   formMode.value = "add";
   editingId.value = null;
@@ -431,14 +441,24 @@ const drawerCustomFields = computed(() => {
           <span v-if="audience && audience.description"> &middot; {{ audience.description }}</span>
         </p>
       </div>
-      <Button variant="primary" @click="openAdd">
-        <template #leading>
-          <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
-            <path d="M7 2.5 V11.5 M2.5 7 H11.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
-          </svg>
-        </template>
-        Add contact
-      </Button>
+      <div class="ad-header-actions">
+        <Button variant="ghost" @click="openImport">
+          <template #leading>
+            <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+              <path d="M7 9.5 V2.5 M4 5.5 L7 2.5 L10 5.5 M2.5 11.5 H11.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+            </svg>
+          </template>
+          Import CSV
+        </Button>
+        <Button variant="primary" @click="openAdd">
+          <template #leading>
+            <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+              <path d="M7 2.5 V11.5 M2.5 7 H11.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+            </svg>
+          </template>
+          Add contact
+        </Button>
+      </div>
     </header>
 
     <!-- Toolbar -->
@@ -767,6 +787,15 @@ const drawerCustomFields = computed(() => {
         </div>
       </aside>
     </div>
+
+    <!-- CSV import wizard (F-07) -->
+    <ImportWizard
+      v-if="showImport"
+      :audience-id="audienceId"
+      :custom-fields="customFields"
+      @close="showImport = false"
+      @done="onImportDone"
+    />
   </div>
 </template>
 
@@ -813,6 +842,7 @@ const drawerCustomFields = computed(() => {
   color: var(--color-ink);
 }
 .ad-lede { margin: 0; font-family: var(--font-body); font-size: var(--text-sm); color: var(--color-ink-soft); }
+.ad-header-actions { display: flex; gap: var(--space-3); align-items: center; }
 
 /* Toolbar */
 .ad-toolbar { display: flex; gap: var(--space-3); align-items: center; flex-wrap: wrap; }

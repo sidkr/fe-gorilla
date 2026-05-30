@@ -316,6 +316,85 @@ async function getOwnedCampaign(campaignId, sessionToken) {
   }
 }
 
+// ── exportCampaignRecipients ─────────────────────────────────────────────────
+// Returns the full per-recipient delivery table for a campaign as CSV TEXT.
+// Columns: email, status, deliveredAt, openedAt, clickedAt, bounceReason.
+// Reuses the same org-scoped CampaignSend query shape as getCampaignRecipients
+// (optionally filtered by `status`), but pages through ALL matching rows so the
+// export is complete. Org-guarded the same way the other report fns are.
+// Returns { filename, csv }.
+const CSV_COLUMNS = [
+  "email",
+  "status",
+  "deliveredAt",
+  "openedAt",
+  "clickedAt",
+  "bounceReason",
+];
+
+// Quote a CSV cell per RFC 4180: wrap in quotes + double embedded quotes when
+// the value contains a comma, quote, CR, or LF. Nullish → empty string.
+function csvCell(v) {
+  const s = v == null ? "" : String(v);
+  return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+function isoOrEmpty(d) {
+  return d ? d.toISOString() : "";
+}
+
+Parse.Cloud.define("exportCampaignRecipients", async (request) => {
+  const user = requireUser(request);
+  const st = user.getSessionToken();
+  const org = await getUserOrg(user, { useMasterKey: true });
+  const params = request.params || {};
+  const campaign = await getOwnedCampaign(params.campaignId, st);
+
+  const filter = typeof params.status === "string" ? params.status : "all";
+
+  const PAGE = 1000;
+  const lines = [CSV_COLUMNS.join(",")];
+  let skip = 0;
+  for (let guard = 0; guard < 1000; guard++) {
+    const q = new Parse.Query("CampaignSend");
+    q.equalTo("organization", org);
+    q.equalTo("campaign", campaign);
+    if (filter && filter !== "all") q.equalTo("status", filter);
+    q.ascending("createdAt");
+    q.limit(PAGE);
+    q.skip(skip);
+    const rows = await q.find({ sessionToken: st });
+    if (!rows.length) break;
+    for (const s of rows) {
+      lines.push(
+        [
+          csvCell(s.get("email")),
+          csvCell(s.get("status")),
+          csvCell(isoOrEmpty(s.get("deliveredAt"))),
+          csvCell(isoOrEmpty(s.get("openedAt"))),
+          // CampaignSend stores the click timestamp as lastClickedAt (see
+          // getCampaignRecipients); accept clickedAt too for forward-compat.
+          csvCell(isoOrEmpty(s.get("clickedAt") || s.get("lastClickedAt"))),
+          csvCell(s.get("bounceReason")),
+        ].join(","),
+      );
+    }
+    if (rows.length < PAGE) break;
+    skip += PAGE;
+  }
+
+  const safeName =
+    (campaign.get("name") || "campaign")
+      .replace(/[^a-z0-9]+/gi, "-")
+      .replace(/^-+|-+$/g, "")
+      .toLowerCase() || "campaign";
+
+  return {
+    filename: `${safeName}-recipients.csv`,
+    csv: lines.join("\r\n"),
+  };
+});
+
 // ── getCampaignReport ─────────────────────────────────────────────────────────
 // F-25 headline metrics for one campaign. Real where the campaign carries
 // counters (or has CampaignSend rows); graceful zeros otherwise.

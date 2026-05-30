@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { useReports } from "~/composables/app/useReports";
 import { useReportsSample } from "~/composables/app/useReportsSample";
@@ -10,7 +10,7 @@ useHead({ title: "Reports" });
 // (no sends yet) → the page drops into DEMO mode: realistic sample data behind a
 // tutorial overlay, so the user sees what Reports will look like. Demo auto-ends
 // after the first real send (campaignReports becomes non-empty) or on dismiss.
-const { reports: campaignReports, loading, error, loadSentCampaignReports } = useReports();
+const { reports: campaignReports, loading, error, loadSentCampaignReports, exportCampaignRecipients } = useReports();
 const { sample, isDismissed, dismiss } = useReportsSample();
 
 const dismissed = ref(isDismissed());
@@ -80,8 +80,52 @@ function onDismiss() {
   dismiss();
   dismissed.value = true;
 }
-function onExport() {
-  /* CSV export route not wired yet */
+// Export every listed (real) campaign's recipients into one CSV, prefixing a
+// `campaign` column so rows stay attributable across campaigns. In demo mode
+// (no real sends yet) there's nothing to export.
+const exporting = ref(false);
+async function onExport() {
+  if (demo.value || !campaignReports.value.length) return;
+  exporting.value = true;
+  try {
+    const header =
+      "campaign,email,status,deliveredAt,openedAt,clickedAt,bounceReason";
+    const parts: string[] = [header];
+    for (const r of campaignReports.value) {
+      const { csv } = await exportCampaignRecipients(r.id);
+      const lines = String(csv || "").split(/\r?\n/);
+      const camp = csvCell(r.name || "Untitled campaign");
+      // Drop the per-campaign header row; prefix the campaign on each data row.
+      for (let i = 1; i < lines.length; i++) {
+        if (!lines[i]) continue;
+        parts.push(`${camp},${lines[i]}`);
+      }
+    }
+    triggerCsvDownload("campaign-recipients.csv", parts.join("\r\n"));
+  } catch (e: any) {
+    error.value = e?.message || "Couldn't export reports.";
+  } finally {
+    exporting.value = false;
+  }
+}
+
+// RFC-4180 cell quoting (mirrors the server) for the prefixed campaign column.
+function csvCell(v: unknown) {
+  const str = v == null ? "" : String(v);
+  return /[",\r\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
+}
+
+// Browser-only CSV download with a UTF-8 BOM for spreadsheet encoding detection.
+function triggerCsvDownload(filename: string, csv: string) {
+  const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 </script>
 
@@ -92,9 +136,9 @@ function onExport() {
         <h1>Reports</h1>
         <p class="rep-lede">Campaign performance, audience health, and deliverability at a glance.</p>
       </div>
-      <Button variant="ghost" @click="onExport">
+      <Button variant="ghost" :disabled="exporting || demo" :loading="exporting" @click="onExport">
         <template #leading><Icon name="download" size="sm" /></template>
-        Export CSV
+        {{ exporting ? "Exporting…" : "Export CSV" }}
       </Button>
     </header>
 

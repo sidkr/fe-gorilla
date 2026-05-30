@@ -86,6 +86,8 @@ async function handleBounce(send, event) {
     if (bounceSubType) send.set("bounceSubType", bounceSubType);
     await writeEmailEvent(send, "bounce", event, { bounceCategory: category });
     await bumpCounter(send.get("campaign"), "bounceCount");
+    await incOrgAbuseCounter(send.get("organization"), "hardBounceCount");
+    await maybeAutoPauseOrg(send.get("organization"));
     return;
   }
 
@@ -133,6 +135,8 @@ async function handleComplaint(send, event) {
   // `unsubscribeCount` — the same bucket the explicit-unsubscribe path uses.
   // (bounceCount is reserved for actual bounces.)
   await bumpCounter(send.get("campaign"), "unsubscribeCount");
+  await incOrgAbuseCounter(send.get("organization"), "complaintCount");
+  await maybeAutoPauseOrg(send.get("organization"));
 }
 
 // Fetch the Contact pointer on the send as a full object (need softBounceCount).
@@ -141,6 +145,55 @@ async function loadContact(send) {
   if (!contactId) return null;
   const q = new Parse.Query("Contact");
   return q.get(contactId, MK);
+}
+
+// ── Org-level abuse controls (Architecture §C2 / Sending.md §15) ─────────────
+// On the shared sending domain one abusive tenant degrades deliverability for
+// everyone, so we auto-pause an org whose complaint or hard-bounce rate crosses
+// a threshold. Rates are computed against monthlySendCount; we ignore tiny
+// samples to avoid pausing on a single early bounce.
+const COMPLAINT_RATE_LIMIT = 0.001; // 0.1%
+const HARD_BOUNCE_RATE_LIMIT = 0.05; // 5%
+const MIN_VOLUME_FOR_AUTOPAUSE = 1000;
+
+async function incOrgAbuseCounter(orgPtr, field) {
+  if (!orgPtr || !orgPtr.id) return;
+  const org = Parse.Object.extend("Organization").createWithoutData(orgPtr.id);
+  org.increment(field, 1);
+  await org.save(null, MK);
+}
+
+// Pause every in-flight campaign for the org once its rate crosses a threshold.
+// Idempotent via the `sendingPaused` flag. The fanout + send-email jobs both
+// honor `sendingPaused` / campaign `paused` so queued work stops cleanly.
+async function maybeAutoPauseOrg(orgPtr) {
+  if (!orgPtr || !orgPtr.id) return;
+  const org = await new Parse.Query("Organization").get(orgPtr.id, MK);
+  if (org.get("sendingPaused")) return;
+  const sent = org.get("monthlySendCount") || 0;
+  if (sent < MIN_VOLUME_FOR_AUTOPAUSE) return;
+
+  const overComplaint = (org.get("complaintCount") || 0) / sent > COMPLAINT_RATE_LIMIT;
+  const overBounce = (org.get("hardBounceCount") || 0) / sent > HARD_BOUNCE_RATE_LIMIT;
+  if (!overComplaint && !overBounce) return;
+
+  org.set("sendingPaused", true);
+  org.set("sendingPausedReason", overComplaint ? "complaint_rate" : "hard_bounce_rate");
+  org.set("sendingPausedAt", new Date());
+  await org.save(null, MK);
+
+  const q = new Parse.Query("Campaign");
+  q.equalTo("organization", org);
+  q.containedIn("status", ["queued", "sending", "scheduled"]);
+  const campaigns = await q.find(MK);
+  for (const c of campaigns) {
+    c.set("status", "paused");
+    c.set(
+      "failureReason",
+      `Auto-paused: account ${overComplaint ? "complaint" : "hard-bounce"} rate exceeded threshold.`,
+    );
+    await c.save(null, MK);
+  }
 }
 
 async function handle({ event } = {}) {

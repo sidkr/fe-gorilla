@@ -30,6 +30,7 @@ import {
 } from "./editor-types";
 import { useAudiences, type Audience } from "~/composables/app/useAudiences";
 import { useSending } from "~/composables/app/useSending";
+import { useSettings } from "~/composables/app/useSettings";
 import { useToast, type ToastTone } from "~/composables/shared/useToast";
 import {
   type Block,
@@ -118,6 +119,21 @@ const sendRecipientCount = ref<number | null>(null);
 const sendError = ref<string>("");
 
 const { scheduleSend } = useSending();
+const { getOrgSettings } = useSettings();
+
+// Org timezone label for the schedule picker (Phase 0 §0.3). Best-effort + lazy:
+// fetched the first time the preflight gate opens, never blocks the editor, and
+// the picker falls back to the browser zone if this stays null.
+const orgTimezone = ref<string | null>(null);
+async function ensureTimezone() {
+  if (orgTimezone.value != null) return;
+  try {
+    const s = await getOrgSettings();
+    orgTimezone.value = (s && (s.timezone as string)) || null;
+  } catch {
+    /* non-fatal — picker uses the browser zone */
+  }
+}
 
 // Preview-width preference (Editor-phase1.md §7). Persists in localStorage.
 const PREVIEW_WIDTH_KEY = "gorilla_editor_preview_width";
@@ -652,10 +668,12 @@ const preflightRecipientCount = computed(() => {
 
 function onOpenSend() {
   preflightOpen.value = true;
+  void ensureTimezone();
 }
 
-async function onPreflightSend() {
+async function onPreflightSend(payload?: { when: string }) {
   if (sendInFlight.value) return;
+  const when = payload?.when || "now";
   sendInFlight.value = true;
   sendStage.value = "sending";
   sendError.value = "";
@@ -663,7 +681,8 @@ async function onPreflightSend() {
     // Flush a save first so the server compiles + sends from the latest
     // campaign state (subject, body, audience, compiledHtml).
     await save();
-    const res = await scheduleSend(props.campaign.id, "now");
+    // when === "now" sends immediately; a future ISO schedules the send.
+    const res = await scheduleSend(props.campaign.id, when);
     sendRecipientCount.value = res.recipientCount ?? null;
     sendStage.value = "sent";
     sendInFlight.value = false;
@@ -904,6 +923,7 @@ watch(
       :send-stage="sendStage"
       :send-recipient-count="sendRecipientCount"
       :send-error="sendError"
+      :timezone="orgTimezone"
       @close="onPreflightClose"
       @send="onPreflightSend"
       @send-success-done="onSendSuccessDone"

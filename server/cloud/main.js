@@ -11,6 +11,7 @@ require("./tenantHooks");
 
 require("./audiences");
 require("./contacts");
+require("./imports");
 require("./customFields");
 require("./segments");
 require("./campaigns");
@@ -18,3 +19,7 @@ require("./templates");
 require("./reports");
 require("./sending");
 require("./settings");
+require("./forms");
+require("./suppression");
+require("./domains");
+require("./automations");

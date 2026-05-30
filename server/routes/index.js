@@ -5,5 +5,7 @@ module.exports = {
   mount(app) {
     require("./tracking").mount(app);
     require("./webhooks").mount(app);
+    require("./imports").mount(app);
+    require("./forms").mount(app);
   },
 };

@@ -76,10 +76,21 @@ async function handle(data, { enqueue = defaultEnqueue } = {}) {
 
   const org = campaign.get("organization");
   const listId = campaign.get("audienceId");
-  if (!org || !listId) return { recipientCount: 0 };
+  const segmentId = campaign.get("segmentId");
+  if (!org || (!listId && !segmentId)) return { recipientCount: 0 };
 
-  // 2. Resolve audience.
-  const contacts = await fetchRecipients(org, listId);
+  // 2. Resolve audience — a Segment if the campaign targets one, else the whole
+  // List. resolveSegmentContacts already applies org scope + subscribed/not-
+  // deleted/not-unsubscribed, matching fetchRecipients, so the dedupe +
+  // suppression loop below works identically for both.
+  let contacts;
+  if (segmentId) {
+    const { resolveSegmentContacts } = require("../../cloud/segments");
+    const segment = await new Parse.Query("Segment").get(segmentId, MK);
+    contacts = await resolveSegmentContacts(segment, org);
+  } else {
+    contacts = await fetchRecipients(org, listId);
+  }
 
   // 3. Dedupe by lowercased email + drop suppressed addresses.
   const seen = new Set();
@@ -90,6 +101,32 @@ async function handle(data, { enqueue = defaultEnqueue } = {}) {
     seen.add(email);
     if (await isSuppressed(org, email)) continue;
     recipients.push({ contact, email });
+  }
+
+  // 3b. Monthly send-cap guard (Architecture §3.6). Never fan out a send that
+  // would push the org past its ceiling — fail the campaign cleanly with a
+  // human-readable reason rather than half-sending. Also refuse if the org has
+  // been auto-paused for abuse (complaint/bounce rate — see webhookIngest).
+  const orgFull = await new Parse.Query("Organization").get(org.id, MK);
+  if (orgFull.get("sendingPaused")) {
+    campaign.set("status", "paused");
+    campaign.set(
+      "failureReason",
+      `Sending paused for this account (${orgFull.get("sendingPausedReason") || "abuse controls"}).`,
+    );
+    await campaign.save(null, MK);
+    return { recipientCount: 0, paused: true };
+  }
+  const cap = orgFull.get("monthlySendCap");
+  const used = orgFull.get("monthlySendCount") || 0;
+  if (typeof cap === "number" && cap > 0 && used + recipients.length > cap) {
+    campaign.set("status", "failed");
+    campaign.set(
+      "failureReason",
+      `Monthly send cap exceeded (${used}/${cap} used; this send needs ${recipients.length}).`,
+    );
+    await campaign.save(null, MK);
+    return { recipientCount: 0, capExceeded: true };
   }
 
   // 4. Upsert a CampaignSend per recipient. Idempotent on (campaign, contact)

@@ -69,9 +69,35 @@ async function setFirst(campaignSend, field, date = new Date()) {
   return true;
 }
 
+// Flip a Campaign sending → sent once every CampaignSend has left "queued"
+// (i.e. each recipient row reached a terminal state: sent/failed/suppressed).
+// Called from the send-email job after each row is processed. Idempotent and
+// safe under the job's concurrency: the queued-count check plus the
+// status === "sending" guard mean a late/duplicate call just no-ops. Returns
+// true only on the single call that actually performs the flip.
+async function finalizeCampaignIfComplete(campaignId) {
+  const id = typeof campaignId === "string" ? campaignId : campaignId && campaignId.id;
+  if (!id) return false;
+
+  const pendingQ = new Parse.Query("CampaignSend");
+  pendingQ.equalTo("campaign", toCampaignPointer(id));
+  pendingQ.equalTo("status", "queued");
+  const pending = await pendingQ.count(MK);
+  if (pending > 0) return false;
+
+  const campaign = await new Parse.Query("Campaign").get(id, MK);
+  if (campaign.get("status") !== "sending") return false;
+
+  campaign.set("status", "sent");
+  if (!campaign.get("sentAt")) campaign.set("sentAt", new Date());
+  await campaign.save(null, MK);
+  return true;
+}
+
 module.exports = {
   bumpCounter,
   setFirst,
+  finalizeCampaignIfComplete,
   COUNTER_FIELDS,
   toCampaignPointer,
 };

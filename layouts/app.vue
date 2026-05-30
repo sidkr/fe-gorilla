@@ -87,6 +87,16 @@ async function onLogout() {
           <span class="nav-label">Campaigns</span>
         </NuxtLink>
 
+        <NuxtLink to="/app/automations" class="nav-item">
+          <span class="nav-stripe" aria-hidden="true"></span>
+          <svg class="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="6" cy="6" r="3" />
+            <circle cx="6" cy="18" r="3" />
+            <path d="M18 6a3 3 0 0 0-3 3v6a3 3 0 0 1-3 3M9 6h6" />
+          </svg>
+          <span class="nav-label">Automations</span>
+        </NuxtLink>
+
         <NuxtLink to="/app/audiences" class="nav-item">
           <span class="nav-stripe" aria-hidden="true"></span>
           <svg class="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -96,6 +106,15 @@ async function onLogout() {
             <path d="M15.5 13.8c2.8 0 5 1.6 5 4.2"/>
           </svg>
           <span class="nav-label">Audiences</span>
+        </NuxtLink>
+
+        <NuxtLink to="/app/forms" class="nav-item">
+          <span class="nav-stripe" aria-hidden="true"></span>
+          <svg class="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="4" y="3" width="16" height="18" rx="2" />
+            <path d="M8 8h8M8 12h8M8 16h4" />
+          </svg>
+          <span class="nav-label">Forms</span>
         </NuxtLink>
 
         <NuxtLink to="/app/segments" class="nav-item">
