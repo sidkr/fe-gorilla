@@ -218,4 +218,25 @@ The canonical list is exported as `PER_TENANT_CLASSES` from `server/cloud/lib/te
 
 **Cost of changing later.** Medium. These signatures are imported across six features; a breaking change is a coordinated edit. Designed to be additive (new token builders, new counter fields, new SES methods) rather than re-shaped.
 
+## #13 — Parse is the app, not the platform: keep Parse for the control plane, move the event firehose to an OLAP store (2026-05-30)
+
+**Context.** The MVP works (multi-tenant app + send pipeline on Parse Server v7 + MongoDB + Agenda). The standing question for an ambitious email platform: is Parse the right backbone at scale? An email platform is really two systems in one — a moderate-volume CRUD **control plane** (orgs, contacts metadata, campaigns, templates, segments, settings) and a high-volume **data plane** (tracking ingest, `EmailEvent`, `CampaignSend`, reporting aggregations, the send queue). The data plane is where the product's value *and* the scale pain concentrate.
+
+**Options considered.**
+- **Stay all-Parse / Mongo / Agenda.** Lowest effort. But Mongo is a mediocre analytics store; `EmailEvent` is a time-series firehose (opens/clicks/bounces → easily billions of rows). We already (a) denormalize counters on `Campaign` to dodge aggregation, (b) bypass Parse for the tracking routes (raw Express), and (c) run the worker on the Node SDK + master key — three signs the framework is the wrong abstraction for the hot paths. Agenda's Mongo-polling queue has a known throughput ceiling (DECISIONS #2). Parse-specific friction already hit: one `beforeSave`/class (worked around with the registry), ACL/CLP overhead that buys nothing on the master-key-only giant collections, LiveQuery that won't scale to many live dashboards.
+- **Re-platform everything now to Postgres + ClickHouse + a real queue.** The correct end-state architecture, but a premature rewrite that discards working code before any scale trigger.
+- **Evolve: Parse for the control plane; purpose-built systems for the firehose.** Keep Parse/Mongo for auth + CRUD (where it's strong and velocity-positive); move events + reporting to a columnar OLAP store; swap Agenda for Redis/SQS/Kafka when it bites. The codebase already has the seams (SES adapter boundary, separate worker process, raw tracking routes, denormalized counters).
+
+**Choice.** **Evolve, don't rewrite.** Treat Parse as the **app / control plane only**. The single highest-ROI scale move is putting the **event firehose into an OLAP store — ClickHouse preferred (BigQuery if fully-managed is wanted)** — and reading reports from it. Queue → Redis+BullMQ / SQS / Kafka when Agenda's ceiling is hit (#2). Long-term, if/when Parse's constraints actually hurt (relational integrity, team/ops scaling, custom-field segmentation cost), migrate the control plane to **Postgres as system-of-record (RLS multitenancy, JSONB custom fields)** — but only on a real trigger, not preemptively.
+
+**Decision triggers (act on these, not the calendar).**
+- Reporting feels slow / we keep adding denormalized counters to avoid aggregation → move events to OLAP **first** (highest ROI; it's the product's core value).
+- Fanout latency / Agenda lock contention under burst → swap the queue.
+- Segment evaluation on custom fields expensive at >~1M contacts/org → search/index layer (OpenSearch) or precomputed segment membership.
+- Backend hiring / Parse becomes an operating or recruiting tax → start the control-plane → Postgres plan.
+
+**OLAP migration shape (incremental + reversible).** (1) **Dual-write** events from the webhook/tracking handlers to both `EmailEvent` (Mongo) and ClickHouse. (2) **Backfill** history. (3) **Cut reporting reads** (`getCampaignReport` / link-breakdown / recipients) over to ClickHouse; materialized views replace the manual `bumpCounter` pattern. (4) **Stop writing** `EmailEvent` to Mongo; TTL the old. Each step is independently shippable and reversible.
+
+**Cost of changing later.** The control-plane → Postgres migration is the big lift (rewrite every query/ACL → RLS); defer it behind a real trigger. The OLAP move is **additive and reversible** (dual-write), so its cost is low and front-loaded into ingestion plumbing — not a rewrite. The SES-adapter and worker seams mean each swap is local, not systemic.
+
 <!-- Append new entries below this line. Keep the numbering monotonic. -->
