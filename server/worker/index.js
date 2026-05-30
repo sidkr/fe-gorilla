@@ -19,6 +19,13 @@ async function start() {
   require("./jobs/campaignFanout").register(agenda);
   require("./jobs/sendEmail").register(agenda);
   require("./jobs/webhookIngest").register(agenda);
+  // Growth-phase jobs (NextPhase). importCsv is enqueued on demand by the
+  // startContactImport cloud fn; automationTick.register() ALSO sets up its own
+  // recurring `agenda.every("60 seconds", …)` schedule. Both were defined but
+  // never wired into the worker — so CSV imports stayed pending and automations
+  // never ran until this registration.
+  require("./jobs/importCsv").register(agenda);
+  require("./jobs/automationTick").register(agenda);
 
   await agenda.start();
   console.log(

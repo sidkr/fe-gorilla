@@ -286,7 +286,7 @@ function stepSummary(step) {
                 <textarea v-model="inspectorDraft.html" class="bu-textarea" rows="8" placeholder="<p>Hello {{firstName}}</p>"></textarea>
               </label>
               <p class="bu-hint">
-                Merge tags like <code>{{ "{{firstName|there}}" }}</code> resolve per contact at send time.
+                Merge tags like <code v-pre>{{firstName|there}}</code> resolve per contact at send time.
                 The unsubscribe link is injected automatically.
               </p>
             </template>
