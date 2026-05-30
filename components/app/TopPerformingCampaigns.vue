@@ -35,12 +35,9 @@ function rankLabel(rank) {
 
 <template>
   <div class="tpc">
-    <div class="tpc-eyebrow">
-      <span class="tpc-eyebrow-dot" aria-hidden="true"></span>
-      <span>Top performing campaigns &middot; last 90 days</span>
-    </div>
+    <SectionEyebrow>Top performing campaigns &middot; last 90 days</SectionEyebrow>
 
-    <div class="tpc-card">
+    <Card padding="none">
       <ol class="tpc-list">
         <li
           v-for="(c, i) in campaigns"
@@ -62,7 +59,7 @@ function rankLabel(rank) {
           </div>
         </li>
       </ol>
-    </div>
+    </Card>
   </div>
 </template>
 
@@ -72,36 +69,10 @@ function rankLabel(rank) {
   flex-direction: column;
   gap: var(--space-3);
 }
-.tpc-eyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  font-family: var(--font-body);
-  font-size: var(--text-xs);
-  font-weight: 600;
-  letter-spacing: var(--tracking-wider);
-  text-transform: uppercase;
-  color: var(--color-ink-dim);
-}
-.tpc-eyebrow-dot {
-  display: inline-block;
-  width: var(--space-2);
-  height: var(--space-2);
-  background: var(--color-pop);
-  border-radius: var(--radius-pill);
-  box-shadow: 0 0 0 3px var(--color-pop-glow);
-}
-.tpc-card {
-  background: var(--color-surface);
-  border: 1px solid var(--color-rule);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
-  padding: var(--space-3) var(--space-5);
-}
 .tpc-list {
   list-style: none;
   margin: 0;
-  padding: 0;
+  padding: var(--space-3) var(--space-5);
 }
 .tpc-row {
   display: grid;

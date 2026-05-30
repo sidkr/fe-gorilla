@@ -12,16 +12,15 @@ defineProps({
 
 <template>
   <div class="qa">
-    <div class="qa-eyebrow">
-      <span class="qa-eyebrow-dot" aria-hidden="true"></span>
-      <span>Quick actions</span>
-    </div>
+    <SectionEyebrow>Quick actions</SectionEyebrow>
 
     <div class="qa-grid">
-      <NuxtLink
+      <Card
         v-for="a in actions"
         :key="a.label"
         :to="a.to"
+        interactive
+        padding="md"
         class="qa-tile"
       >
         <span class="qa-icon" aria-hidden="true">
@@ -94,7 +93,7 @@ defineProps({
           <div class="qa-label">{{ a.label }}</div>
           <div class="qa-desc">{{ a.desc }}</div>
         </div>
-      </NuxtLink>
+      </Card>
     </div>
   </div>
 </template>
@@ -105,51 +104,19 @@ defineProps({
   flex-direction: column;
   gap: var(--space-3);
 }
-.qa-eyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  font-family: var(--font-body);
-  font-size: var(--text-xs);
-  font-weight: 600;
-  letter-spacing: var(--tracking-wider);
-  text-transform: uppercase;
-  color: var(--color-ink-dim);
-}
-.qa-eyebrow-dot {
-  display: inline-block;
-  width: var(--space-2);
-  height: var(--space-2);
-  background: var(--color-pop);
-  border-radius: var(--radius-pill);
-  box-shadow: 0 0 0 3px var(--color-pop-glow);
-}
 .qa-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--space-4);
 }
-.qa-tile {
+/* Lay out the icon + text stack inside the Card body. */
+.qa-tile :deep(.card__body) {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  padding: var(--space-5);
-  background: var(--color-surface);
-  border: 1px solid var(--color-rule);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
-  text-decoration: none;
-  color: var(--color-ink);
-  transition: border-color var(--dur-base) var(--ease-out),
-              box-shadow var(--dur-base) var(--ease-out),
-              transform var(--dur-fast) var(--ease-out);
 }
 .qa-tile:hover {
   border-color: var(--color-pop);
-  box-shadow: var(--shadow-md);
-}
-.qa-tile:active {
-  transform: translateY(1px);
 }
 .qa-tile:focus-visible {
   outline: none;

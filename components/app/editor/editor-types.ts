@@ -9,13 +9,10 @@ export interface Audience {
   count: number;
 }
 
-// Mock audiences. Replace with `new Parse.Query("List")` when Audiences ships
-// (see Editor-phase1.md §2). The contract — id, name, count — stays the same.
-export const MOCK_AUDIENCES: ReadonlyArray<Audience> = [
-  { id: "a_all",        name: "All subscribers",     count: 12847 },
-  { id: "a_engaged",    name: "Engaged subscribers", count: 8234 },
-  { id: "a_newsletter", name: "Newsletter list",     count: 3201 },
-];
+// Audiences are now loaded live from the `List` class via useAudiences() in
+// AudienceSelector.vue. The `Audience` contract above (id, name, count) is the
+// shape that component maps each List row onto, so its emit contract — an
+// audience id string — is unchanged.
 
 export type SetupField =
   | "subject"

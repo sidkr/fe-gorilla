@@ -13,11 +13,12 @@ async function start() {
   initParseClient();
   const agenda = await getAgenda();
 
-  // Register job handlers via side-effect imports. Each handler calls
-  // agenda.define(...) at load time. New handlers: add a require here.
-  // require("./jobs/campaignFanout");
-  // require("./jobs/sendEmail");
-  // require("./jobs/webhookIngest");
+  // Register job handlers. Each handler module exports register(agenda) and
+  // calls agenda.define(NAME, ...) using the shared jobNames constants. New
+  // handlers: require the module and call register(agenda) here.
+  require("./jobs/campaignFanout").register(agenda);
+  require("./jobs/sendEmail").register(agenda);
+  require("./jobs/webhookIngest").register(agenda);
 
   await agenda.start();
   console.log(

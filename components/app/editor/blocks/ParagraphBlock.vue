@@ -10,6 +10,8 @@
 // in `html`.
 import { computed, nextTick, ref, watch } from "vue";
 import BrandColorPicker from "../BrandColorPicker.vue";
+import MergeTagPicker from "../MergeTagPicker.vue";
+import { insertAtCursor } from "~/composables/app/useMergeTags";
 
 interface Props {
   mode: "render" | "inspect";
@@ -36,6 +38,26 @@ const styleVars = computed(() => ({
 function patch(k: keyof Props["blockProps"], v: unknown) {
   emit("update", { [k]: v } as Partial<Props["blockProps"]>);
 }
+
+// ── Merge-tag insertion (inspect mode) ───────────────────────────────────
+// The text field is a shared <TextArea> whose root element IS the <textarea>,
+// so we capture that DOM node via a function ref for caret-aware insertion.
+const textArea = ref<HTMLTextAreaElement | null>(null);
+function setTextArea(el: unknown) {
+  textArea.value = (el && (el as { $el?: HTMLTextAreaElement }).$el)
+    ? (el as { $el: HTMLTextAreaElement }).$el
+    : (el as HTMLTextAreaElement | null);
+}
+function insertTag(token: string) {
+  const next = insertAtCursor(textArea.value, token);
+  patch("html", next);
+}
+
+const alignOptions = [
+  { label: "Left", value: "left" },
+  { label: "Center", value: "center" },
+  { label: "Right", value: "right" },
+] as const;
 
 // The contenteditable element holds the DOM-side source of truth while
 // editing. Vue's text-interpolation is suppressed in editable mode so
@@ -90,29 +112,27 @@ watch(
   </div>
 
   <div v-else class="p-inspect">
-    <label class="ins-row">
-      <span class="ins-label">Text</span>
-      <textarea
-        class="ins-textarea"
-        rows="5"
-        :value="blockProps.html"
-        @input="patch('html', ($event.target as HTMLTextAreaElement).value)"
-      ></textarea>
-    </label>
+    <div class="ins-row">
+      <span class="ins-label">
+        <span>Text</span>
+        <MergeTagPicker compact @insert="insertTag" />
+      </span>
+      <TextArea
+        :ref="setTextArea"
+        :rows="5"
+        :model-value="blockProps.html"
+        @update:model-value="patch('html', $event)"
+      />
+    </div>
 
     <div class="ins-row">
       <span class="ins-label">Align</span>
-      <div class="ins-segmented" role="group">
-        <button
-          v-for="a in ['left', 'center', 'right'] as const"
-          :key="a"
-          type="button"
-          :class="['ins-seg', { active: blockProps.align === a }]"
-          @click="patch('align', a)"
-        >
-          {{ a }}
-        </button>
-      </div>
+      <SegmentedControl
+        :options="alignOptions"
+        aria-label="Align"
+        :model-value="blockProps.align"
+        @update:model-value="patch('align', $event)"
+      />
     </div>
 
     <div class="ins-row">

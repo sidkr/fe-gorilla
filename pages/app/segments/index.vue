@@ -1,4 +1,11 @@
-<script setup>
+<script setup lang="ts">
+import {
+  useSegments,
+  type Segment,
+  type SegmentRules,
+  OPERATOR_LABELS,
+} from "~/composables/app/useSegments";
+
 definePageMeta({
   layout: "app",
   middleware: "auth-required",
@@ -6,18 +13,123 @@ definePageMeta({
 
 useHead({ title: "Segments" });
 
-// All values below are mock data. The Parse-backed segment evaluator isn't
-// live yet; when it lands we'll swap these for real queries.
-const segments = [
-  { id: "s_01", name: "Recent buyers (30d)",     audience: "All subscribers", rule: "purchased: in last 30d",                              count: 1247, lastUsed: "May 18, 2026" },
-  { id: "s_02", name: "High-value (LTV > $500)", audience: "All subscribers", rule: "ltv > 500",                                            count: 412,  lastUsed: "May 14, 2026" },
-  { id: "s_03", name: "Cart abandoners",         audience: "All subscribers", rule: "added_to_cart AND NOT purchased: in 24h",              count: 287,  lastUsed: "May 21, 2026" },
-  { id: "s_04", name: "Active in last 7d",       audience: "All subscribers", rule: "opened OR clicked: in last 7d",                        count: 3845, lastUsed: "May 21, 2026" },
-  { id: "s_05", name: "Unengaged (30d)",         audience: "All subscribers", rule: "no opens AND no clicks: in last 30d",                  count: 4613, lastUsed: "May 10, 2026" },
-  { id: "s_06", name: "Birthday this month",     audience: "All subscribers", rule: "birthday: in May",                                     count: 178,  lastUsed: "May 1, 2026"  },
-  { id: "s_07", name: "Lapsed VIPs",             audience: "VIP Members",     rule: "tier = vip AND no purchase: in last 90d",              count: 23,   lastUsed: "—"        },
-  { id: "s_08", name: "New this week",           audience: "All subscribers", rule: "createdAt: in last 7d",                                count: 89,   lastUsed: "May 19, 2026" },
-];
+const router = useRouter();
+const { listSegments, duplicateSegment, deleteSegment } = useSegments();
+
+const loading = ref(true);
+const loadError = ref("");
+const rawSegments = ref<Segment[]>([]);
+const actionError = ref("");
+const busyId = ref<string | null>(null);
+
+// Render a rule tree into the compact mono string the table column shows.
+// e.g. { op:"and", conditions:[{field:"email",operator:"contains",value:"@gmail.com"}] }
+//      → "email contains \"@gmail.com\""
+// Operator labels come from the shared map in useSegments (single source).
+const OP_LABELS = OPERATOR_LABELS;
+
+function summarizeCondition(c: { field: string; operator: string; value?: unknown }): string {
+  const op = OP_LABELS[c.operator] || c.operator;
+  if (c.operator === "is_empty" || c.operator === "is_not_empty") {
+    return `${c.field} ${op}`;
+  }
+  if (c.operator === "last_n_days") {
+    return `${c.field} in last ${c.value} days`;
+  }
+  const v =
+    typeof c.value === "string" ? `"${c.value}"` : JSON.stringify(c.value);
+  return `${c.field} ${op} ${v}`;
+}
+
+function summarizeRules(rules: SegmentRules | null): string {
+  if (!rules || !Array.isArray(rules.conditions) || rules.conditions.length === 0) {
+    return "all contacts";
+  }
+  const joiner = rules.op === "or" ? " OR " : " AND ";
+  return rules.conditions
+    .map((c) =>
+      "op" in c && (c.op === "and" || c.op === "or")
+        ? `(${summarizeRules(c as SegmentRules)})`
+        : summarizeCondition(c as { field: string; operator: string; value?: unknown }),
+    )
+    .join(joiner);
+}
+
+function formatDate(d: string | Date | null): string {
+  if (!d) return "—";
+  const date = typeof d === "string" ? new Date(d) : d;
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+// Map the cloud-fn shape → the row shape the table renders.
+const segments = computed(() =>
+  rawSegments.value.map((s) => ({
+    id: s.id,
+    name: s.name,
+    audience: s.list ? s.listName || "List" : "All subscribers",
+    rule: summarizeRules(s.rules),
+    count: s.lastCount ?? 0,
+    kind: s.kind,
+    lastUsed: formatDate(s.lastEvaluatedAt),
+    raw: s,
+  })),
+);
+
+function truncate(value: string, max: number): string {
+  if (!value) return "";
+  return value.length > max ? value.slice(0, max - 1) + "…" : value;
+}
+const fmtCount = (n: number) => new Intl.NumberFormat("en-US").format(n);
+
+async function reload() {
+  rawSegments.value = await listSegments();
+}
+
+function edit(id: string) {
+  router.push(`/app/segments/${id}`);
+}
+
+async function duplicate(seg: Segment) {
+  actionError.value = "";
+  busyId.value = seg.id;
+  try {
+    await duplicateSegment(seg);
+    await reload();
+  } catch (err) {
+    actionError.value = (err as Error)?.message || "Could not duplicate.";
+  } finally {
+    busyId.value = null;
+  }
+}
+
+async function remove(seg: Segment) {
+  if (!confirm(`Delete segment "${seg.name}"? This cannot be undone.`)) return;
+  actionError.value = "";
+  busyId.value = seg.id;
+  try {
+    await deleteSegment(seg.id);
+    await reload();
+  } catch (err) {
+    actionError.value = (err as Error)?.message || "Could not delete.";
+  } finally {
+    busyId.value = null;
+  }
+}
+
+onMounted(async () => {
+  try {
+    await reload();
+  } catch (err) {
+    loadError.value = (err as Error)?.message || "Failed to load segments.";
+  } finally {
+    loading.value = false;
+  }
+});
 </script>
 
 <template>
@@ -28,12 +140,14 @@ const segments = [
         <h1>Segments</h1>
         <p class="seg-lede">Saved slices of your audiences, sendable like a list.</p>
       </div>
-      <NuxtLink to="/app/segments/new" class="seg-cta">
-        <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
-          <path d="M7 2.5 V11.5 M2.5 7 H11.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
-        </svg>
-        <span>New segment</span>
-      </NuxtLink>
+      <Button to="/app/segments/new" variant="primary">
+        <template #leading>
+          <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+            <path d="M7 2.5 V11.5 M2.5 7 H11.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+          </svg>
+        </template>
+        New segment
+      </Button>
     </header>
 
     <!-- 2. Brief explainer card -->
@@ -62,9 +176,44 @@ const segments = [
         <span class="seg-eyebrow-dot" aria-hidden="true"></span>
         <span>All segments &middot; {{ segments.length }}</span>
       </div>
-      <div class="seg-card seg-card-flush">
-        <AppSegmentsTable :segments="segments" />
-      </div>
+      <p v-if="actionError" class="seg-state seg-state-error">{{ actionError }}</p>
+      <p v-if="loading" class="seg-state">Loading segments…</p>
+      <p v-else-if="loadError" class="seg-state seg-state-error">{{ loadError }}</p>
+      <EmptyState
+        v-else-if="segments.length === 0"
+        title="No segments yet"
+        subtitle="Create your first to slice your audience."
+      />
+      <TableShell v-else>
+        <template #head>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Rule</th>
+          <th class="tbl-num">Contacts</th>
+          <th>Last used</th>
+          <th class="tbl-actions" aria-hidden="true"></th>
+        </template>
+        <template #body>
+          <tr v-for="s in segments" :key="s.id">
+            <td class="tbl-name">
+              <NuxtLink :to="`/app/segments/${s.id}`" class="tbl-link" :title="s.name">
+                {{ truncate(s.name, 30) }}
+              </NuxtLink>
+            </td>
+            <td>
+              <Pill :tone="s.kind === 'dynamic' ? 'brand' : 'neutral'">{{ s.kind }}</Pill>
+            </td>
+            <td class="tbl-rule" :title="s.rule">{{ truncate(s.rule, 50) }}</td>
+            <td class="tbl-num tabular">{{ fmtCount(s.count) }}</td>
+            <td class="tbl-last tabular" :class="{ 'tbl-empty': s.lastUsed === '—' }">{{ s.lastUsed }}</td>
+            <td class="tbl-actions">
+              <Button variant="ghost" size="sm" :disabled="busyId === s.id" @click="edit(s.id)">Edit</Button>
+              <Button variant="ghost" size="sm" :disabled="busyId === s.id" @click="duplicate(s.raw)">Duplicate</Button>
+              <Button variant="danger" size="sm" :disabled="busyId === s.id" @click="remove(s.raw)">Delete</Button>
+            </td>
+          </tr>
+        </template>
+      </TableShell>
     </section>
   </div>
 </template>
@@ -100,36 +249,6 @@ const segments = [
   font-size: var(--text-md);
   color: var(--color-ink-soft);
 }
-.seg-cta {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-3) var(--space-5);
-  background: var(--btn-primary-bg);
-  color: var(--btn-primary-fg);
-  font-family: var(--font-body);
-  font-size: var(--text-sm);
-  font-weight: 600;
-  border-radius: var(--radius-md);
-  text-decoration: none;
-  box-shadow: var(--shadow-sm);
-  transition: background-color var(--dur-base) var(--ease-out),
-              transform var(--dur-fast) var(--ease-out),
-              box-shadow var(--dur-base) var(--ease-out);
-  white-space: nowrap;
-}
-.seg-cta:hover {
-  background: var(--btn-primary-hover);
-  box-shadow: var(--shadow-md);
-}
-.seg-cta:active {
-  transform: translateY(1px);
-}
-.seg-cta:focus-visible {
-  outline: none;
-  box-shadow: var(--shadow-pop-glow);
-}
-
 /* Sections */
 .seg-section {
   display: flex;
@@ -156,15 +275,49 @@ const segments = [
   box-shadow: 0 0 0 3px var(--color-pop-glow);
 }
 
-/* Card surfaces */
-.seg-card {
-  background: var(--color-surface);
-  border: 1px solid var(--color-rule);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
-  overflow: hidden;
+/* Loading / error states above the table */
+.seg-state {
+  margin: 0;
+  padding: var(--space-6) var(--space-5);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  color: var(--color-ink-soft);
+  text-align: center;
 }
-.seg-card-flush { padding: 0; }
+.seg-state-error {
+  color: var(--color-danger, var(--color-ink));
+}
+
+/* Cell content styling (chrome comes from <TableShell>) */
+.tbl-name {
+  font-weight: 600;
+  font-family: var(--font-display);
+  letter-spacing: var(--tracking-tight);
+}
+.tbl-link {
+  text-decoration: none;
+  color: var(--color-ink);
+}
+.tbl-link:hover { color: var(--color-pop); }
+.tbl-rule {
+  font-family: var(--font-mono);
+  color: var(--color-ink-soft);
+  max-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tbl-num, .tbl-last { font-family: var(--font-mono); }
+.tbl-num { color: var(--color-ink); }
+.tbl-last { color: var(--color-ink-soft); }
+.tbl-empty { color: var(--color-ink-dim); }
+.tabular { font-variant-numeric: tabular-nums; }
+.tbl-actions {
+  display: flex;
+  gap: var(--space-2);
+  justify-content: flex-end;
+  white-space: nowrap;
+}
 
 /* Explainer card */
 .seg-explainer {

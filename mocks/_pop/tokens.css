@@ -121,6 +121,15 @@
   --btn-ghost-border:    var(--color-rule);
   --btn-ghost-hover-bg:  var(--color-surface-2);
 
+  --btn-danger-bg:       var(--color-danger);
+  --btn-danger-fg:       #FFFFFF;
+  --btn-danger-hover:    #991B1B;
+
+  --btn-height-sm:       36px;
+  --btn-height-md:       44px;
+  --btn-height-lg:       48px;
+  --opacity-disabled:    0.55;       /* standard disabled opacity for controls */
+
   --link-color:          var(--color-pop-deep);
   --link-color-hover:    var(--color-pop);
 

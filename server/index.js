@@ -20,7 +20,7 @@ const config = {
   serverURL:   process.env.PARSE_SERVER_URL    || "http://localhost:8080/api",
   cloud:       path.join(__dirname, "cloud/main.js"),
   liveQuery: {
-    classNames: [],
+    classNames: ["Campaign"],
   },
   accountLockout: {
     duration: 5,
@@ -35,7 +35,7 @@ const config = {
 
 const api = new ParseServer(config);
 
-const port = 8080;
+const port = Number(process.env.PARSE_PORT) || 8080;
 const httpServer = require("http").createServer(app);
 
 async function start() {
@@ -71,8 +71,19 @@ async function start() {
   // `app` is already the request listener from http.createServer(app) above —
   // don't bind it again here or every request fires the middleware chain twice
   // and the second pass hits ERR_HTTP_HEADERS_SENT.
-  httpServer.listen(port, () => {
+  httpServer.listen(port, async () => {
     console.log("\x1b[36m%s\x1b[0m", `Server running at http://localhost:${port}`);
+
+    // Idempotently ensure per-tenant schemas, indexes, and CLPs exist. Runs
+    // with the master key against the now-listening REST endpoint. Never
+    // crashes boot on a benign schema/index error — logs and continues.
+    // See DECISIONS #10.
+    try {
+      const { bootstrapSchemas } = require("./cloud/lib/bootstrapSchemas");
+      await bootstrapSchemas();
+    } catch (err) {
+      console.warn("[bootstrapSchemas] non-fatal:", err && err.message);
+    }
   });
 }
 

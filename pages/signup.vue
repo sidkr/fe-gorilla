@@ -8,7 +8,7 @@ definePageMeta({
 useHead({
   title: "Sign up",
   meta: [
-    { name: "description", content: "Create your Gorilla account. Send your first email campaign in minutes — free for 10,000 emails a month." },
+    { name: "description", content: "Create your Fe-Mail Gorilla account. Send your first email campaign in minutes — free for 10,000 emails a month." },
     { name: "robots", content: "index,follow" },
   ],
   link: [
@@ -56,8 +56,8 @@ async function onSubmit() {
       name:     name.value.trim(),
       company:  company.value.trim(),
     });
-    const next = typeof route.query.next === "string" ? route.query.next : "/app/dashboard";
-    await navigateTo(next);
+    // Open-redirect guard: only honor `next` if it's a same-site app path.
+    await navigateTo(safeNextPath(route.query.next));
   } catch (err) {
     errorMsg.value = err?.message || "Sign up failed. Please try again.";
   } finally {
@@ -73,7 +73,7 @@ async function onSubmit() {
   <section class="col col-form">
     <header class="chrome">
       <div class="brand">
-        <svg class="brand-mark" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Gorilla">
+        <svg class="brand-mark" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Fe-Mail Gorilla">
           <path d="M14 22 C14 11 21 4 32 4 C43 4 50 11 50 22 L50 36 C50 47 43 56 32 60 C21 56 14 47 14 36 Z" fill="var(--color-pop)"/>
           <path d="M14 22 L50 22 L50 28 L14 28 Z" fill="var(--color-pop-deep)"/>
           <line x1="32" y1="4" x2="32" y2="22" stroke="var(--color-ink)" stroke-width="1.4" stroke-opacity="0.32"/>
@@ -84,7 +84,7 @@ async function onSubmit() {
           <rect x="36" y="33" width="9" height="2.2" rx="0.5" fill="var(--color-ink)"/>
           <path d="M22 45 L42 45 L38 53 L26 53 Z" fill="var(--color-pop-deep)"/>
         </svg>
-        <span class="wordmark">Gorilla</span>
+        <span class="wordmark">Fe-Mail Gorilla</span>
         <span class="fe-chip">Fe26</span>
       </div>
       <div class="ghost-link">Already have an account?<NuxtLink to="/login">Sign in</NuxtLink></div>
@@ -97,18 +97,14 @@ async function onSubmit() {
 
         <form class="form" @submit.prevent="onSubmit" novalidate>
           <!-- Full name -->
-          <div class="field">
-            <label for="name">Full name</label>
-            <div class="input-shell">
-              <input v-model="name" id="name" class="input" type="text" placeholder="Your name" autocomplete="name" required>
-            </div>
-          </div>
+          <FormField label="Full name" inputId="name">
+            <TextInput v-model="name" type="text" placeholder="Your name" />
+          </FormField>
 
           <!-- Work email -->
-          <div class="field">
-            <label for="email">Work email</label>
+          <FormField label="Work email" inputId="email">
             <div class="input-shell">
-              <input v-model="email" id="email" :class="['input', { 'has-affix': emailValid }]" type="email" placeholder="name@company.com" autocomplete="email" required>
+              <TextInput v-model="email" type="email" placeholder="name@company.com" :class="{ 'has-affix': emailValid }" />
               <span v-if="emailValid" class="input-affix" aria-label="valid">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <circle cx="12" cy="12" r="10" fill="var(--color-ok)"/>
@@ -116,66 +112,59 @@ async function onSubmit() {
                 </svg>
               </span>
             </div>
-          </div>
+          </FormField>
 
           <!-- Company -->
-          <div class="field">
-            <label for="company">Company name</label>
-            <div class="input-shell">
-              <input v-model="company" id="company" class="input" type="text" placeholder="Your company or brand" autocomplete="organization" required>
-            </div>
-          </div>
+          <FormField label="Company name" inputId="company">
+            <TextInput v-model="company" type="text" placeholder="Your company or brand" />
+          </FormField>
 
           <!-- Password -->
-          <div class="field">
-            <label for="password">Password</label>
-            <div class="input-shell">
-              <input v-model="password" id="password" class="input" type="password" autocomplete="new-password" minlength="8" required>
-            </div>
+          <FormField label="Password" inputId="password">
+            <TextInput v-model="password" type="password" />
             <div v-if="password.length > 0" class="strength">
               <div class="strength-bars" :aria-label="`Password strength: ${strengthLabel.toLowerCase()}`">
                 <span v-for="i in 4" :key="i" :class="['strength-bar', { on: i <= passwordStrength }]"></span>
               </div>
               <span class="strength-label">{{ strengthLabel }}</span>
             </div>
-          </div>
+          </FormField>
 
           <!-- Terms -->
-          <label class="terms">
-            <span :class="['checkbox', { checked: terms }]" :aria-checked="terms" role="checkbox" tabindex="0" @click="terms = !terms" @keydown.space.prevent="terms = !terms">
-              <svg v-if="terms" width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M5 12.5 L10 17.5 L19 7.5" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-            </span>
+          <Checkbox v-model="terms" class="terms">
             <span class="terms-label">
               I agree to the <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a>
             </span>
-          </label>
+          </Checkbox>
 
           <!-- Error -->
           <p v-if="errorMsg" class="form-error" role="alert">{{ errorMsg }}</p>
 
           <!-- Primary CTA -->
-          <button type="submit" class="btn btn-primary" :disabled="submitting" style="margin-top: var(--space-2);">
+          <Button variant="primary" size="lg" block type="submit" :loading="submitting" :disabled="submitting" style="margin-top: var(--space-2);">
             {{ submitting ? "Creating account…" : "Create account" }}
-            <svg v-if="!submitting" width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-              <path d="M5 12 H19 M13 6 L19 12 L13 18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </button>
+            <template v-if="!submitting" #trailing>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <path d="M5 12 H19 M13 6 L19 12 L13 18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </template>
+          </Button>
 
           <!-- OR divider -->
           <div class="or"><span class="or-chip">or</span></div>
 
           <!-- Google -->
-          <button type="button" class="btn btn-ghost">
-            <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-              <path d="M17.64 9.2c0-.64-.06-1.25-.17-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.79 2.72v2.26h2.9c1.7-1.56 2.69-3.86 2.69-6.62z" fill="#4285F4"/>
-              <path d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.9-2.26c-.8.54-1.83.86-3.06.86-2.35 0-4.34-1.59-5.05-3.72H.96v2.33A9 9 0 0 0 9 18z" fill="#34A853"/>
-              <path d="M3.95 10.7A5.4 5.4 0 0 1 3.66 9c0-.59.1-1.16.29-1.7V4.97H.96A9 9 0 0 0 0 9c0 1.45.35 2.82.96 4.03l2.99-2.33z" fill="#FBBC05"/>
-              <path d="M9 3.58c1.32 0 2.51.45 3.44 1.35l2.58-2.58A9 9 0 0 0 9 0 9 9 0 0 0 .96 4.97l2.99 2.33C4.66 5.17 6.65 3.58 9 3.58z" fill="#EA4335"/>
-            </svg>
+          <Button variant="ghost" size="lg" block type="button">
+            <template #leading>
+              <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <path d="M17.64 9.2c0-.64-.06-1.25-.17-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.79 2.72v2.26h2.9c1.7-1.56 2.69-3.86 2.69-6.62z" fill="#4285F4"/>
+                <path d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.9-2.26c-.8.54-1.83.86-3.06.86-2.35 0-4.34-1.59-5.05-3.72H.96v2.33A9 9 0 0 0 9 18z" fill="#34A853"/>
+                <path d="M3.95 10.7A5.4 5.4 0 0 1 3.66 9c0-.59.1-1.16.29-1.7V4.97H.96A9 9 0 0 0 0 9c0 1.45.35 2.82.96 4.03l2.99-2.33z" fill="#FBBC05"/>
+                <path d="M9 3.58c1.32 0 2.51.45 3.44 1.35l2.58-2.58A9 9 0 0 0 9 0 9 9 0 0 0 .96 4.97l2.99 2.33C4.66 5.17 6.65 3.58 9 3.58z" fill="#EA4335"/>
+              </svg>
+            </template>
             Continue with Google
-          </button>
+          </Button>
 
           <p class="micro">By creating an account you'll join 8,400+ marketers shipping iron-clad campaigns.</p>
         </form>
@@ -197,7 +186,7 @@ async function onSubmit() {
   <aside class="col col-promo">
     <div class="col-body">
       <div class="promo-wrap">
-        <span class="eyebrow"><span class="dot"></span>WHY GORILLA</span>
+        <span class="eyebrow"><span class="dot"></span>WHY FE-MAIL GORILLA</span>
 
         <h2 class="promo-h">Heavy-duty marketing tools, light on the brain.</h2>
 
@@ -253,7 +242,7 @@ async function onSubmit() {
             <svg width="14" height="14" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2l2.95 6.6 7.05.85-5.2 4.95L18.2 22 12 18.3 5.8 22l1.4-7.6L2 9.45l7.05-.85L12 2z" fill="var(--color-pop)"/></svg>
           </div>
           <blockquote class="quote-text">
-            "We switched off Mailchimp in a weekend. Best decision we made all quarter."
+            "We switched our whole stack over in a weekend. Fe-Mail Gorilla is forged for people who actually send — best decision we made all quarter."
           </blockquote>
           <div class="attrib">
             <span class="avatar" aria-hidden="true">AK</span>
@@ -380,35 +369,12 @@ async function onSubmit() {
     flex-direction: column;
     gap: var(--space-4);
   }
-  .field { display: flex; flex-direction: column; gap: var(--space-2); }
-  .field label {
-    font-family: var(--font-body);
-    font-size: var(--text-sm);
-    font-weight: 600;
-    color: var(--color-ink);
-  }
   .input-shell {
     position: relative;
     display: flex;
     align-items: center;
   }
-  .input {
-    width: 100%;
-    height: 44px;
-    padding: 0 var(--space-4);
-    font-family: var(--font-body);
-    font-size: var(--text-md);
-    color: var(--field-text);
-    background: var(--field-bg);
-    border: 1px solid var(--field-border);
-    border-radius: var(--radius-md);
-    outline: none;
-    transition: border-color var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out);
-  }
-  .input::placeholder { color: var(--field-placeholder); }
-  .input:focus { border-color: var(--field-border-focus); box-shadow: var(--shadow-pop-glow); }
-  .input.is-focus { border-color: var(--field-border-focus); box-shadow: var(--shadow-pop-glow); }
-  .input.has-affix { padding-right: 40px; }
+  .input-shell .text-input.has-affix { padding-right: 40px; }
   .input-affix {
     position: absolute;
     right: var(--space-3);
@@ -448,32 +414,8 @@ async function onSubmit() {
 
   /* ── Terms checkbox ──────────────────────────────────────────────────── */
   .terms {
-    display: flex;
     align-items: flex-start;
-    gap: var(--space-3);
     margin-top: var(--space-1);
-  }
-  .checkbox {
-    width: 18px;
-    height: 18px;
-    border-radius: var(--radius-xs);
-    background: var(--color-surface);
-    border: 1px solid var(--color-rule-strong);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    margin-top: 1px;
-    cursor: pointer;
-    transition: background var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
-  }
-  .checkbox.checked {
-    background: var(--color-pop);
-    border-color: var(--color-pop);
-  }
-  .checkbox:focus-visible {
-    outline: none;
-    box-shadow: var(--shadow-pop-glow);
   }
   .form-error {
     margin: var(--space-1) 0 0;
@@ -485,10 +427,6 @@ async function onSubmit() {
     font-family: var(--font-body);
     font-size: var(--text-sm);
     line-height: var(--leading-snug);
-  }
-  .btn:disabled {
-    opacity: 0.65;
-    cursor: not-allowed;
   }
   .terms-label {
     font-family: var(--font-body);
@@ -502,35 +440,6 @@ async function onSubmit() {
     text-underline-offset: 2px;
   }
   .terms-label a:hover { color: var(--link-color-hover); }
-
-  /* ── Buttons ─────────────────────────────────────────────────────────── */
-  .btn {
-    width: 100%;
-    height: 48px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: var(--space-2);
-    border-radius: var(--radius-md);
-    font-family: var(--font-display);
-    font-weight: 700;
-    font-size: var(--text-md);
-    cursor: pointer;
-    border: 1px solid transparent;
-    transition: background var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out);
-  }
-  .btn-primary {
-    background: var(--btn-primary-bg);
-    color: var(--btn-primary-fg);
-    box-shadow: var(--shadow-md);
-  }
-  .btn-primary:hover { background: var(--btn-primary-hover); }
-  .btn-ghost {
-    background: var(--color-surface);
-    color: var(--btn-ghost-fg);
-    border-color: var(--btn-ghost-border);
-  }
-  .btn-ghost:hover { background: var(--btn-ghost-hover-bg); }
 
   /* ── OR divider ──────────────────────────────────────────────────────── */
   .or {

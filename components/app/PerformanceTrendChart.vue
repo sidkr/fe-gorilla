@@ -70,12 +70,9 @@ const yTicks = computed(() => {
 
 <template>
   <div class="ptc">
-    <div class="ptc-eyebrow">
-      <span class="ptc-eyebrow-dot" aria-hidden="true"></span>
-      <span>Performance trend &middot; last 30 days</span>
-    </div>
+    <SectionEyebrow>Performance trend &middot; last 30 days</SectionEyebrow>
 
-    <div class="ptc-card">
+    <Card padding="md" class="ptc-card">
       <div class="ptc-head">
         <div class="ptc-legend">
           <span class="ptc-legend-item">
@@ -158,7 +155,7 @@ const yTicks = computed(() => {
           </g>
         </svg>
       </div>
-    </div>
+    </Card>
   </div>
 </template>
 
@@ -168,31 +165,7 @@ const yTicks = computed(() => {
   flex-direction: column;
   gap: var(--space-3);
 }
-.ptc-eyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  font-family: var(--font-body);
-  font-size: var(--text-xs);
-  font-weight: 600;
-  letter-spacing: var(--tracking-wider);
-  text-transform: uppercase;
-  color: var(--color-ink-dim);
-}
-.ptc-eyebrow-dot {
-  display: inline-block;
-  width: var(--space-2);
-  height: var(--space-2);
-  background: var(--color-pop);
-  border-radius: var(--radius-pill);
-  box-shadow: 0 0 0 3px var(--color-pop-glow);
-}
-.ptc-card {
-  background: var(--color-surface);
-  border: 1px solid var(--color-rule);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
-  padding: var(--space-5);
+.ptc-card :deep(.card__body) {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);

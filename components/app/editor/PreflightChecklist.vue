@@ -15,12 +15,24 @@ interface Props {
   checks: PreflightCheck[];
   // The selected audience's recipient count, for the primary CTA copy.
   recipientCount: number | null;
+  // Send pipeline state, owned by the Shell. `idle` shows the checklist;
+  // `sending` shows progress + disables the button; `sent`/`error` swap in
+  // a result panel.
+  sendStage?: "idle" | "sending" | "sent" | "error";
+  sendRecipientCount?: number | null;
+  sendError?: string;
 }
 
-const props = defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), {
+  sendStage: "idle",
+  sendRecipientCount: null,
+  sendError: "",
+});
 const emit = defineEmits<{
   (e: "close"): void;
   (e: "send"): void;
+  (e: "send-success-done"): void;
+  (e: "send-error-dismiss"): void;
   (e: "open-test-send"): void;
   (e: "edit", field: SetupField): void;
   (e: "toast", text: string): void;
@@ -40,8 +52,10 @@ const ctaLabel = computed(() => {
   return `Send to ${props.recipientCount.toLocaleString("en-US")} recipients`;
 });
 
+const sending = computed(() => props.sendStage === "sending");
+
 function onSend() {
-  if (!canSend.value) return;
+  if (!canSend.value || sending.value) return;
   emit("send");
 }
 
@@ -59,12 +73,64 @@ function onSchedule() {
   <Teleport to="body">
     <div v-if="open" class="pf-backdrop" @click.self="emit('close')">
       <div class="pf-modal" role="dialog" aria-labelledby="pf-title">
+        <!-- Success state: the send was scheduled/queued. -->
+        <div v-if="sendStage === 'sent'" class="pf-result">
+          <span class="pf-result-icon pf-result-icon--ok" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="26" height="26">
+              <path
+                d="M5 12l5 5 9-11"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </span>
+          <h2 class="pf-title">
+            Sending<template v-if="sendRecipientCount != null">
+              to {{ sendRecipientCount.toLocaleString("en-US") }}
+              recipient{{ sendRecipientCount === 1 ? "" : "s" }}</template>
+          </h2>
+          <p class="pf-result-desc">Track it in Reports.</p>
+          <div class="pf-result-actions">
+            <Button variant="primary" @click="emit('send-success-done')">
+              View campaigns
+            </Button>
+          </div>
+        </div>
+
+        <!-- Error state: the cloud fn rejected (validation or send failure). -->
+        <div v-else-if="sendStage === 'error'" class="pf-result">
+          <span class="pf-result-icon pf-result-icon--fail" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="24" height="24">
+              <path
+                d="M6 6l12 12M18 6L6 18"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.2"
+                stroke-linecap="round"
+              />
+            </svg>
+          </span>
+          <h2 class="pf-title">Couldn't send</h2>
+          <p class="pf-result-desc pf-result-desc--error">{{ sendError }}</p>
+          <div class="pf-result-actions">
+            <Button variant="ghost" @click="emit('send-error-dismiss')">
+              Back to checklist
+            </Button>
+          </div>
+        </div>
+
+        <!-- Default: the readiness checklist (also shown while sending). -->
+        <template v-else>
         <header class="pf-head">
           <h2 id="pf-title" class="pf-title">Ready to send?</h2>
           <button
             type="button"
             class="pf-close"
             aria-label="Close"
+            :disabled="sending"
             @click="emit('close')"
           >
             <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
@@ -120,47 +186,55 @@ function onSchedule() {
               <div class="pf-label">{{ check.label }}</div>
               <div class="pf-desc">{{ check.description }}</div>
             </div>
-            <button
+            <Button
               v-if="check.status === 'fail' && check.fixField"
-              type="button"
-              class="pf-edit"
+              variant="subtle"
+              size="sm"
               @click="onEdit(check.fixField)"
             >
               Edit
-              <svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true">
-                <path
-                  d="M5 12h14M13 6l6 6-6 6"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="1.8"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                />
-              </svg>
-            </button>
+              <template #trailing>
+                <svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true">
+                  <path
+                    d="M5 12h14M13 6l6 6-6 6"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.8"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+              </template>
+            </Button>
           </li>
         </ul>
 
         <footer class="pf-foot">
           <div class="pf-foot-left">
-            <button type="button" class="pf-link" @click="emit('open-test-send')">
+            <Button
+              variant="subtle"
+              size="sm"
+              :disabled="sending"
+              @click="emit('open-test-send')"
+            >
               Send a test first
-            </button>
+            </Button>
           </div>
           <div class="pf-foot-right">
-            <button type="button" class="pf-btn pf-btn--ghost" @click="onSchedule">
+            <Button variant="ghost" :disabled="sending" @click="onSchedule">
               Schedule for later
-            </button>
-            <button
-              type="button"
-              class="pf-btn pf-btn--pop"
-              :disabled="!canSend"
+            </Button>
+            <Button
+              variant="primary"
+              :disabled="!canSend || sending"
+              :loading="sending"
               @click="onSend"
             >
-              {{ ctaLabel }}
-            </button>
+              {{ sending ? "Sending…" : ctaLabel }}
+            </Button>
           </div>
         </footer>
+        </template>
       </div>
     </div>
   </Teleport>
@@ -187,6 +261,44 @@ function onSchedule() {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+}
+
+.pf-result {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: var(--space-6) var(--space-5);
+  gap: var(--space-2);
+}
+.pf-result-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-pill);
+  margin-bottom: var(--space-2);
+}
+.pf-result-icon--ok {
+  background: var(--color-ok-bg);
+  color: var(--color-ok);
+}
+.pf-result-icon--fail {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+.pf-result-desc {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-ink-soft);
+  line-height: var(--leading-snug);
+}
+.pf-result-desc--error { color: var(--color-danger); }
+.pf-result-actions {
+  margin-top: var(--space-4);
+  display: flex;
+  justify-content: center;
 }
 
 .pf-head {
@@ -272,23 +384,6 @@ function onSchedule() {
   line-height: var(--leading-snug);
 }
 
-.pf-edit {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  padding: var(--space-1) var(--space-2);
-  border: 0;
-  background: transparent;
-  color: var(--color-pop-deep);
-  font-family: var(--font-body);
-  font-size: var(--text-xs);
-  font-weight: 600;
-  cursor: pointer;
-  border-radius: var(--radius-xs);
-  flex-shrink: 0;
-}
-.pf-edit:hover { color: var(--color-pop); background: var(--color-pop-bg); }
-
 .pf-foot {
   display: flex;
   align-items: center;
@@ -300,49 +395,4 @@ function onSchedule() {
 }
 .pf-foot-left { display: flex; }
 .pf-foot-right { display: flex; gap: var(--space-2); }
-
-.pf-link {
-  background: transparent;
-  border: 0;
-  padding: 0;
-  font-family: var(--font-body);
-  font-size: var(--text-sm);
-  color: var(--link-color);
-  cursor: pointer;
-}
-.pf-link:hover { color: var(--link-color-hover); text-decoration: underline; }
-
-.pf-btn {
-  padding: var(--space-2) var(--space-4);
-  border-radius: var(--radius-md);
-  font-family: var(--font-body);
-  font-size: var(--text-sm);
-  font-weight: 600;
-  cursor: pointer;
-  border: 1px solid transparent;
-  transition: background var(--dur-fast) var(--ease-out),
-    border-color var(--dur-fast) var(--ease-out),
-    color var(--dur-fast) var(--ease-out);
-}
-.pf-btn--ghost {
-  background: var(--color-surface);
-  color: var(--color-ink);
-  border-color: var(--color-rule);
-}
-.pf-btn--ghost:hover { background: var(--color-surface-2); }
-.pf-btn--pop {
-  background: var(--btn-primary-bg);
-  color: var(--btn-primary-fg);
-  border-color: var(--btn-primary-bg);
-}
-.pf-btn--pop:hover {
-  background: var(--btn-primary-hover);
-  border-color: var(--btn-primary-hover);
-}
-.pf-btn--pop[disabled] {
-  background: var(--color-surface-sunk);
-  color: var(--color-ink-dim);
-  border-color: var(--color-rule);
-  cursor: not-allowed;
-}
 </style>

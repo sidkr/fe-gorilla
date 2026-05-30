@@ -2,9 +2,9 @@
 // AudienceCard — a single audience surface on /app/audiences.
 // Renders name, optional tag chip, contact count, growth + engagement
 // inline stats (with a tiny horizontal bar for engagement), and a footer
-// row with "last sent" + a "View →" link. The whole card is wrapped in a
-// NuxtLink so the entire surface is clickable; we treat the inner "View →"
-// as decorative-only (it's already inside the link).
+// row with "last sent" + a "View →" link. The whole card is the shared
+// <Card> primitive in interactive mode, navigating via its `to` prop, so the
+// entire surface is clickable; we treat the inner "View →" as decorative-only.
 import { computed } from "vue";
 
 const props = defineProps({
@@ -34,11 +34,11 @@ const engagementPct = computed(() => {
 </script>
 
 <template>
-  <NuxtLink :to="to" class="aud-card">
+  <Card :interactive="true" :to="to" padding="md" class="aud-card">
     <!-- Top row: name + optional tag -->
     <div class="aud-card-top">
       <h3 class="aud-card-name">{{ name }}</h3>
-      <span v-if="tag" class="aud-card-tag">{{ tag }}</span>
+      <Pill v-if="tag" tone="brand">{{ tag }}</Pill>
     </div>
 
     <!-- Big tabular contact count + label -->
@@ -101,33 +101,16 @@ const engagementPct = computed(() => {
         </svg>
       </span>
     </div>
-  </NuxtLink>
+  </Card>
 </template>
 
 <style scoped>
-.aud-card {
+/* Card chrome (surface, border, radius, shadow, hover, focus) now comes from
+   the shared <Card> primitive. We only own the inner layout here. */
+.aud-card :deep(.card__body) {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  padding: var(--space-5);
-  background: var(--color-surface);
-  border: 1px solid var(--color-rule);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
-  text-decoration: none;
-  color: inherit;
-  transition: border-color var(--dur-base) var(--ease-out),
-              box-shadow var(--dur-base) var(--ease-out),
-              transform var(--dur-fast) var(--ease-out);
-}
-.aud-card:hover {
-  border-color: var(--color-pop);
-  box-shadow: var(--shadow-md);
-}
-.aud-card:focus-visible {
-  outline: none;
-  border-color: var(--color-pop);
-  box-shadow: var(--shadow-pop-glow);
 }
 
 /* Top row */
@@ -149,19 +132,6 @@ const engagementPct = computed(() => {
   min-width: 0;
   /* Allow long names to wrap, don't push the tag off-card */
   overflow-wrap: anywhere;
-}
-.aud-card-tag {
-  flex: none;
-  padding: var(--space-1) var(--space-3);
-  background: var(--color-pop-bg);
-  color: var(--color-pop-deep);
-  border-radius: var(--radius-pill);
-  font-family: var(--font-body);
-  font-size: var(--text-xs);
-  font-weight: 600;
-  letter-spacing: var(--tracking-wide);
-  line-height: 1.2;
-  white-space: nowrap;
 }
 
 /* Big count + label */

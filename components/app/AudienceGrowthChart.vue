@@ -78,20 +78,17 @@ const ticks = computed(() => {
 
 <template>
   <div class="agc">
-    <div class="agc-eyebrow">
-      <span class="agc-eyebrow-dot" aria-hidden="true"></span>
-      <span>Audience growth &middot; last 30 days</span>
-    </div>
+    <SectionEyebrow>Audience growth &middot; last 30 days</SectionEyebrow>
 
-    <div class="agc-card">
+    <Card padding="md" class="agc-card">
       <div class="agc-head">
         <div class="agc-number">{{ total }}</div>
-        <div class="agc-delta">
+        <Pill tone="success" class="agc-delta">
           <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
             <path d="M5 1.5 L9 6 H6.2 V8.5 H3.8 V6 H1 Z" fill="currentColor" />
           </svg>
           <span>{{ deltaAbs }} &middot; {{ deltaPct }}</span>
-        </div>
+        </Pill>
       </div>
 
       <div class="agc-chart-wrap">
@@ -163,7 +160,7 @@ const ticks = computed(() => {
           </g>
         </svg>
       </div>
-    </div>
+    </Card>
   </div>
 </template>
 
@@ -173,31 +170,7 @@ const ticks = computed(() => {
   flex-direction: column;
   gap: var(--space-3);
 }
-.agc-eyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  font-family: var(--font-body);
-  font-size: var(--text-xs);
-  font-weight: 600;
-  letter-spacing: var(--tracking-wider);
-  text-transform: uppercase;
-  color: var(--color-ink-dim);
-}
-.agc-eyebrow-dot {
-  display: inline-block;
-  width: var(--space-2);
-  height: var(--space-2);
-  background: var(--color-pop);
-  border-radius: var(--radius-pill);
-  box-shadow: 0 0 0 3px var(--color-pop-glow);
-}
-.agc-card {
-  background: var(--color-surface);
-  border: 1px solid var(--color-rule);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
-  padding: var(--space-5);
+.agc-card :deep(.card__body) {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
@@ -218,18 +191,7 @@ const ticks = computed(() => {
   font-variant-numeric: tabular-nums;
 }
 .agc-delta {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  padding: var(--space-1) var(--space-3);
-  border-radius: var(--radius-pill);
-  font-family: var(--font-body);
-  font-size: var(--text-xs);
-  font-weight: 600;
   font-variant-numeric: tabular-nums;
-  line-height: 1;
-  color: var(--color-ok);
-  background: var(--color-ok-bg);
 }
 .agc-chart-wrap {
   width: 100%;

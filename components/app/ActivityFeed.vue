@@ -1,6 +1,6 @@
 <script setup>
 // Recent member events, used in the right column next to recent campaigns.
-// Avatar color rotates by event kind (subscribed / opened / clicked / bounced
+// Avatar tone rotates by event kind (subscribed / opened / clicked / bounced
 // / unsubscribed) so the feed is scannable at a glance.
 defineProps({
   events: {
@@ -12,27 +12,32 @@ defineProps({
     // }]
   },
 });
+
+// Map an event kind → Avatar tone.
+const KIND_TONE = {
+  subscribed: "success",
+  opened: "brand",
+  clicked: "info",
+  bounced: "warn",
+  unsubscribed: "danger",
+};
+function toneFor(kind) {
+  return KIND_TONE[kind] || "neutral";
+}
 </script>
 
 <template>
   <div class="af">
-    <div class="af-eyebrow">
-      <span class="af-eyebrow-dot" aria-hidden="true"></span>
-      <span>Recent activity</span>
-    </div>
+    <SectionEyebrow>Recent activity</SectionEyebrow>
 
-    <div class="af-card">
+    <Card padding="none">
       <ul class="af-list">
         <li
           v-for="(e, i) in events"
           :key="i"
           class="af-row"
         >
-          <span
-            class="af-avatar"
-            :class="`is-${e.kind}`"
-            aria-hidden="true"
-          >{{ e.initials }}</span>
+          <Avatar :tone="toneFor(e.kind)" size="md">{{ e.initials }}</Avatar>
 
           <div class="af-text">
             <div class="af-line-1">
@@ -46,20 +51,22 @@ defineProps({
         </li>
       </ul>
 
-      <NuxtLink to="/app/audiences" class="af-view-all">
-        <span>View all activity</span>
-        <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
-          <path
-            d="M2 6 H9 M6.5 2.5 L10 6 L6.5 9.5"
-            stroke="currentColor"
-            stroke-width="1.5"
-            fill="none"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          />
-        </svg>
-      </NuxtLink>
-    </div>
+      <template #footer>
+        <NuxtLink to="/app/audiences" class="af-view-all">
+          <span>View all activity</span>
+          <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+            <path
+              d="M2 6 H9 M6.5 2.5 L10 6 L6.5 9.5"
+              stroke="currentColor"
+              stroke-width="1.5"
+              fill="none"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+        </NuxtLink>
+      </template>
+    </Card>
   </div>
 </template>
 
@@ -68,33 +75,6 @@ defineProps({
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-}
-.af-eyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  font-family: var(--font-body);
-  font-size: var(--text-xs);
-  font-weight: 600;
-  letter-spacing: var(--tracking-wider);
-  text-transform: uppercase;
-  color: var(--color-ink-dim);
-}
-.af-eyebrow-dot {
-  display: inline-block;
-  width: var(--space-2);
-  height: var(--space-2);
-  background: var(--color-pop);
-  border-radius: var(--radius-pill);
-  box-shadow: 0 0 0 3px var(--color-pop-glow);
-}
-.af-card {
-  background: var(--color-surface);
-  border: 1px solid var(--color-rule);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
-  display: flex;
-  flex-direction: column;
 }
 .af-list {
   list-style: none;
@@ -111,39 +91,6 @@ defineProps({
 }
 .af-row:last-child {
   border-bottom: none;
-}
-.af-avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-pill);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--font-body);
-  font-size: var(--text-xs);
-  font-weight: 700;
-  letter-spacing: var(--tracking-wide);
-  flex: none;
-}
-.af-avatar.is-subscribed {
-  background: var(--color-pop);
-  color: var(--color-ink-on-pop);
-}
-.af-avatar.is-opened {
-  background: var(--color-ink-soft);
-  color: var(--color-ink-on-pop);
-}
-.af-avatar.is-clicked {
-  background: var(--color-pop-deep);
-  color: var(--color-ink-on-pop);
-}
-.af-avatar.is-bounced {
-  background: var(--color-warn-bg);
-  color: var(--color-warn);
-}
-.af-avatar.is-unsubscribed {
-  background: var(--color-danger-bg);
-  color: var(--color-danger);
 }
 .af-text {
   min-width: 0;
@@ -185,7 +132,7 @@ defineProps({
   align-self: center;
 }
 .af-view-all {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
@@ -195,12 +142,9 @@ defineProps({
   font-weight: 600;
   color: var(--link-color);
   text-decoration: none;
-  border-top: 1px solid var(--color-rule);
-  transition: color var(--dur-fast) var(--ease-out),
-              background-color var(--dur-fast) var(--ease-out);
+  transition: color var(--dur-fast) var(--ease-out);
 }
 .af-view-all:hover {
   color: var(--link-color-hover);
-  background: var(--color-surface-2);
 }
 </style>

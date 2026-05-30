@@ -41,8 +41,8 @@ async function onLogout() {
   <div class="app-shell">
     <aside class="app-sidebar" aria-label="Primary">
       <!-- ── Brand lockup ─────────────────────────────────────────── -->
-      <NuxtLink to="/app/dashboard" class="brand" aria-label="Gorilla home">
-        <svg class="brand-mark" width="28" height="28" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Gorilla">
+      <NuxtLink to="/app/dashboard" class="brand" aria-label="Fe-Mail Gorilla home">
+        <svg class="brand-mark" width="28" height="28" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Fe-Mail Gorilla">
           <path d="M14 22 C14 11 21 4 32 4 C43 4 50 11 50 22 L50 36 C50 47 43 56 32 60 C21 56 14 47 14 36 Z" fill="var(--color-pop)"/>
           <path d="M14 22 L50 22 L50 28 L14 28 Z" fill="var(--color-pop-deep)"/>
           <line x1="32" y1="4" x2="32" y2="22" stroke="var(--color-ink)" stroke-width="1.4" stroke-opacity="0.32"/>
@@ -53,19 +53,19 @@ async function onLogout() {
           <rect x="36" y="33" width="9" height="2.2" rx="0.5" fill="var(--color-ink)"/>
           <path d="M22 45 L42 45 L38 53 L26 53 Z" fill="var(--color-pop-deep)"/>
         </svg>
-        <span class="brand-word">Gorilla</span>
+        <span class="brand-word">Fe-Mail Gorilla</span>
         <span class="fe26" aria-label="Iron, element 26">
           <span class="num">26</span><span class="sym">Fe</span>
         </span>
       </NuxtLink>
 
       <!-- ── Primary CTA ──────────────────────────────────────────── -->
-      <NuxtLink to="/app/campaigns/new" class="cta-new">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M12 5v14M5 12h14"/>
-        </svg>
-        <span>New campaign</span>
-      </NuxtLink>
+      <div class="cta-new-wrap">
+        <Button variant="primary" block to="/app/campaigns/new">
+          <template #leading><Icon name="plus" size="sm" /></template>
+          New campaign
+        </Button>
+      </div>
 
       <!-- ── Nav links ────────────────────────────────────────────── -->
       <nav class="nav" aria-label="App sections">
@@ -127,6 +127,15 @@ async function onLogout() {
           </svg>
           <span class="nav-label">Reports</span>
         </NuxtLink>
+
+        <NuxtLink to="/app/settings" class="nav-item">
+          <span class="nav-stripe" aria-hidden="true"></span>
+          <svg class="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+          <span class="nav-label">Settings</span>
+        </NuxtLink>
       </nav>
 
       <div class="spacer" aria-hidden="true"></div>
@@ -140,14 +149,16 @@ async function onLogout() {
             <span v-if="auth.username && auth.name" class="user-email">{{ auth.username }}</span>
           </div>
         </div>
-        <button type="button" class="logout" @click="onLogout">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M15 17l5-5-5-5"/>
-            <path d="M20 12H9"/>
-            <path d="M12 20H5V4h7"/>
-          </svg>
-          <span>Log out</span>
-        </button>
+        <Button variant="ghost" block @click="onLogout">
+          <template #leading>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M15 17l5-5-5-5"/>
+              <path d="M20 12H9"/>
+              <path d="M12 20H5V4h7"/>
+            </svg>
+          </template>
+          Log out
+        </Button>
       </div>
     </aside>
 
@@ -156,6 +167,9 @@ async function onLogout() {
         <slot />
       </div>
     </main>
+
+    <!-- Global toast host (design-system) — renders the useToast() queue. -->
+    <ToastHost />
   </div>
 </template>
 
@@ -230,33 +244,8 @@ async function onLogout() {
 }
 
 /* ── Primary CTA ──────────────────────────────────────────────── */
-.cta-new {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-2);
+.cta-new-wrap {
   margin: var(--space-3) var(--space-1) var(--space-4);
-  height: 40px;
-  background: var(--btn-primary-bg);
-  color: var(--btn-primary-fg);
-  border-radius: var(--radius-md);
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: var(--text-sm);
-  letter-spacing: var(--tracking-tight);
-  text-decoration: none;
-  transition: background var(--dur-base) var(--ease-out),
-              box-shadow var(--dur-base) var(--ease-out),
-              transform var(--dur-fast) var(--ease-out);
-}
-.cta-new:hover {
-  background: var(--btn-primary-hover);
-  box-shadow: var(--shadow-sm);
-}
-.cta-new:active { transform: translateY(1px); }
-.cta-new:focus-visible {
-  outline: none;
-  box-shadow: var(--shadow-pop-glow);
 }
 
 /* ── Nav list ─────────────────────────────────────────────────── */
@@ -272,6 +261,7 @@ async function onLogout() {
   gap: var(--space-3);
   height: 40px;
   padding: 0 var(--space-3);
+  white-space: nowrap;
   border-radius: var(--radius-sm);
   text-decoration: none;
   font-family: var(--font-body);
@@ -371,32 +361,6 @@ async function onLogout() {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-/* ── Logout (ghost) ───────────────────────────────────────────── */
-.logout {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-2);
-  height: 36px;
-  padding: 0 var(--space-3);
-  border: 1px solid var(--btn-ghost-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-  color: var(--btn-ghost-fg);
-  font-family: var(--font-body);
-  font-weight: 600;
-  font-size: var(--text-sm);
-  letter-spacing: var(--tracking-tight);
-  cursor: pointer;
-  transition: background var(--dur-fast) var(--ease-out),
-              color var(--dur-fast) var(--ease-out);
-}
-.logout:hover { background: var(--btn-ghost-hover-bg); }
-.logout:focus-visible {
-  outline: none;
-  box-shadow: var(--shadow-pop-glow);
 }
 
 /* ── Main content ─────────────────────────────────────────────── */

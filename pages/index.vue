@@ -1,10 +1,11 @@
 <script setup>
 useHead({
-  title: "",  // empty so titleTemplate uses the default homepage title
+  title: "Fe-Mail Gorilla",
+  titleTemplate: null,  // use the raw title verbatim — nothing appended
   meta: [
-    { name: "description", content: "Iron-clad email marketing for senders who mean business. Design, segment, and send campaigns with 98.4% inbox placement. Free for your first 10,000 emails / month." },
-    { property: "og:title", content: "Gorilla — Email that hits like iron." },
-    { property: "og:description", content: "Iron-clad email marketing. Design, segment, and send campaigns that actually arrive." },
+    { name: "description", content: "Fe-Mail Gorilla — iron-forged email marketing for senders who mean business. Design, segment, and send campaigns with 98.4% inbox placement. Free for your first 10,000 emails / month." },
+    { property: "og:title", content: "Fe-Mail Gorilla — Email that hits like iron." },
+    { property: "og:description", content: "Fe-Mail Gorilla: iron-forged email marketing. Design, segment, and send campaigns that actually arrive." },
     { property: "og:type", content: "website" },
     { property: "og:url", content: "https://gorilla.email/" },
     { name: "twitter:card", content: "summary_large_image" },
@@ -20,22 +21,9 @@ useHead({
   <!-- ── NAV ─────────────────────────────────────────────── -->
   <nav class="nav">
     <div class="wrap nav-inner">
-      <NuxtLink to="/" class="brand" aria-label="Gorilla home">
-        <svg class="brand-mark" width="32" height="32" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Gorilla">
-          <path d="M14 22 C14 11 21 4 32 4 C43 4 50 11 50 22 L50 36 C50 47 43 56 32 60 C21 56 14 47 14 36 Z" fill="var(--color-pop)"/>
-          <path d="M14 22 L50 22 L50 28 L14 28 Z" fill="var(--color-pop-deep)"/>
-          <line x1="32" y1="4" x2="32" y2="22" stroke="var(--color-ink)" stroke-width="1.4" stroke-opacity="0.32"/>
-          <circle cx="32" cy="12" r="1.6" fill="var(--color-ink)" fill-opacity="0.55"/>
-          <circle cx="19" cy="25" r="1.4" fill="var(--color-ink)" fill-opacity="0.4"/>
-          <circle cx="45" cy="25" r="1.4" fill="var(--color-ink)" fill-opacity="0.4"/>
-          <rect x="19" y="33" width="9" height="2.2" rx="0.5" fill="var(--color-ink)"/>
-          <rect x="36" y="33" width="9" height="2.2" rx="0.5" fill="var(--color-ink)"/>
-          <path d="M22 45 L42 45 L38 53 L26 53 Z" fill="var(--color-pop-deep)"/>
-        </svg>
-        <span class="brand-word">Gorilla</span>
-        <span class="fe26" aria-label="Iron, element 26">
-          <span class="num">26</span><span class="sym">Fe</span>
-        </span>
+      <NuxtLink to="/" class="brand" aria-label="Fe-Mail Gorilla home">
+        <BrandMark :size="34" />
+        <BrandWordmark :height="34" />
       </NuxtLink>
       <ul class="nav-links">
         <li><a href="#">Product</a></li>
@@ -45,8 +33,8 @@ useHead({
         <li><a href="#">Docs</a></li>
       </ul>
       <div class="nav-cta">
-        <NuxtLink to="/login" class="nav-signin">Sign in</NuxtLink>
-        <NuxtLink to="/signup" class="btn btn-primary btn-sm">Sign up free</NuxtLink>
+        <Button variant="subtle" size="sm" to="/login">Sign in</Button>
+        <Button variant="primary" size="sm" to="/signup">Sign up free</Button>
       </div>
     </div>
   </nav>
@@ -64,13 +52,13 @@ useHead({
           <span>Iron</span>
         </div>
         <h1>Email that hits like iron.</h1>
-        <p class="lede">Design, segment, and send marketing campaigns that actually arrive. 98.4% inbox placement, real-time reporting, and a visual editor your team won't fight.</p>
+        <p class="lede">Fe-Mail Gorilla is iron-forged email marketing — design, segment, and send campaigns that actually arrive. 98.4% inbox placement, real-time reporting, and a visual editor your team won't fight.</p>
         <div class="hero-cta">
-          <NuxtLink to="/signup" class="btn btn-primary btn-lg">
+          <Button variant="primary" size="lg" to="/signup">
             Sign up free
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
-          </NuxtLink>
-          <a href="#" class="btn btn-ghost btn-lg">See live demo</a>
+            <template #trailing><Icon name="arrow-right" /></template>
+          </Button>
+          <Button variant="ghost" size="lg" href="#">See live demo</Button>
         </div>
         <p class="hero-trust">Free for your first 10,000 emails / month · no card required</p>
       </div>
@@ -100,17 +88,7 @@ useHead({
           </g>
         </svg>
         <div class="mark-wrap">
-          <svg class="brand-big" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Gorilla">
-            <path d="M14 22 C14 11 21 4 32 4 C43 4 50 11 50 22 L50 36 C50 47 43 56 32 60 C21 56 14 47 14 36 Z" fill="var(--color-pop)"/>
-            <path d="M14 22 L50 22 L50 28 L14 28 Z" fill="var(--color-pop-deep)"/>
-            <line x1="32" y1="4" x2="32" y2="22" stroke="var(--color-ink)" stroke-width="1.4" stroke-opacity="0.32"/>
-            <circle cx="32" cy="12" r="1.6" fill="var(--color-ink)" fill-opacity="0.55"/>
-            <circle cx="19" cy="25" r="1.4" fill="var(--color-ink)" fill-opacity="0.4"/>
-            <circle cx="45" cy="25" r="1.4" fill="var(--color-ink)" fill-opacity="0.4"/>
-            <rect x="19" y="33" width="9" height="2.2" rx="0.5" fill="var(--color-ink)"/>
-            <rect x="36" y="33" width="9" height="2.2" rx="0.5" fill="var(--color-ink)"/>
-            <path d="M22 45 L42 45 L38 53 L26 53 Z" fill="var(--color-pop-deep)"/>
-          </svg>
+          <BrandMark class="brand-big" />
         </div>
         <span class="stamp">Forged · Fe26</span>
       </div>
@@ -125,7 +103,7 @@ useHead({
         </div>
         <div class="stat">
           <div class="num">12M<span class="accent">+</span></div>
-          <div class="label">Emails sent through Gorilla this week</div>
+          <div class="label">Emails sent through Fe-Mail Gorilla this week</div>
         </div>
         <div class="stat">
           <div class="num">3.2<span class="accent">s</span></div>
@@ -139,7 +117,7 @@ useHead({
   <section class="block">
     <div class="wrap">
       <div class="sect-head">
-        <span class="sect-eyebrow">What you get</span>
+        <SectionEyebrow>What you get</SectionEyebrow>
         <h2>Heavy-duty tools, finally easy to use.</h2>
       </div>
       <div class="features">
@@ -184,7 +162,7 @@ useHead({
   <section class="block how">
     <div class="wrap">
       <div class="sect-head">
-        <span class="sect-eyebrow">How it works</span>
+        <SectionEyebrow>How it works</SectionEyebrow>
         <h2>Three steps. No surprises.</h2>
       </div>
       <div class="steps">
@@ -236,7 +214,7 @@ useHead({
     <div class="wrap testimonial-wrap">
       <div class="testimonial">
         <span class="qmark" aria-hidden="true">“</span>
-        <blockquote>We moved off Mailchimp in a weekend. Gorilla feels like it was built by people who actually send email.</blockquote>
+        <blockquote>We switched our whole stack over in a weekend. Fe-Mail Gorilla feels like it was forged by people who actually send email.</blockquote>
         <cite><strong>Alex K.</strong> · Head of Growth, Folkways</cite>
       </div>
 
@@ -268,10 +246,10 @@ useHead({
   <section class="final-cta">
     <div class="wrap">
       <h2>Start sending. We'll do the heavy lifting.</h2>
-      <NuxtLink to="/signup" class="btn btn-primary btn-lg">
+      <Button variant="primary" size="lg" to="/signup">
         Sign up free
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
-      </NuxtLink>
+        <template #trailing><Icon name="arrow-right" /></template>
+      </Button>
       <p class="trust">Free for your first 10,000 emails / month · no card required</p>
     </div>
   </section>
@@ -282,20 +260,10 @@ useHead({
       <div class="footer-grid">
         <div class="footer-brand">
           <a href="#" class="brand">
-            <svg class="brand-mark" width="28" height="28" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Gorilla">
-              <path d="M14 22 C14 11 21 4 32 4 C43 4 50 11 50 22 L50 36 C50 47 43 56 32 60 C21 56 14 47 14 36 Z" fill="var(--color-pop)"/>
-              <path d="M14 22 L50 22 L50 28 L14 28 Z" fill="var(--color-pop-deep)"/>
-              <line x1="32" y1="4" x2="32" y2="22" stroke="var(--color-ink)" stroke-width="1.4" stroke-opacity="0.32"/>
-              <circle cx="32" cy="12" r="1.6" fill="var(--color-ink)" fill-opacity="0.55"/>
-              <circle cx="19" cy="25" r="1.4" fill="var(--color-ink)" fill-opacity="0.4"/>
-              <circle cx="45" cy="25" r="1.4" fill="var(--color-ink)" fill-opacity="0.4"/>
-              <rect x="19" y="33" width="9" height="2.2" rx="0.5" fill="var(--color-ink)"/>
-              <rect x="36" y="33" width="9" height="2.2" rx="0.5" fill="var(--color-ink)"/>
-              <path d="M22 45 L42 45 L38 53 L26 53 Z" fill="var(--color-pop-deep)"/>
-            </svg>
-            <span class="brand-word">Gorilla</span>
+            <BrandMark :size="28" />
+            <BrandWordmark :height="28" />
           </a>
-          <p class="blurb">Iron-clad email marketing for teams that want their campaigns to actually arrive.</p>
+          <p class="blurb">Fe-Mail Gorilla — iron-forged email marketing for teams that want their campaigns to actually arrive.</p>
         </div>
         <div class="footer-col">
           <h4>Product</h4>
@@ -339,7 +307,7 @@ useHead({
         </div>
       </div>
       <div class="footer-bottom">
-        <span class="meta">© 2026 Gorilla · Forged for email</span>
+        <span class="meta">© 2026 Fe-Mail Gorilla · Forged for email</span>
         <span class="fe26" aria-label="Iron, element 26">
           <span class="num">26</span><span class="sym">Fe</span><span class="name">Iron</span>
         </span>
@@ -406,37 +374,6 @@ useHead({
       letter-spacing: var(--tracking-wider);
     }
 
-    /* ── Buttons ───────────────────────────────────────────── */
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      gap: var(--space-2);
-      height: 44px;
-      padding: 0 var(--space-5);
-      border-radius: var(--radius-md);
-      font-family: var(--font-body);
-      font-weight: 600;
-      font-size: var(--text-base);
-      letter-spacing: var(--tracking-tight);
-      transition: background var(--dur-base) var(--ease-out),
-                  color var(--dur-base) var(--ease-out),
-                  transform var(--dur-fast) var(--ease-out);
-    }
-    .btn:active { transform: translateY(1px); }
-    .btn-primary {
-      background: var(--btn-primary-bg);
-      color: var(--btn-primary-fg);
-    }
-    .btn-primary:hover { background: var(--btn-primary-hover); }
-    .btn-ghost {
-      color: var(--btn-ghost-fg);
-      border: 1px solid var(--btn-ghost-border);
-      background: var(--color-surface);
-    }
-    .btn-ghost:hover { background: var(--btn-ghost-hover-bg); }
-    .btn-sm { height: 36px; padding: 0 var(--space-4); font-size: var(--text-sm); }
-    .btn-lg { height: 52px; padding: 0 var(--space-6); font-size: var(--text-md); }
-
     /* ── Eyebrow chip (periodic-table styled) ──────────────── */
     .eyebrow {
       display: inline-flex;
@@ -459,25 +396,6 @@ useHead({
       display: inline-block;
     }
     .eyebrow .sep { color: var(--color-ink-dim); }
-
-    /* ── Section eyebrow (mono small caps with coral dot) ──── */
-    .sect-eyebrow {
-      display: inline-flex;
-      align-items: center;
-      gap: var(--space-2);
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      letter-spacing: var(--tracking-wider);
-      color: var(--color-ink-soft);
-      text-transform: uppercase;
-    }
-    .sect-eyebrow::before {
-      content: "";
-      width: 8px;
-      height: 8px;
-      background: var(--color-pop);
-      display: inline-block;
-    }
 
     /* ── Nav ───────────────────────────────────────────────── */
     .nav {
@@ -506,13 +424,7 @@ useHead({
       transition: color var(--dur-fast) var(--ease-out);
     }
     .nav-links a:hover { color: var(--color-ink); }
-    .nav-cta { display: flex; align-items: center; gap: var(--space-3); }
-    .nav-signin {
-      font-size: var(--text-sm);
-      font-weight: 500;
-      color: var(--color-ink);
-      padding: 0 var(--space-3);
-    }
+    .nav-cta { display: flex; align-items: center; gap: var(--space-3); flex-shrink: 0; }
 
     /* ── Hero ──────────────────────────────────────────────── */
     .hero {
@@ -633,7 +545,7 @@ useHead({
       padding: var(--space-9) 0;
     }
     .sect-head { margin-bottom: var(--space-7); max-width: 720px; }
-    .sect-head .sect-eyebrow { margin-bottom: var(--space-4); }
+    .sect-head .eyebrow { margin-bottom: var(--space-4); }
     .sect-head h2 {
       font-family: var(--font-display);
       font-weight: 800;
@@ -818,15 +730,6 @@ useHead({
       margin-left: auto;
       margin-right: auto;
     }
-    .final-cta .btn-primary {
-      background: var(--color-pop);
-      color: var(--color-ink-on-pop);
-      height: 56px;
-      padding: 0 var(--space-6);
-      font-size: var(--text-md);
-      font-weight: 700;
-    }
-    .final-cta .btn-primary:hover { background: var(--color-pop-deep); }
     .final-cta .trust {
       margin-top: var(--space-5);
       font-size: var(--text-sm);

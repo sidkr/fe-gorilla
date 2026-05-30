@@ -1,15 +1,37 @@
 <script setup lang="ts">
-import { MOCK_AUDIENCES, type Audience } from "./editor-types";
-// AudienceSelector — custom dropdown over MOCK_AUDIENCES. The list of
-// audiences is hardcoded for Phase 1 (Editor-phase1.md §2). When the
-// real Audiences feature ships, only the lookup source switches; this
-// component's emit contract (audience id string) stays the same.
+import { type Audience } from "./editor-types";
+// AudienceSelector — custom dropdown over the org's real audiences (the `List`
+// class), loaded once on mount via useAudiences(). Each List row is mapped onto
+// the editor's { id, name, count } Audience shape. This component's emit
+// contract (audience id string) is unchanged.
 //
 // Not using a native <select> because we want:
 //   - the count rendered next to the name in the menu items
 //   - a custom focus ring matching the Pop tokens
 //   - keyboard navigation that doesn't surface the platform UI
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
+import { useAudiences } from "~/composables/app/useAudiences";
+
+// Live audiences, loaded on mount. Until then the list is empty (the trigger
+// shows the placeholder / a previously-selected id still resolves once loaded).
+const audiences = ref<Audience[]>([]);
+const loading = ref(false);
+
+async function loadAudiences() {
+  loading.value = true;
+  try {
+    const rows = await useAudiences().listAudiences();
+    audiences.value = rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      count: r.contactCount,
+    }));
+  } catch (_) {
+    audiences.value = [];
+  } finally {
+    loading.value = false;
+  }
+}
 
 interface Props {
   modelValue: string | null; // audienceId
@@ -28,7 +50,7 @@ const triggerEl = ref<HTMLButtonElement | null>(null);
 const activeIndex = ref<number>(0);
 
 const selected = computed<Audience | null>(
-  () => MOCK_AUDIENCES.find((a) => a.id === props.modelValue) ?? null,
+  () => audiences.value.find((a) => a.id === props.modelValue) ?? null,
 );
 
 function formatCount(n: number): string {
@@ -39,7 +61,7 @@ function toggleOpen() {
   open.value = !open.value;
   if (open.value) {
     // Land focus on the currently-selected row, or the first one.
-    const idx = MOCK_AUDIENCES.findIndex((a) => a.id === props.modelValue);
+    const idx = audiences.value.findIndex((a) => a.id === props.modelValue);
     activeIndex.value = idx >= 0 ? idx : 0;
   }
 }
@@ -55,7 +77,7 @@ function onTriggerKey(e: KeyboardEvent) {
   if (e.key === "Enter" || e.key === " " || e.key === "ArrowDown") {
     e.preventDefault();
     open.value = true;
-    const idx = MOCK_AUDIENCES.findIndex((a) => a.id === props.modelValue);
+    const idx = audiences.value.findIndex((a) => a.id === props.modelValue);
     activeIndex.value = idx >= 0 ? idx : 0;
   }
 }
@@ -68,20 +90,21 @@ function onMenuKey(e: KeyboardEvent) {
     void nextTick(() => triggerEl.value?.focus());
     return;
   }
+  const len = audiences.value.length;
+  if (len === 0) return;
   if (e.key === "ArrowDown") {
     e.preventDefault();
-    activeIndex.value = (activeIndex.value + 1) % MOCK_AUDIENCES.length;
+    activeIndex.value = (activeIndex.value + 1) % len;
     return;
   }
   if (e.key === "ArrowUp") {
     e.preventDefault();
-    activeIndex.value =
-      (activeIndex.value - 1 + MOCK_AUDIENCES.length) % MOCK_AUDIENCES.length;
+    activeIndex.value = (activeIndex.value - 1 + len) % len;
     return;
   }
   if (e.key === "Enter" || e.key === " ") {
     e.preventDefault();
-    choose(MOCK_AUDIENCES[activeIndex.value]);
+    choose(audiences.value[activeIndex.value]);
   }
 }
 
@@ -95,6 +118,7 @@ function onClickOutside(e: MouseEvent) {
 
 onMounted(() => {
   document.addEventListener("mousedown", onClickOutside);
+  void loadAudiences();
   if (props.autofocus) {
     void nextTick(() => triggerEl.value?.focus());
   }
@@ -131,16 +155,7 @@ defineExpose({ focus: () => triggerEl.value?.focus() });
         <span class="aud-count">{{ formatCount(selected.count) }}</span>
       </span>
       <span v-else class="aud-trigger-placeholder">Choose an audience</span>
-      <svg class="aud-caret" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
-        <path
-          d="M6 9l6 6 6-6"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.8"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        />
-      </svg>
+      <Icon name="chevron-down" :size="14" class="aud-caret" />
     </button>
 
     <ul
@@ -150,7 +165,19 @@ defineExpose({ focus: () => triggerEl.value?.focus() });
       :aria-activedescendant="`aud-opt-${activeIndex}`"
     >
       <li
-        v-for="(a, i) in MOCK_AUDIENCES"
+        v-if="audiences.length === 0"
+        class="aud-opt aud-opt--empty"
+        role="option"
+        aria-disabled="true"
+        :aria-selected="false"
+      >
+        <span class="aud-opt-text">
+          <span class="aud-name">{{ loading ? "Loading audiences…" : "No audiences yet" }}</span>
+          <span class="aud-opt-meta">Create one on the Audiences page</span>
+        </span>
+      </li>
+      <li
+        v-for="(a, i) in audiences"
         :key="a.id"
         :id="`aud-opt-${i}`"
         role="option"
@@ -166,23 +193,12 @@ defineExpose({ focus: () => triggerEl.value?.focus() });
           <span class="aud-name">{{ a.name }}</span>
           <span class="aud-opt-meta">{{ formatCount(a.count) }} contacts</span>
         </span>
-        <svg
+        <Icon
           v-if="a.id === modelValue"
-          viewBox="0 0 24 24"
-          width="14"
-          height="14"
-          aria-hidden="true"
+          name="check"
+          :size="14"
           class="aud-opt-check"
-        >
-          <path
-            d="M5 12l5 5 9-11"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          />
-        </svg>
+        />
       </li>
     </ul>
   </div>
@@ -239,6 +255,7 @@ defineExpose({ focus: () => triggerEl.value?.focus() });
 }
 .aud-trigger-placeholder {
   color: var(--field-placeholder);
+  white-space: nowrap;
 }
 .aud-caret {
   color: var(--color-ink-dim);
@@ -291,5 +308,8 @@ defineExpose({ focus: () => triggerEl.value?.focus() });
 .aud-opt-check {
   color: var(--color-ink-soft);
   flex-shrink: 0;
+}
+.aud-opt--empty {
+  cursor: default;
 }
 </style>

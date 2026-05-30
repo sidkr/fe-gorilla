@@ -50,6 +50,11 @@ const statusKind = computed<"saving" | "dirty" | "saved" | "none">(() => {
 
 const displayName = computed(() => props.name || "Untitled campaign");
 
+const previewWidthOptions = [
+  { label: "Desktop", value: "desktop" },
+  { label: "Mobile", value: "mobile" },
+];
+
 function humanizeElapsed(ms: number): string {
   if (ms < 5000) return "just now";
   const s = Math.round(ms / 1000);
@@ -83,16 +88,7 @@ function onSetupClick(e: MouseEvent) {
         aria-label="Back to campaigns"
         @click="emit('back')"
       >
-        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-          <path
-            d="M15 6l-6 6 6 6"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.8"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          />
-        </svg>
+        <Icon name="back" size="sm" />
       </button>
       <!-- Name is a click-target into the Setup popover (the popover owns
            the actual edit field per Editor-phase1.md §1). -->
@@ -103,16 +99,7 @@ function onSetupClick(e: MouseEvent) {
         @click="onSetupClick"
       >
         <span class="topbar-name-text">{{ displayName }}</span>
-        <svg viewBox="0 0 24 24" width="14" height="14" class="topbar-name-caret" aria-hidden="true">
-          <path
-            d="M6 9l6 6 6-6"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.8"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          />
-        </svg>
+        <Icon name="chevron-down" :size="14" class="topbar-name-caret" />
       </button>
       <span :class="['topbar-status', `topbar-status--${statusKind}`]">
         <span class="topbar-status-dot" aria-hidden="true"></span>
@@ -122,32 +109,12 @@ function onSetupClick(e: MouseEvent) {
 
     <div class="topbar-center">
       <!-- Desktop/Mobile preview width toggle (Editor-phase1.md §7). -->
-      <div class="topbar-segmented" role="group" aria-label="Preview width">
-        <button
-          type="button"
-          :class="['topbar-seg', { 'topbar-seg--active': previewWidth === 'desktop' }]"
-          :aria-pressed="previewWidth === 'desktop'"
-          @click="emit('update:previewWidth', 'desktop')"
-        >
-          <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
-            <rect x="3" y="5" width="18" height="12" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.6" />
-            <path d="M8 21h8M12 17v4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
-          </svg>
-          Desktop
-        </button>
-        <button
-          type="button"
-          :class="['topbar-seg', { 'topbar-seg--active': previewWidth === 'mobile' }]"
-          :aria-pressed="previewWidth === 'mobile'"
-          @click="emit('update:previewWidth', 'mobile')"
-        >
-          <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
-            <rect x="7" y="3" width="10" height="18" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.6" />
-            <path d="M11 18h2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
-          </svg>
-          Mobile
-        </button>
-      </div>
+      <SegmentedControl
+        :model-value="previewWidth"
+        :options="previewWidthOptions"
+        aria-label="Preview width"
+        @update:model-value="emit('update:previewWidth', $event)"
+      />
     </div>
 
     <div class="topbar-actions">
@@ -162,16 +129,7 @@ function onSetupClick(e: MouseEvent) {
           :disabled="!canUndo"
           @click="emit('undo')"
         >
-          <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
-            <path
-              d="M9 14l-5-5 5-5M4 9h9a6 6 0 0 1 0 12h-3"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.8"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
-          </svg>
+          <Icon name="undo" :size="14" />
         </button>
         <button
           type="button"
@@ -181,33 +139,14 @@ function onSetupClick(e: MouseEvent) {
           :disabled="!canRedo"
           @click="emit('redo')"
         >
-          <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
-            <path
-              d="M15 14l5-5-5-5M20 9h-9a6 6 0 0 0 0 12h3"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.8"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
-          </svg>
+          <Icon name="redo" :size="14" />
         </button>
       </div>
-      <button type="button" class="btn btn--ghost" @click="onSetupClick">
-        Setup
-      </button>
-      <button type="button" class="btn btn--ghost" @click="emit('save')">
-        Save draft
-      </button>
-      <button type="button" class="btn btn--ghost" @click="onTestSendClick">
-        Test send
-      </button>
-      <button type="button" class="btn btn--ghost" @click="emit('open-preview')">
-        Preview
-      </button>
-      <button type="button" class="btn btn--pop" @click="emit('open-send')">
-        Send
-      </button>
+      <Button variant="ghost" size="sm" @click="onSetupClick">Setup</Button>
+      <Button variant="ghost" size="sm" @click="emit('save')">Save draft</Button>
+      <Button variant="ghost" size="sm" @click="onTestSendClick">Test send</Button>
+      <Button variant="ghost" size="sm" @click="emit('open-preview')">Preview</Button>
+      <Button variant="primary" size="sm" @click="emit('open-send')">Send</Button>
     </div>
   </header>
 </template>
@@ -309,38 +248,6 @@ function onSetupClick(e: MouseEvent) {
   align-items: center;
   flex-shrink: 0;
 }
-.topbar-segmented {
-  display: inline-flex;
-  border: 1px solid var(--color-rule);
-  border-radius: var(--radius-md);
-  overflow: hidden;
-  background: var(--color-surface);
-}
-.topbar-seg {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1-5);
-  padding: var(--space-1-5) var(--space-3);
-  background: var(--color-surface);
-  border: 0;
-  border-right: 1px solid var(--color-rule);
-  color: var(--color-ink-soft);
-  font-family: var(--font-body);
-  font-size: var(--text-xs);
-  font-weight: 600;
-  cursor: pointer;
-  transition: background var(--dur-fast) var(--ease-out),
-    color var(--dur-fast) var(--ease-out);
-}
-.topbar-seg:last-child { border-right: 0; }
-.topbar-seg:hover {
-  background: var(--color-surface-2);
-  color: var(--color-ink);
-}
-.topbar-seg--active {
-  background: var(--color-pop-bg);
-  color: var(--color-ink);
-}
 
 .topbar-actions {
   display: flex;
@@ -377,39 +284,5 @@ function onSetupClick(e: MouseEvent) {
   color: var(--color-ink-dim);
   opacity: 0.45;
   cursor: not-allowed;
-}
-
-.btn {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-4);
-  height: 36px;
-  border-radius: var(--radius-md);
-  font-family: var(--font-body);
-  font-size: var(--text-sm);
-  font-weight: 600;
-  cursor: pointer;
-  transition: background var(--dur-fast) var(--ease-out),
-    border-color var(--dur-fast) var(--ease-out),
-    color var(--dur-fast) var(--ease-out);
-}
-.btn--ghost {
-  background: var(--color-surface);
-  color: var(--btn-ghost-fg);
-  border: 1px solid var(--btn-ghost-border);
-}
-.btn--ghost:hover {
-  background: var(--btn-ghost-hover-bg);
-  border-color: var(--color-rule-strong);
-}
-.btn--pop {
-  background: var(--btn-primary-bg);
-  color: var(--btn-primary-fg);
-  border: 1px solid var(--btn-primary-bg);
-}
-.btn--pop:hover {
-  background: var(--btn-primary-hover);
-  border-color: var(--btn-primary-hover);
 }
 </style>

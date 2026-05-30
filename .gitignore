@@ -14,3 +14,7 @@ test-results
 .DS_Store
 .vscode
 .idea
+
+# Machine-specific / transient Claude Code state
+.claude/settings.local.json
+.claude/scheduled_tasks.lock

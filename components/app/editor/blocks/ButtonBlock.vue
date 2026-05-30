@@ -1,8 +1,10 @@
 <script setup lang="ts">
 // ButtonBlock — CTA. The canvas renders it as a real-looking pill so
 // the user gets immediate visual feedback when adjusting bg/fg/radius.
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import BrandColorPicker from "../BrandColorPicker.vue";
+import MergeTagPicker from "../MergeTagPicker.vue";
+import { insertAtCursor } from "~/composables/app/useMergeTags";
 
 interface Props {
   mode: "render" | "inspect";
@@ -35,6 +37,26 @@ const styleVars = computed(() => ({
 function patch(k: keyof Props["blockProps"], v: unknown) {
   emit("update", { [k]: v } as Partial<Props["blockProps"]>);
 }
+
+// ── Merge-tag insertion (inspect mode) ───────────────────────────────────
+// The label field is a shared <TextInput> whose root element IS the <input>,
+// so we capture that DOM node via a function ref for caret-aware insertion.
+const labelInput = ref<HTMLInputElement | null>(null);
+function setLabelInput(el: unknown) {
+  labelInput.value = (el && (el as { $el?: HTMLInputElement }).$el)
+    ? (el as { $el: HTMLInputElement }).$el
+    : (el as HTMLInputElement | null);
+}
+function insertTag(token: string) {
+  const next = insertAtCursor(labelInput.value, token);
+  patch("label", next);
+}
+
+const alignOptions = [
+  { label: "Left", value: "left" },
+  { label: "Center", value: "center" },
+  { label: "Right", value: "right" },
+] as const;
 </script>
 
 <template>
@@ -48,24 +70,26 @@ function patch(k: keyof Props["blockProps"], v: unknown) {
   </div>
 
   <div v-else class="btn-inspect">
-    <label class="ins-row">
-      <span class="ins-label">Label</span>
-      <input
+    <div class="ins-row">
+      <span class="ins-label">
+        <span>Label</span>
+        <MergeTagPicker compact @insert="insertTag" />
+      </span>
+      <TextInput
+        :ref="setLabelInput"
         type="text"
-        class="ins-input"
-        :value="blockProps.label"
-        @input="patch('label', ($event.target as HTMLInputElement).value)"
+        :model-value="blockProps.label"
+        @update:model-value="patch('label', $event)"
       />
-    </label>
+    </div>
 
     <label class="ins-row">
       <span class="ins-label">Link URL</span>
-      <input
+      <TextInput
         type="url"
-        class="ins-input"
         placeholder="https://…"
-        :value="blockProps.href"
-        @input="patch('href', ($event.target as HTMLInputElement).value)"
+        :model-value="blockProps.href"
+        @update:model-value="patch('href', $event)"
       />
     </label>
 
@@ -87,17 +111,12 @@ function patch(k: keyof Props["blockProps"], v: unknown) {
 
     <div class="ins-row">
       <span class="ins-label">Align</span>
-      <div class="ins-segmented" role="group">
-        <button
-          v-for="a in ['left', 'center', 'right'] as const"
-          :key="a"
-          type="button"
-          :class="['ins-seg', { active: blockProps.align === a }]"
-          @click="patch('align', a)"
-        >
-          {{ a }}
-        </button>
-      </div>
+      <SegmentedControl
+        :options="alignOptions"
+        aria-label="Align"
+        :model-value="blockProps.align"
+        @update:model-value="patch('align', $event)"
+      />
     </div>
 
     <label class="ins-row">

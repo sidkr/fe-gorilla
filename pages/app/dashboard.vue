@@ -1,5 +1,7 @@
 <script setup>
+import { computed, onMounted } from "vue";
 import { useAuthStore } from "~/stores/auth";
+import { useDashboard } from "~/composables/app/useDashboard";
 
 definePageMeta({
   layout: "app",
@@ -10,66 +12,144 @@ useHead({ title: "Dashboard" });
 
 const auth = useAuthStore();
 
-// All values below are mock data. The Parse send pipeline isn't live yet;
-// when it lands we'll swap these for real queries / cloud functions.
-const kpis = [
-  { label: "Active campaigns",    value: "3",      delta: "+1 vs last week",      deltaDirection: "up" },
-  { label: "Subscribers",         value: "12,847", delta: "+342 in last 30d",     deltaDirection: "up" },
-  { label: "Avg open rate (30d)", value: "46.4%",  delta: "+2.1pp vs prev 30d",   deltaDirection: "up" },
-  { label: "Avg click rate (30d)",value: "8.9%",   delta: "−0.3pp vs prev 30d", deltaDirection: "down" },
+// Real org-scoped metrics from the `getDashboardMetrics` cloud function.
+// Audiences / contacts / campaigns-by-status are real from day one; engagement
+// totals (sent/opens/clicks) are 0 until the send pipeline lands — the widgets
+// below render graceful empty states in that case.
+const { metrics, loading, error, load, showOnboarding, dismissOnboarding } =
+  useDashboard();
+onMounted(load);
+
+// ── Onboarding checklist ──────────────────────────────────────────────────────
+// Driven entirely by real org state (metrics.onboarding.steps). Each entry links
+// the incomplete step to the route where the user completes it. The whole card
+// hides when every step is done (showOnboarding from the composable) or the user
+// dismisses it. We render all steps (done + not), so users see progress.
+const ONBOARDING_STEPS = [
+  {
+    key: "senderIdentity",
+    label: "Set a default from-email",
+    desc: "Tell us which verified address your campaigns send from.",
+    to: "/app/settings",
+    cta: "Go to settings",
+  },
+  {
+    key: "audience",
+    label: "Create your first audience",
+    desc: "An audience is a list of people you email.",
+    to: "/app/audiences",
+    cta: "Create audience",
+  },
+  {
+    key: "contact",
+    label: "Add some contacts",
+    desc: "Import subscribers or add them by hand.",
+    to: "/app/audiences",
+    cta: "Add contacts",
+  },
+  {
+    key: "campaign",
+    label: "Build a campaign",
+    desc: "Compose an email and pick who receives it.",
+    to: "/app/campaigns/new",
+    cta: "New campaign",
+  },
+  {
+    key: "sent",
+    label: "Send your first campaign",
+    desc: "Hit send (or schedule) to reach your audience.",
+    to: "/app/campaigns/new",
+    cta: "Compose & send",
+  },
 ];
 
-const funnelStages = [
-  { name: "Sent",      count: 12847, pct: "100%" },
-  { name: "Delivered", count: 12612, pct: "98.2%" },
-  { name: "Opened",    count: 5847,  pct: "45.5%" },
-  { name: "Clicked",   count: 1124,  pct: "8.7%" },
-  { name: "Converted", count: 287,   pct: "2.2%" },
-];
+const onboardingSteps = computed(() => {
+  const steps = metrics.value?.onboarding?.steps || {};
+  return ONBOARDING_STEPS.map((s) => ({ ...s, done: !!steps[s.key] }));
+});
+const onboardingDoneCount = computed(
+  () => onboardingSteps.value.filter((s) => s.done).length,
+);
 
-const recentCampaigns = [
-  { id: "c_1", name: "Spring Sale 2026 — Early Access", status: "Sent", sent: "May 18, 2026", openRate: "46.4%", clickRate: "8.9%" },
-  { id: "c_2", name: "April Refresh",                          status: "Sent", sent: "Apr 22, 2026", openRate: "41.2%", clickRate: "7.6%" },
-  { id: "c_3", name: "Member-only Drop",                       status: "Sent", sent: "Mar 30, 2026", openRate: "52.1%", clickRate: "11.4%" },
-  { id: "c_4", name: "Loyalty Program Update",                 status: "Sent", sent: "Mar 15, 2026", openRate: "38.7%", clickRate: "5.2%" },
-  { id: "c_5", name: "February Newsletter",                    status: "Sent", sent: "Feb 14, 2026", openRate: "44.3%", clickRate: "8.1%" },
-];
+// ── Formatters ────────────────────────────────────────────────────────────--
+function fmtNum(n) {
+  return Number(n || 0).toLocaleString("en-US");
+}
+function fmtPct(fraction) {
+  return `${((fraction || 0) * 100).toFixed(1)}%`;
+}
 
-// 30 daily subscriber counts, oldest → newest. Mostly upward trend with
-// small day-to-day jitter so the chart reads as organic, not synthetic.
-const audienceGrowthPoints = [
-  12505, 12511, 12518, 12522, 12530, 12537, 12541, 12548, 12554, 12559,
-  12568, 12575, 12579, 12586, 12591, 12597, 12606, 12612, 12618, 12626,
-  12633, 12641, 12649, 12658, 12664, 12671, 12679, 12695, 12731, 12847,
-];
+// ── KPI strip ─────────────────────────────────────────────────────────────--
+// Active campaigns = sending + scheduled. Subscribers = subscribed contacts.
+// Open/click rates are lifetime, computed by the cloud fn; show "—" delta since
+// we have no prior-period comparison until the pipeline records history.
+const kpis = computed(() => {
+  const m = metrics.value;
+  const byStatus = m?.campaigns?.byStatus || {};
+  const active = (byStatus.sending || 0) + (byStatus.scheduled || 0);
+  return [
+    { label: "Active campaigns",     value: fmtNum(active),                          delta: `${fmtNum(m?.campaigns?.total || 0)} total`, deltaDirection: "neutral" },
+    { label: "Subscribers",          value: fmtNum(m?.contacts?.subscribed || 0),    delta: `${fmtNum(m?.contacts?.total || 0)} contacts`, deltaDirection: "neutral" },
+    { label: "Avg open rate",        value: fmtPct(m?.rates?.open),                  delta: "lifetime", deltaDirection: "neutral" },
+    { label: "Avg click rate",       value: fmtPct(m?.rates?.click),                 delta: "lifetime", deltaDirection: "neutral" },
+  ];
+});
 
-const engagementSlices = [
-  { label: "Engaged",          count: 8234, countLabel: "8,234", pct: 64, kind: "pop" },
-  { label: "Unengaged",        count: 3201, countLabel: "3,201", pct: 25, kind: "soft" },
-  { label: "New (last 30d)",   count: 1412, countLabel: "1,412", pct: 11, kind: "new" },
-];
+// ── Funnel ───────────────────────────────────────────────────────────────--
+// Built from lifetime totals. The component derives step rates + bar heights;
+// at all-zero it renders the empty bars cleanly (MIN_BAR_HEIGHT_PCT floor).
+const funnelStages = computed(() => {
+  const t = metrics.value?.totals || { sent: 0, delivered: 0, opens: 0, clicks: 0 };
+  const pctOfSent = (n) => (t.sent ? `${((n / t.sent) * 100).toFixed(1)}%` : "0%");
+  return [
+    { name: "Sent",      count: t.sent,      pct: pctOfSent(t.sent) },
+    { name: "Delivered", count: t.delivered, pct: pctOfSent(t.delivered) },
+    { name: "Opened",    count: t.opens,     pct: pctOfSent(t.opens) },
+    { name: "Clicked",   count: t.clicks,    pct: pctOfSent(t.clicks) },
+  ];
+});
 
-const activityEvents = [
-  { initials: "MR", kind: "subscribed",   actor: "Maria Rodriguez", action: "subscribed",   detail: "via /pricing",                time: "12m ago" },
-  { initials: "AC", kind: "clicked",      actor: "Alex Chen",       action: "clicked",      detail: "Spring Sale → /featured",     time: "18m ago" },
-  { initials: "JW", kind: "bounced",      actor: "James Wright",    action: "bounced",      detail: "hard bounce · gmail.com",     time: "21m ago" },
-  { initials: "SK", kind: "opened",       actor: "Sienna Khan",     action: "opened",       detail: "\"February Newsletter\"",     time: "34m ago" },
-  { initials: "PD", kind: "unsubscribed", actor: "Priya Desai",     action: "unsubscribed", detail: "from \"Spring Sale\"",        time: "47m ago" },
-  { initials: "RT", kind: "clicked",      actor: "Ryan Tran",       action: "clicked",      detail: "\"/sale/under-50\"",          time: "51m ago" },
-  { initials: "ML", kind: "opened",       actor: "Maria Lopez",     action: "opened",       detail: "\"April Refresh\"",           time: "1h ago" },
-  { initials: "DT", kind: "subscribed",   actor: "David Tran",      action: "subscribed",   detail: "via /signup",                 time: "1h ago" },
-];
+// ── Audience growth ─────────────────────────────────────────────────────────
+// Per-day subscriber history needs an events rollup that doesn't exist yet, so
+// we render a flat line at the current subscriber count (honest: no synthetic
+// trend). When the rollup lands this becomes a real series. deltaAbs is blank
+// because we have no prior point to diff against.
+const subscriberCount = computed(() => metrics.value?.contacts?.subscribed || 0);
+const audienceGrowthPoints = computed(() => Array(30).fill(subscriberCount.value));
 
-const topCampaigns = [
-  { rank: 1, name: "Member-only Drop",                    openRate: 52.1 },
-  { rank: 2, name: "Spring Sale 2026 — Early Access",     openRate: 46.4 },
-  { rank: 3, name: "February Newsletter",                 openRate: 44.3 },
-];
+// ── Engagement donut ─────────────────────────────────────────────────────────
+// Real split of subscribed vs everyone else. Engaged/unengaged segmentation
+// needs per-contact engagement scoring (pipeline), so for now we show
+// Subscribed vs Other (unsubscribed/bounced/etc.) — both real counts.
+const engagementSlices = computed(() => {
+  const total = metrics.value?.contacts?.total || 0;
+  const subscribed = metrics.value?.contacts?.subscribed || 0;
+  const other = Math.max(total - subscribed, 0);
+  const pct = (n) => (total ? Math.round((n / total) * 100) : 0);
+  return [
+    { label: "Subscribed", count: subscribed, countLabel: fmtNum(subscribed), pct: pct(subscribed), kind: "pop" },
+    { label: "Other",      count: other,      countLabel: fmtNum(other),      pct: pct(other),      kind: "soft" },
+  ];
+});
+const engagementTotal = computed(() => fmtNum(metrics.value?.contacts?.total || 0));
 
+// Recent campaigns + activity feed + top performers need per-campaign report
+// rows and an event stream — all empty until sends happen. Show empty arrays so
+// the components render their empty states rather than fabricated rows.
+const recentCampaigns = [];
+const activityEvents = [];
+const topCampaigns = [];
+
+// Quick actions — every `to` is a real, existing route. New campaign and Build a
+// segment go straight to their create flows (/app/campaigns/new, the segment
+// builder at /app/segments/new which the [id] page handles as id==="new").
+// Create audience / Add contacts land on /app/audiences where the create + import
+// affordances live; Browse templates → /app/templates.
 const quickActions = [
   { to: "/app/campaigns/new", icon: "paper-plane", label: "New campaign",     desc: "Compose and send a fresh email" },
-  { to: "/app/audiences",     icon: "upload",      label: "Import contacts",  desc: "Bring in subscribers from a CSV" },
-  { to: "/app/segments",      icon: "filter",      label: "New segment",      desc: "Slice your audience by rules" },
+  { to: "/app/audiences",     icon: "upload",      label: "Create audience",  desc: "Start a new list of subscribers" },
+  { to: "/app/audiences",     icon: "upload",      label: "Add contacts",     desc: "Import subscribers from a CSV" },
+  { to: "/app/segments/new",  icon: "filter",      label: "Build a segment",  desc: "Slice your audience by rules" },
   { to: "/app/templates",     icon: "document",    label: "Browse templates", desc: "Start from a saved layout" },
 ];
 </script>
@@ -82,12 +162,10 @@ const quickActions = [
         <h1>Welcome, {{ auth.name || auth.username }}.</h1>
         <p class="dash-lede">Here's what's happening across your campaigns.</p>
       </div>
-      <NuxtLink to="/app/campaigns/new" class="dash-cta">
-        <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
-          <path d="M7 2.5 V11.5 M2.5 7 H11.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
-        </svg>
-        <span>New campaign</span>
-      </NuxtLink>
+      <Button variant="primary" to="/app/campaigns/new">
+        <template #leading><Icon name="plus" size="sm" /></template>
+        New campaign
+      </Button>
     </header>
 
     <!-- 2. KPI strip -->
@@ -102,39 +180,82 @@ const quickActions = [
       />
     </section>
 
+    <!-- Error banner (non-fatal; widgets still render their zero states) -->
+    <p v-if="error" class="dash-error">{{ error }}</p>
+
+    <!-- Onboarding checklist — driven by real org state. Hidden once every step
+         is complete or the user dismisses it. -->
+    <section v-if="showOnboarding" class="onboard" aria-label="Setup checklist">
+      <div class="onboard-head">
+        <div class="onboard-head-text">
+          <h2 class="onboard-title">Finish setting up Fe-Mail Gorilla</h2>
+          <p class="onboard-sub">
+            {{ onboardingDoneCount }} of {{ onboardingSteps.length }} steps done — knock out the rest to start sending.
+          </p>
+        </div>
+        <button type="button" class="onboard-dismiss" aria-label="Dismiss checklist" @click="dismissOnboarding">
+          <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+            <path d="M3 3 L11 11 M11 3 L3 11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+          </svg>
+        </button>
+      </div>
+
+      <ul class="onboard-list">
+        <li v-for="step in onboardingSteps" :key="step.key" class="onboard-item" :class="{ 'is-done': step.done }">
+          <span class="onboard-check" :class="{ 'is-done': step.done }" aria-hidden="true">
+            <svg v-if="step.done" width="14" height="14" viewBox="0 0 14 14">
+              <path d="M3 7.5 L6 10.5 L11 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </span>
+          <div class="onboard-item-text">
+            <div class="onboard-item-label">{{ step.label }}</div>
+            <div class="onboard-item-desc">{{ step.desc }}</div>
+          </div>
+          <span v-if="step.done" class="onboard-done-tag">Done</span>
+          <NuxtLink v-else :to="step.to" class="onboard-item-cta">{{ step.cta }}</NuxtLink>
+        </li>
+      </ul>
+    </section>
+
     <!-- 3. Audience growth + engagement donut -->
     <section class="dash-split dash-split-66-34">
-      <AppAudienceGrowthChart :points="audienceGrowthPoints" />
-      <AppEngagementDonut :slices="engagementSlices" total="12,847" />
+      <AppAudienceGrowthChart
+        :points="audienceGrowthPoints"
+        :total="fmtNum(subscriberCount)"
+        delta-abs="—"
+        delta-pct="no history yet"
+      />
+      <AppEngagementDonut :slices="engagementSlices" :total="engagementTotal" />
     </section>
 
     <!-- 4. Funnel -->
     <section class="dash-section">
-      <div class="dash-eyebrow">
-        <span class="dash-eyebrow-dot" aria-hidden="true"></span>
-        <span>Last 30 days &middot; campaign performance</span>
-      </div>
-      <div class="dash-card">
+      <SectionEyebrow>Lifetime &middot; campaign performance</SectionEyebrow>
+      <Card>
         <AppCampaignFunnel :stages="funnelStages" />
-      </div>
+      </Card>
     </section>
 
     <!-- 5. Recent campaigns + activity feed -->
     <section class="dash-split dash-split-60-40">
       <div class="dash-section">
-        <div class="dash-eyebrow">
-          <span class="dash-eyebrow-dot" aria-hidden="true"></span>
-          <span>Recent campaigns</span>
-        </div>
-        <div class="dash-card dash-card-flush">
-          <AppRecentCampaignsTable :campaigns="recentCampaigns" />
-        </div>
+        <SectionEyebrow>Recent campaigns</SectionEyebrow>
+        <AppRecentCampaignsTable v-if="recentCampaigns.length" :campaigns="recentCampaigns" />
+        <Card v-else>
+          <p class="dash-empty">No campaigns sent yet. Your sent campaigns will show up here.</p>
+        </Card>
       </div>
-      <AppActivityFeed :events="activityEvents" />
+      <AppActivityFeed v-if="activityEvents.length" :events="activityEvents" />
+      <div v-else class="dash-section">
+        <SectionEyebrow>Recent activity</SectionEyebrow>
+        <Card>
+          <p class="dash-empty">No recent activity. Subscriber and email events will appear here once you start sending.</p>
+        </Card>
+      </div>
     </section>
 
     <!-- 6. Top performing campaigns -->
-    <AppTopPerformingCampaigns :campaigns="topCampaigns" />
+    <AppTopPerformingCampaigns v-if="topCampaigns.length" :campaigns="topCampaigns" />
 
     <!-- 7. Quick actions -->
     <AppQuickActions :actions="quickActions" />
@@ -172,36 +293,6 @@ const quickActions = [
   font-size: var(--text-md);
   color: var(--color-ink-soft);
 }
-.dash-cta {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-3) var(--space-5);
-  background: var(--btn-primary-bg);
-  color: var(--btn-primary-fg);
-  font-family: var(--font-body);
-  font-size: var(--text-sm);
-  font-weight: 600;
-  border-radius: var(--radius-md);
-  text-decoration: none;
-  box-shadow: var(--shadow-sm);
-  transition: background-color var(--dur-base) var(--ease-out),
-              transform var(--dur-fast) var(--ease-out),
-              box-shadow var(--dur-base) var(--ease-out);
-  white-space: nowrap;
-}
-.dash-cta:hover {
-  background: var(--btn-primary-hover);
-  box-shadow: var(--shadow-md);
-}
-.dash-cta:active {
-  transform: translateY(1px);
-}
-.dash-cta:focus-visible {
-  outline: none;
-  box-shadow: var(--shadow-pop-glow);
-}
-
 /* KPI strip */
 .dash-kpis {
   display: grid;
@@ -221,10 +312,157 @@ const quickActions = [
   flex-direction: column;
   gap: var(--space-3);
 }
-.dash-eyebrow {
+/* Empty-state copy inside a card (no data yet — pre-send-pipeline). */
+.dash-empty {
+  margin: 0;
+  padding: var(--space-6) var(--space-5);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  color: var(--color-ink-soft);
+  text-align: center;
+}
+.dash-error {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  color: var(--color-danger);
+  background: var(--color-danger-bg);
+  border-radius: var(--radius-md);
+}
+
+/* Onboarding checklist card */
+.onboard {
+  background: var(--color-surface);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.onboard-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+.onboard-title {
+  margin: 0 0 var(--space-1);
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  font-weight: 800;
+  letter-spacing: var(--tracking-tight);
+  color: var(--color-ink);
+}
+.onboard-sub {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  color: var(--color-ink-soft);
+}
+.onboard-dismiss {
+  flex: none;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-ink-dim);
+  cursor: pointer;
+  transition: border-color var(--dur-base) var(--ease-out),
+              color var(--dur-base) var(--ease-out);
+}
+.onboard-dismiss:hover {
+  border-color: var(--color-pop);
+  color: var(--color-ink);
+}
+.onboard-dismiss:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-pop-glow);
+}
+.onboard-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
   gap: var(--space-2);
+}
+.onboard-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-md);
+}
+.onboard-item.is-done {
+  border-color: transparent;
+  background: var(--color-surface-sunk);
+}
+.onboard-check {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--color-rule);
+  border-radius: var(--radius-pill);
+  color: var(--btn-primary-fg);
+}
+.onboard-check.is-done {
+  background: var(--color-pop);
+  border-color: var(--color-pop);
+}
+.onboard-item-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.onboard-item-label {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--color-ink);
+}
+.onboard-item.is-done .onboard-item-label {
+  color: var(--color-ink-soft);
+}
+.onboard-item-desc {
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  color: var(--color-ink-soft);
+  line-height: var(--leading-snug);
+}
+.onboard-item-cta {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-2) var(--space-4);
+  background: var(--btn-primary-bg);
+  color: var(--btn-primary-fg);
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background-color var(--dur-base) var(--ease-out);
+}
+.onboard-item-cta:hover {
+  background: var(--btn-primary-hover);
+}
+.onboard-item-cta:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-pop-glow);
+}
+.onboard-done-tag {
+  flex: none;
   font-family: var(--font-body);
   font-size: var(--text-xs);
   font-weight: 600;
@@ -232,22 +470,15 @@ const quickActions = [
   text-transform: uppercase;
   color: var(--color-ink-dim);
 }
-.dash-eyebrow-dot {
-  display: inline-block;
-  width: var(--space-2);
-  height: var(--space-2);
-  background: var(--color-pop);
-  border-radius: var(--radius-pill);
-  box-shadow: 0 0 0 3px var(--color-pop-glow);
+@media (max-width: 520px) {
+  .onboard-item {
+    flex-wrap: wrap;
+  }
+  .onboard-item-cta,
+  .onboard-done-tag {
+    margin-left: calc(20px + var(--space-3));
+  }
 }
-.dash-card {
-  background: var(--color-surface);
-  border: 1px solid var(--color-rule);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
-  overflow: hidden;
-}
-.dash-card-flush { padding: 0; }
 
 /* Two-column rows. Stack below 960px to match the KPI breakpoint. */
 .dash-split {
