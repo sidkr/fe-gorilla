@@ -114,6 +114,8 @@ async function submit() {
     <nav class="set-tabs" aria-label="Settings sections">
       <NuxtLink to="/app/settings" class="set-tab">General</NuxtLink>
       <NuxtLink to="/app/settings/senders" class="set-tab">Sender identities</NuxtLink>
+      <NuxtLink to="/app/settings/domains" class="set-tab">Domains</NuxtLink>
+      <NuxtLink to="/app/settings/suppression" class="set-tab">Suppression</NuxtLink>
     </nav>
 
     <p v-if="loading" class="set-state">Loading settings…</p>

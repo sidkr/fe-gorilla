@@ -84,6 +84,11 @@ export default defineNuxtConfig({
     // same origin — in dev via :3001, in prod/tunnel via the public host.
     "/t/**":      { proxy: `http://localhost:${process.env.PARSE_PORT || 8080}/t/**` },
     "/u/**":      { proxy: `http://localhost:${process.env.PARSE_PORT || 8080}/u/**` },
+
+    // Hosted signup forms (public, server-rendered by Express): GET/POST /f/:id,
+    // double-opt-in confirm, and the embed.js snippet. Same proxy pattern as the
+    // tracking endpoints so embedded form URLs resolve through the same origin.
+    "/f/**":      { proxy: `http://localhost:${process.env.PARSE_PORT || 8080}/f/**` },
   },
 
   // Marketing pages prerendered to static HTML at build time (SEO + speed),

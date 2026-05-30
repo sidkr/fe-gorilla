@@ -163,13 +163,13 @@ afterEach(() => {
 describe("[id].vue — dynamic custom-field form (registry-driven)", () => {
   it("D-01: the custom-field section is hidden when the registry is empty", async () => {
     const w = await mountPage({ rows: [], fields: [] });
-    await w.find("header .btn").trigger("click"); // open Add
+    await w.findAll("header .btn").filter((b) => b.text().includes("Add"))[0].trigger("click"); // open Add
     expect(w.text()).not.toContain("Custom fields");
   });
 
   it("D-01/D-02: renders one control per field with the correct type per field", async () => {
     const w = await mountPage({ rows: [], fields: REGISTRY });
-    await w.find("header .btn").trigger("click");
+    await w.findAll("header .btn").filter((b) => b.text().includes("Add"))[0].trigger("click");
 
     expect(w.text()).toContain("Custom fields");
 
@@ -195,7 +195,7 @@ describe("[id].vue — dynamic custom-field form (registry-driven)", () => {
 
   it("D-06: submitting with an empty email blocks the call and shows the error", async () => {
     const w = await mountPage({ rows: [], fields: REGISTRY });
-    await w.find("header .btn").trigger("click");
+    await w.findAll("header .btn").filter((b) => b.text().includes("Add"))[0].trigger("click");
     await w.find("form").trigger("submit.prevent");
     await flushPromises();
     expect(w.text()).toContain("Email is required.");
@@ -204,7 +204,7 @@ describe("[id].vue — dynamic custom-field form (registry-driven)", () => {
 
   it("D-05: a required custom field left empty blocks submit client-side", async () => {
     const w = await mountPage({ rows: [], fields: REGISTRY });
-    await w.find("header .btn").trigger("click");
+    await w.findAll("header .btn").filter((b) => b.text().includes("Add"))[0].trigger("click");
     // Fill a valid email, leave the required `nickname` (text) blank.
     await w.find('input[type="email"]').setValue("new@example.com");
     await w.find("form").trigger("submit.prevent");
@@ -218,7 +218,7 @@ describe("[id].vue — dynamic custom-field form (registry-driven)", () => {
     // Registry without a required field so submit goes through.
     const fields = REGISTRY.filter((f) => !f.required);
     const w = await mountPage({ rows: [], fields });
-    await w.find("header .btn").trigger("click");
+    await w.findAll("header .btn").filter((b) => b.text().includes("Add"))[0].trigger("click");
 
     await w.find('input[type="email"]').setValue("payload@example.com");
     // Tags input is the field labelled "Tags" — find the input following that
@@ -291,7 +291,7 @@ describe("[id].vue — dynamic custom-field form (registry-driven)", () => {
 
     // The dup row must be loaded so openDrawerById can find it.
     const w = await mountPage({ rows: [existing], total: 1, fields: [] });
-    await w.find("header .btn").trigger("click");
+    await w.findAll("header .btn").filter((b) => b.text().includes("Add"))[0].trigger("click");
     await w.find('input[type="email"]').setValue("dup@example.com");
     await w.find("form").trigger("submit.prevent");
     await flushPromises();

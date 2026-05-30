@@ -32,7 +32,10 @@ const {
   listUnsubHeaders,
 } = require("../../lib/renderEmail");
 const { isSuppressed } = require("../../lib/suppression");
-const { bumpCounter } = require("../../lib/campaignCounters");
+const {
+  bumpCounter,
+  finalizeCampaignIfComplete,
+} = require("../../lib/campaignCounters");
 
 const MK = { useMasterKey: true };
 
@@ -79,11 +82,18 @@ async function handle(data) {
     send.set("status", "suppressed");
     send.set("statusUpdatedAt", new Date());
     await send.save(null, MK);
+    await finalizeCampaignIfComplete(campaignId);
     return;
   }
 
   // 3. Load Campaign + run the merge pass.
   const campaign = await new Parse.Query("Campaign").get(campaignId, MK);
+
+  // If the campaign was paused after this row was queued — manually
+  // (pauseCampaign) or auto-paused on abuse (complaint/bounce rate) — leave the
+  // row "queued" so resumeCampaign can re-send it, and stop here.
+  if (campaign.get("status") === "paused") return;
+
   let html = resolveMergeFields(
     campaign.get("compiledHtml") || "",
     send.get("mergeFields") || {},
@@ -139,6 +149,14 @@ async function handle(data) {
     await event.save(null, MK);
 
     await bumpCounter(campaignId, "sentCount");
+    // Count this send against the org's monthly cap (Architecture §3.6) — an
+    // atomic $inc so concurrent send-email workers don't clobber the counter.
+    if (org && org.id) {
+      const orgPtr = Parse.Object.extend("Organization").createWithoutData(org.id);
+      orgPtr.increment("monthlySendCount", 1);
+      await orgPtr.save(null, MK);
+    }
+    await finalizeCampaignIfComplete(campaignId);
   } catch (err) {
     // 8. Failure: mark failed (+ truncated reason) then re-throw for Agenda retry.
     const reason = String((err && err.message) || err || "unknown error").slice(0, 500);
@@ -147,6 +165,9 @@ async function handle(data) {
     send.set("statusUpdatedAt", new Date());
     try {
       await send.save(null, MK);
+      // A failed row has also left "queued" — let the campaign finalize so a
+      // send that's all-failures (or mixed) doesn't hang forever in "sending".
+      await finalizeCampaignIfComplete(campaignId);
     } catch (_) {
       // If even the status write fails, still surface the original send error.
     }

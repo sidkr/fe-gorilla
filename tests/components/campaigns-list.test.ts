@@ -266,9 +266,16 @@ describe("Campaigns index row-action gating (LS-02)", () => {
     );
   });
 
-  it("sending offers only Duplicate (no Edit/Rename/Archive/Delete)", async () => {
+  it("sending offers Duplicate + Pause (no Edit/Rename/Archive/Delete)", async () => {
     const wrapper = await mountCampaignsPage([row({ status: "sending" })]);
     const items = await menuItemsFor(wrapper, "sending");
-    expect(items).toEqual(["Duplicate"]);
+    // Pause is offered on an in-flight send (Phase 0 §0.2); Edit/Rename/Archive/
+    // Delete remain gated off while sending.
+    expect(items).toContain("Duplicate");
+    expect(items).toContain("Pause");
+    expect(items).not.toContain("Edit");
+    expect(items).not.toContain("Rename");
+    expect(items).not.toContain("Archive");
+    expect(items).not.toContain("Delete");
   });
 });

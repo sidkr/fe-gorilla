@@ -637,5 +637,88 @@ Parse.Cloud.define("deleteSegment", async (request) => {
   return { ok: true };
 });
 
-// Exported for unit-level testing of the compiler if ever needed.
-module.exports = { compileRules, applyLeaf };
+// ── resolveSegmentContacts ─────────────────────────────────────────────────
+// Resolve a Segment (a Parse Segment object OR a plain object with the same
+// shape: { rules, kind, list, staticContacts }) to its matching Contact objects
+// for `org`. This is the send-fanout entry point — it lets a campaign target a
+// segment instead of a whole list.
+//
+//   - static segment  → fetch the snapshotted staticContacts (org-scoped).
+//   - dynamic segment → compile its rules (+ optional list scope) and find().
+//
+// Always org-scoped: the static path filters Contacts by `organization`; the
+// dynamic path's compiled query already calls `.equalTo("organization", org)`.
+//
+// opts.subscribedOnly (default true) additionally restricts to subscribed,
+// non-deleted, non-unsubscribed contacts so a send never targets unsubscribed/
+// cleaned addresses (matches campaignFanout's audience predicate). opts.limit
+// caps the result (default 100000, per Architecture §5.3). Uses the master key
+// (the org filter + ACL isolate the tenant).
+async function resolveSegmentContacts(segment, org, opts = {}) {
+  if (!segment) throw badRequest("resolveSegmentContacts requires a segment.");
+  if (!org) throw badRequest("resolveSegmentContacts requires an org.");
+
+  const subscribedOnly = opts.subscribedOnly !== false;
+  const limit = Number.isFinite(opts.limit) ? opts.limit : 100000;
+
+  // Field accessor that works for both a Parse object and a plain object.
+  const read = (key) =>
+    typeof segment.get === "function" ? segment.get(key) : segment[key];
+
+  const kind = read("kind") || "dynamic";
+
+  const applySubscribed = (q) => {
+    if (!subscribedOnly) return;
+    q.equalTo("status", "subscribed");
+    q.notEqualTo("deleted", true);
+    q.notEqualTo("unsubscribed", true);
+  };
+
+  // ── static: the snapshot IS the answer. ──────────────────────────────────
+  if (kind === "static") {
+    const ptrs = read("staticContacts") || [];
+    const ids = ptrs
+      .map((p) => (p && p.id ? p.id : typeof p === "string" ? p : null))
+      .filter(Boolean);
+    if (!ids.length) return [];
+    const out = [];
+    const CHUNK = 1000; // bound containedIn by index size
+    for (let i = 0; i < ids.length && out.length < limit; i += CHUNK) {
+      const q = new Parse.Query("Contact");
+      q.equalTo("organization", org);
+      q.containedIn("objectId", ids.slice(i, i + CHUNK));
+      applySubscribed(q);
+      q.limit(CHUNK);
+      const rows = await q.find({ useMasterKey: true });
+      for (const r of rows) {
+        out.push(r);
+        if (out.length >= limit) break;
+      }
+    }
+    return out;
+  }
+
+  // ── dynamic: compile the rule tree → Contact query. ──────────────────────
+  const registry = await loadRegistry(org);
+  const compiled = compileRules(read("rules"), org, registry);
+
+  // Optional list scope (a segment may be constrained to one list).
+  const listVal = read("list");
+  if (listVal) {
+    const listPtr =
+      listVal && listVal.id
+        ? listVal
+        : typeof listVal === "string"
+          ? listPointerFrom(listVal)
+          : null;
+    if (listPtr) compiled.equalTo("lists", listPtr);
+  }
+
+  applySubscribed(compiled);
+  compiled.limit(limit);
+  return compiled.find({ useMasterKey: true });
+}
+
+// Exported: the compiler/applyLeaf for unit tests, and resolveSegmentContacts
+// for the send fanout's segment-targeting path.
+module.exports = { compileRules, applyLeaf, resolveSegmentContacts };

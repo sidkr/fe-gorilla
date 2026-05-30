@@ -119,6 +119,26 @@ export function useCampaigns() {
     });
   }
 
+  // Pause a sending/scheduled campaign → status "paused". Server rejects any
+  // other source status. See campaigns.js pauseCampaign.
+  function pauseCampaign(id: string) {
+    return runCloud<{ ok: boolean; id: string; status: CampaignStatus }>(
+      "pauseCampaign",
+      { campaignId: id },
+    );
+  }
+
+  // Resume a paused campaign → back to "sending" (re-enqueuing the remaining
+  // queued recipients) or "scheduled". See campaigns.js resumeCampaign.
+  function resumeCampaign(id: string) {
+    return runCloud<{
+      ok: boolean;
+      id: string;
+      status: CampaignStatus;
+      requeued: number;
+    }>("resumeCampaign", { campaignId: id });
+  }
+
   return {
     listCampaigns,
     getCampaign,
@@ -127,5 +147,7 @@ export function useCampaigns() {
     renameCampaign,
     updateCampaign,
     deleteCampaign,
+    pauseCampaign,
+    resumeCampaign,
   };
 }

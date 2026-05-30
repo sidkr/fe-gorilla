@@ -145,6 +145,14 @@ async function bootstrapSchemas() {
     field(s, e, "timezone", "String");
     // Physical mailing address shown in email footers (CAN-SPAM requirement).
     field(s, e, "address", "String");
+    // Abuse controls (shared sending domain): rolling counters + auto-pause flag.
+    // webhookIngest bumps complaintCount/hardBounceCount and flips sendingPaused
+    // when a rate threshold is crossed; fanout refuses to send while paused.
+    field(s, e, "complaintCount", "Number");
+    field(s, e, "hardBounceCount", "Number");
+    field(s, e, "sendingPaused", "Boolean");
+    field(s, e, "sendingPausedReason", "String");
+    field(s, e, "sendingPausedAt", "Date");
     index(s, e, "org_slug_unique", { slug: 1 });
     s.setCLP(authOnlyCLP());
   });
@@ -258,6 +266,9 @@ async function bootstrapSchemas() {
     field(s, e, "fromEmail", "String");
     field(s, e, "replyTo", "String");
     field(s, e, "audienceId", "String");    // a List id (string, not a pointer)
+    field(s, e, "segmentId", "String");     // optional: target a Segment instead of the whole list
+    field(s, e, "pausedFrom", "String");    // prior status snapshot for pause/resume
+    field(s, e, "failureReason", "String"); // set when fanout fails (cap exceeded / abuse pause)
     field(s, e, "bodyBg", "String");
     field(s, e, "createdBy", "Pointer", { targetClass: "_User" });
     field(s, e, "scheduledAt", "Date");
@@ -325,6 +336,119 @@ async function bootstrapSchemas() {
     field(s, e, "reason", "String");
     // Per-org suppression (DECISIONS #4): unique (organization, email).
     index(s, e, "suppression_org_email_unique", { organization: 1, email: 1 });
+    s.setCLP(authOnlyCLP());
+  });
+
+  // ── SendingDomain (Track C — F-04 domain verification) ──────────────────────
+  await ensureClass("SendingDomain", (s, e) => {
+    field(s, e, "organization", "Pointer", { targetClass: "Organization" });
+    field(s, e, "domain", "String");
+    field(s, e, "selector", "String");
+    field(s, e, "status", "String"); // pending | verified | failed
+    field(s, e, "verified", "Boolean");
+    field(s, e, "records", "Array");
+    field(s, e, "lastCheckedAt", "Date");
+    field(s, e, "lastCheckResult", "Object");
+    index(s, e, "sendingdomain_org_domain_unique", { organization: 1, domain: 1 });
+    s.setCLP(authOnlyCLP());
+  });
+
+  // ── SuppressionAuditLog (Track C — F-28 manual remove audit trail) ──────────
+  await ensureClass("SuppressionAuditLog", (s, e) => {
+    field(s, e, "organization", "Pointer", { targetClass: "Organization" });
+    field(s, e, "action", "String"); // "remove"
+    field(s, e, "email", "String");
+    field(s, e, "reason", "String");
+    field(s, e, "suppressionId", "String");
+    field(s, e, "actorId", "String");
+    index(s, e, "supplog_org_created", { organization: 1, createdAt: -1 });
+    s.setCLP(authOnlyCLP());
+  });
+
+  // ── ImportJob (Track A — F-07 CSV import lifecycle) ─────────────────────────
+  await ensureClass("ImportJob", (s, e) => {
+    field(s, e, "organization", "Pointer", { targetClass: "Organization" });
+    field(s, e, "listId", "String");
+    field(s, e, "filePath", "String");
+    field(s, e, "fileName", "String");
+    field(s, e, "hasHeader", "Boolean");
+    field(s, e, "mapping", "Object");
+    field(s, e, "consent", "Object");
+    field(s, e, "status", "String"); // pending | running | done | failed
+    field(s, e, "totalRows", "Number");
+    field(s, e, "processedRows", "Number");
+    field(s, e, "created", "Number");
+    field(s, e, "updated", "Number");
+    field(s, e, "skippedInvalid", "Number");
+    field(s, e, "skippedSuppressed", "Number");
+    field(s, e, "errors", "Array");
+    field(s, e, "startedAt", "Date");
+    field(s, e, "finishedAt", "Date");
+    index(s, e, "importjob_org_created", { organization: 1, createdAt: -1 });
+    s.setCLP(authOnlyCLP());
+  });
+
+  // ── Form + FormSubmission (Track A — signup forms) ──────────────────────────
+  await ensureClass("Form", (s, e) => {
+    field(s, e, "organization", "Pointer", { targetClass: "Organization" });
+    field(s, e, "name", "String");
+    field(s, e, "fields", "Array");
+    field(s, e, "targetListId", "String");
+    field(s, e, "doubleOptIn", "Boolean");
+    field(s, e, "redirectUrl", "String");
+    field(s, e, "submitButtonText", "String");
+    field(s, e, "status", "String");
+    field(s, e, "submissionCount", "Number");
+    index(s, e, "form_org_created", { organization: 1, createdAt: -1 });
+    s.setCLP(authOnlyCLP());
+  });
+  await ensureClass("FormSubmission", (s, e) => {
+    field(s, e, "organization", "Pointer", { targetClass: "Organization" });
+    field(s, e, "form", "Pointer", { targetClass: "Form" });
+    field(s, e, "email", "String");
+    field(s, e, "data", "Object");
+    field(s, e, "contact", "Pointer", { targetClass: "Contact" });
+    field(s, e, "confirmed", "Boolean");
+    field(s, e, "ip", "String");
+    index(s, e, "formsub_org_created", { organization: 1, createdAt: -1 });
+    s.setCLP(authOnlyCLP());
+  });
+
+  // ── Automation + steps + enrollments (Track B — journeys) ───────────────────
+  await ensureClass("Automation", (s, e) => {
+    field(s, e, "organization", "Pointer", { targetClass: "Organization" });
+    field(s, e, "name", "String");
+    field(s, e, "status", "String"); // draft | active | paused
+    field(s, e, "trigger", "Object"); // { type, config }
+    field(s, e, "stats", "Object"); // { enrolled, completed, exited }
+    field(s, e, "stepCount", "Number");
+    field(s, e, "createdBy", "Pointer", { targetClass: "_User" });
+    index(s, e, "automation_org_status", { organization: 1, status: 1 });
+    s.setCLP(authOnlyCLP());
+  });
+  await ensureClass("AutomationStep", (s, e) => {
+    field(s, e, "organization", "Pointer", { targetClass: "Organization" });
+    field(s, e, "automation", "Pointer", { targetClass: "Automation" });
+    field(s, e, "order", "Number");
+    field(s, e, "type", "String"); // send_email | wait | branch | exit
+    field(s, e, "config", "Object");
+    field(s, e, "nextStepId", "String");
+    field(s, e, "branchYesStepId", "String");
+    field(s, e, "branchNoStepId", "String");
+    index(s, e, "step_automation_order", { automation: 1, order: 1 });
+    s.setCLP(authOnlyCLP());
+  });
+  await ensureClass("AutomationEnrollment", (s, e) => {
+    field(s, e, "organization", "Pointer", { targetClass: "Organization" });
+    field(s, e, "automation", "Pointer", { targetClass: "Automation" });
+    field(s, e, "contact", "Pointer", { targetClass: "Contact" });
+    field(s, e, "currentStepOrder", "Number");
+    field(s, e, "status", "String"); // active | completed | exited
+    field(s, e, "nextRunAt", "Date");
+    field(s, e, "claimedAt", "Date");
+    field(s, e, "context", "Object");
+    index(s, e, "enroll_status_nextrun", { status: 1, nextRunAt: 1 });
+    index(s, e, "enroll_automation_contact", { automation: 1, contact: 1 });
     s.setCLP(authOnlyCLP());
   });
 

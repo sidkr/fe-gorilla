@@ -21,16 +21,20 @@ interface Props {
   sendStage?: "idle" | "sending" | "sent" | "error";
   sendRecipientCount?: number | null;
   sendError?: string;
+  // Org timezone label shown next to the schedule picker (Phase 0 §0.3).
+  timezone?: string | null;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   sendStage: "idle",
   sendRecipientCount: null,
   sendError: "",
+  timezone: null,
 });
 const emit = defineEmits<{
   (e: "close"): void;
-  (e: "send"): void;
+  // `send` now carries when: "now" or a future ISO timestamp (Phase 0 §0.3).
+  (e: "send", payload: { when: string }): void;
   (e: "send-success-done"): void;
   (e: "send-error-dismiss"): void;
   (e: "open-test-send"): void;
@@ -54,18 +58,63 @@ const ctaLabel = computed(() => {
 
 const sending = computed(() => props.sendStage === "sending");
 
+// ── Send now vs schedule (Phase 0 §0.3) ───────────────────────────────────
+// mode "now" sends immediately; "schedule" reveals a date+time picker that
+// produces a future ISO timestamp. scheduleSend enforces the future-time rule
+// server-side; we mirror a 5-minute floor in the UI so the obvious case never
+// round-trips just to be rejected.
+const mode = ref<"now" | "schedule">("now");
+
+// Format a Date as a <input type="datetime-local"> value: local "YYYY-MM-DDTHH:mm".
+function toLocalInput(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return (
+    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` +
+    `T${pad(d.getHours())}:${pad(d.getMinutes())}`
+  );
+}
+
+const minLocal = computed(() => toLocalInput(new Date(Date.now() + 5 * 60_000)));
+const scheduledLocal = ref<string>(minLocal.value);
+
+// Org timezone label, falling back to the browser zone.
+const tzLabel = computed(() => {
+  if (props.timezone) return props.timezone;
+  try {
+    const z = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (z) return `${z} (your timezone)`;
+  } catch {
+    /* ignore */
+  }
+  return "your timezone";
+});
+
+const scheduleValid = computed(() => {
+  if (mode.value !== "schedule") return true;
+  const t = new Date(scheduledLocal.value).getTime();
+  return Number.isFinite(t) && t > Date.now();
+});
+
+const ctaText = computed(() => {
+  if (sending.value) return mode.value === "schedule" ? "Scheduling…" : "Sending…";
+  if (mode.value === "schedule") return "Schedule send";
+  return ctaLabel.value;
+});
+
 function onSend() {
-  if (!canSend.value || sending.value) return;
-  emit("send");
+  if (!canSend.value || sending.value || !scheduleValid.value) return;
+  if (mode.value === "schedule") {
+    // datetime-local has no zone; new Date(localString) interprets it in the
+    // browser's local zone and toISOString() normalizes to UTC for the server.
+    emit("send", { when: new Date(scheduledLocal.value).toISOString() });
+  } else {
+    emit("send", { when: "now" });
+  }
 }
 
 function onEdit(field: SetupField | null) {
   if (!field) return;
   emit("edit", field);
-}
-
-function onSchedule() {
-  emit("toast", "Scheduling lands in the next iteration.");
 }
 </script>
 
@@ -209,6 +258,38 @@ function onSchedule() {
           </li>
         </ul>
 
+        <!-- When to send: now vs scheduled (Phase 0 §0.3). -->
+        <div class="pf-schedule">
+          <div class="pf-mode" role="radiogroup" aria-label="When to send">
+            <label class="pf-mode-opt">
+              <input type="radio" value="now" v-model="mode" :disabled="sending" />
+              <span>Send now</span>
+            </label>
+            <label class="pf-mode-opt">
+              <input
+                type="radio"
+                value="schedule"
+                v-model="mode"
+                :disabled="sending"
+              />
+              <span>Schedule for…</span>
+            </label>
+          </div>
+          <div v-if="mode === 'schedule'" class="pf-when">
+            <input
+              type="datetime-local"
+              class="pf-when-input"
+              v-model="scheduledLocal"
+              :min="minLocal"
+              :disabled="sending"
+            />
+            <p class="pf-when-tz">Times are in {{ tzLabel }}.</p>
+            <p v-if="!scheduleValid" class="pf-when-err">
+              Pick a time at least a few minutes from now.
+            </p>
+          </div>
+        </div>
+
         <footer class="pf-foot">
           <div class="pf-foot-left">
             <Button
@@ -221,16 +302,13 @@ function onSchedule() {
             </Button>
           </div>
           <div class="pf-foot-right">
-            <Button variant="ghost" :disabled="sending" @click="onSchedule">
-              Schedule for later
-            </Button>
             <Button
               variant="primary"
-              :disabled="!canSend || sending"
+              :disabled="!canSend || sending || !scheduleValid"
               :loading="sending"
               @click="onSend"
             >
-              {{ sending ? "Sending…" : ctaLabel }}
+              {{ ctaText }}
             </Button>
           </div>
         </footer>
@@ -384,6 +462,50 @@ function onSchedule() {
   line-height: var(--leading-snug);
 }
 
+.pf-schedule {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border-top: 1px solid var(--color-rule);
+}
+.pf-mode {
+  display: flex;
+  gap: var(--space-4);
+}
+.pf-mode-opt {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--color-ink);
+  cursor: pointer;
+}
+.pf-mode-opt input { accent-color: var(--color-pop); }
+.pf-when {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.pf-when-input {
+  font-size: var(--text-sm);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  align-self: flex-start;
+}
+.pf-when-tz {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--color-ink-soft);
+}
+.pf-when-err {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--color-danger);
+}
 .pf-foot {
   display: flex;
   align-items: center;

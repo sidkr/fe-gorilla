@@ -587,6 +587,20 @@ Parse.Cloud.afterSave("Contact", async (request) => {
   for (const listId of affected) {
     if (listId) await recomputeListCount(listId);
   }
+
+  // Fire list-membership automation triggers for a newly-subscribed contact.
+  // enrollByTrigger is internally wrapped in try/catch so it never breaks the
+  // save; required lazily to avoid a load-order cycle with automations.js.
+  if (!original && object.get("status") === "subscribed") {
+    try {
+      const { enrollByTrigger } = require("./automations");
+      await enrollByTrigger(object.get("organization"), "contact_added_to_list", object, {
+        listIds: current,
+      });
+    } catch (_) {
+      // never block the contact save on automation enrollment
+    }
+  }
 });
 
 Parse.Cloud.afterDelete("Contact", async (request) => {
