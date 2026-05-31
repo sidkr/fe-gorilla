@@ -1,33 +1,32 @@
 <script setup lang="ts">
-// MarketingDemoPlayer — the homepage "live demo". Plays back real app screenshots
-// (captured by scripts/demo + tests/demo) as a video-like product tour: animated
-// cursor, spotlight rings, Ken Burns motion, captions, and a chapter rail.
+// MarketingDemoPlayer — the homepage "live demo", an onboarding-tour style player
+// over real app screenshots (captured by scripts/demo + tests/demo).
+//
+// Each scene: a frame crossfades in; a dim+spotlight GLIDES to the highlighted UI
+// region; an annotation coachmark (title + caption + step) anchors right beside it
+// with a pointer. Autoplays on scroll-into-view, loops, and falls back to a static,
+// manually-steppable tour under prefers-reduced-motion.
 //
 // Marketing-only: NO imports from components/app/* or stores/*. Reads the static
-// /demo/manifest.json (written by the capture harness) on the client; renders a
-// poster frame at prerender/first paint so there's no layout shift. Honors
-// prefers-reduced-motion (static, manual stepping — no autoplay/motion).
+// /demo/manifest.json on the client; renders a poster frame at prerender/first paint.
 import { ref, computed, onMounted, onBeforeUnmount } from "vue";
 
 interface Hotspot { x: number; y: number; w: number; h: number; label?: string }
-interface CursorStep { x: number; y: number; t: number; click?: boolean }
-interface KenBurns { scaleFrom: number; scaleTo: number; panTo: [number, number] }
 interface Scene {
   id: string; chapter: string; title: string; caption: string; image: string;
-  w: number; h: number; hold: number; kenburns?: KenBurns; hotspots: Hotspot[]; cursor: CursorStep[];
+  w: number; h: number; hold: number; hotspots: Hotspot[];
 }
 interface Manifest { version: number; viewport: { width: number; height: number }; chapters: { id: string; label: string }[]; scenes: Scene[] }
 
 const POSTER = "/demo/frames/01-dashboard.jpg";
+const PAD = 10; // px padding (manifest coords) around a hotspot for the spotlight
 
 const manifest = ref<Manifest | null>(null);
 const idx = ref(0);
 const playing = ref(false);
 const reduced = ref(false);
+const isFullscreen = ref(false);
 const root = ref<HTMLElement | null>(null);
-const kb = ref({ scale: 1, x: 0, y: 0 });
-const cur = ref({ x: 720, y: 450, show: false });
-const ripple = ref({ x: 0, y: 0, p: 1 }); // p: 0→1 animation progress (1 = done/hidden)
 const sceneProgress = ref(0);
 
 let raf = 0;
@@ -40,51 +39,106 @@ const scene = computed<Scene | null>(() => scenes.value[idx.value] ?? null);
 const chapters = computed(() => manifest.value?.chapters ?? []);
 const image = computed(() => scene.value?.image ?? POSTER);
 const chapterLabel = computed(() => chapters.value.find((c) => c.id === scene.value?.chapter)?.label ?? "");
+const stepNum = computed(() => String(idx.value + 1).padStart(2, "0"));
+const stepTotal = computed(() => String(scenes.value.length || 9).padStart(2, "0"));
 
-const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
-const easeInOut = (t: number) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
-const easeOut = (t: number) => 1 - Math.pow(1 - t, 3);
+const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
+const pct = (v: number, total: number) => (v / total) * 100;
+
+// Primary highlighted region for this scene (first hotspot, or a sensible default).
+const primary = computed<Hotspot>(() => {
+  const h = scene.value?.hotspots?.[0];
+  if (h) return h;
+  const { width: W, height: H } = vp.value;
+  return { x: W * 0.05, y: H * 0.12, w: W * 0.5, h: H * 0.2 };
+});
+
+// Spotlight box (dim everything else, ring the cutout). Positioned in % so it
+// scales with the stage; CSS transitions the top/left/width/height → it glides.
+const spotStyle = computed(() => {
+  const h = primary.value, { width: W, height: H } = vp.value;
+  return {
+    left: pct(h.x - PAD, W) + "%",
+    top: pct(h.y - PAD, H) + "%",
+    width: pct(h.w + PAD * 2, W) + "%",
+    height: pct(h.h + PAD * 2, H) + "%",
+  };
+});
+
+// Anchor the coachmark below the highlight when there's room beneath it, else above.
+const annoSide = computed(() => {
+  const h = primary.value, H = vp.value.height;
+  return (h.y + h.h) / H < 0.6 ? "bottom" : "top";
+});
+const annoStyle = computed(() => {
+  const h = primary.value, { width: W, height: H } = vp.value;
+  const left = clamp(pct(h.x + h.w / 2, W), 26, 74);
+  const top = annoSide.value === "bottom" ? pct(h.y + h.h, H) : pct(h.y, H);
+  return { left: left + "%", top: top + "%" };
+});
 
 onMounted(async () => {
   reduced.value = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
   try {
     const r = await fetch("/demo/manifest.json", { cache: "no-cache" });
     if (r.ok) manifest.value = await r.json();
-  } catch { /* poster stays; component degrades gracefully */ }
+  } catch { /* poster stays; graceful degrade */ }
 
   io = new IntersectionObserver(
     (entries) => {
       const e = entries[0];
       const visible = !!e?.isIntersecting && e.intersectionRatio >= 0.4;
       if (visible && !reduced.value) play();
-      else pause();
+      else if (!isFullscreen.value) pause();
     },
     { threshold: [0, 0.4, 0.75] },
   );
   if (root.value) io.observe(root.value);
+
+  document.addEventListener("fullscreenchange", onFsChange);
+  document.addEventListener("webkitfullscreenchange", onFsChange as EventListener);
 });
 
-onBeforeUnmount(() => { cancelAnimationFrame(raf); io?.disconnect(); });
+onBeforeUnmount(() => {
+  cancelAnimationFrame(raf);
+  io?.disconnect();
+  document.removeEventListener("fullscreenchange", onFsChange);
+  document.removeEventListener("webkitfullscreenchange", onFsChange as EventListener);
+});
+
+// ── Full screen ──────────────────────────────────────────────────────────────
+function fsElement(): Element | null {
+  return document.fullscreenElement || (document as any).webkitFullscreenElement || null;
+}
+async function toggleFullscreen() {
+  const el = root.value as (HTMLElement & { webkitRequestFullscreen?: () => Promise<void> }) | null;
+  if (!el) return;
+  try {
+    if (fsElement()) {
+      await (document.exitFullscreen?.() ?? (document as any).webkitExitFullscreen?.());
+    } else {
+      await (el.requestFullscreen?.() ?? el.webkitRequestFullscreen?.());
+    }
+  } catch { /* fullscreen denied / unsupported — ignore */ }
+}
+function onFsChange() {
+  isFullscreen.value = fsElement() === root.value;
+  if (isFullscreen.value && !reduced.value) play();
+}
 
 function play() {
   if (playing.value || !scenes.value.length || reduced.value) return;
   playing.value = true;
-  sceneStart = performance.now();
+  sceneStart = performance.now() - sceneProgress.value * (scene.value?.hold || 3600);
   loop();
 }
-function pause() {
-  playing.value = false;
-  cancelAnimationFrame(raf);
-}
+function pause() { playing.value = false; cancelAnimationFrame(raf); }
 function toggle() { playing.value ? pause() : play(); }
 
 function go(i: number) {
   const n = scenes.value.length || 1;
   idx.value = ((i % n) + n) % n;
   sceneStart = performance.now();
-  kb.value = { scale: 1, x: 0, y: 0 };
-  cur.value = { x: vp.value.width / 2, y: vp.value.height / 2, show: false };
-  ripple.value = { x: 0, y: 0, p: 1 };
   sceneProgress.value = 0;
 }
 function jumpToChapter(id: string) {
@@ -92,60 +146,18 @@ function jumpToChapter(id: string) {
   if (i >= 0) { go(i); if (!reduced.value) play(); }
 }
 
-function updateCursor(s: Scene, t: number) {
-  const steps = s.cursor || [];
-  if (!steps.length) { cur.value.show = false; return; }
-  cur.value.show = true;
-  // position: hold at first until its t, lerp between steps, hold at last.
-  let pos = { x: steps[0].x, y: steps[0].y };
-  for (let i = 0; i < steps.length; i++) {
-    const a = steps[i];
-    const b = steps[i + 1];
-    if (!b) { pos = { x: a.x, y: a.y }; break; }
-    if (t >= a.t && t < b.t) {
-      const k = easeInOut((t - a.t) / Math.max(1, b.t - a.t));
-      pos = { x: lerp(a.x, b.x, k), y: lerp(a.y, b.y, k) };
-      break;
-    }
-    if (t < a.t) { pos = { x: a.x, y: a.y }; break; }
-  }
-  cur.value.x = pos.x; cur.value.y = pos.y;
-  // click ripple: fire a 480ms ripple when crossing a click step's time.
-  const click = steps.find((st) => st.click && t >= st.t && t < st.t + 480);
-  if (click) ripple.value = { x: click.x, y: click.y, p: (t - click.t) / 480 };
-  else if (ripple.value.p < 1) ripple.value.p = 1;
-}
-
 function loop() {
   raf = requestAnimationFrame(loop);
   const s = scene.value;
   if (!s) return;
-  const t = performance.now() - sceneStart;
-  const hold = s.hold || 3200;
-  sceneProgress.value = Math.min(1, t / hold);
-
-  if (s.kenburns) {
-    const e = easeInOut(sceneProgress.value);
-    kb.value = {
-      scale: lerp(s.kenburns.scaleFrom, s.kenburns.scaleTo, e),
-      x: lerp(0, s.kenburns.panTo[0], e),
-      y: lerp(0, s.kenburns.panTo[1], e),
-    };
-  }
-  updateCursor(s, t);
-  if (t >= hold) go(idx.value + 1);
+  const hold = s.hold || 3600;
+  sceneProgress.value = Math.min(1, (performance.now() - sceneStart) / hold);
+  if (sceneProgress.value >= 1) go(idx.value + 1);
 }
-
-// transform that zooms/pans the stage (image + overlay together)
-const stageTransform = computed(() =>
-  `scale(${kb.value.scale}) translate(${kb.value.x}px, ${kb.value.y}px)`,
-);
-const rippleR = computed(() => 8 + easeOut(ripple.value.p) * 34);
-const rippleOpacity = computed(() => (ripple.value.p >= 1 ? 0 : (1 - ripple.value.p) * 0.5));
 </script>
 
 <template>
-  <section ref="root" class="demo" aria-label="Fe-Mail Gorilla product demo">
+  <section ref="root" class="demo" :class="{ 'is-fs': isFullscreen }" aria-label="Fe-Mail Gorilla product demo">
     <!-- Chapter rail -->
     <div class="demo-chapters" role="tablist" aria-label="Demo chapters">
       <button
@@ -165,197 +177,217 @@ const rippleOpacity = computed(() => (ripple.value.p >= 1 ? 0 : (1 - ripple.valu
       <div class="demo-chrome">
         <span class="demo-dot" /><span class="demo-dot" /><span class="demo-dot" />
         <span class="demo-url">app.gorilla.email<span class="demo-url-path">/{{ scene?.id ?? "dashboard" }}</span></span>
-        <button class="demo-play" type="button" :aria-label="playing ? 'Pause demo' : 'Play demo'" @click="toggle">
-          <svg v-if="playing" width="13" height="13" viewBox="0 0 12 12"><rect x="2" y="1.5" width="3" height="9" rx="1" /><rect x="7" y="1.5" width="3" height="9" rx="1" /></svg>
-          <svg v-else width="13" height="13" viewBox="0 0 12 12"><path d="M3 1.8 10 6 3 10.2Z" /></svg>
-        </button>
+        <div class="demo-actions">
+          <button class="demo-play" type="button" :aria-label="playing ? 'Pause demo' : 'Play demo'" @click="toggle">
+            <svg v-if="playing" width="13" height="13" viewBox="0 0 12 12"><rect x="2" y="1.5" width="3" height="9" rx="1" /><rect x="7" y="1.5" width="3" height="9" rx="1" /></svg>
+            <svg v-else width="13" height="13" viewBox="0 0 12 12"><path d="M3 1.8 10 6 3 10.2Z" /></svg>
+          </button>
+          <button class="demo-icon-btn" type="button" :aria-label="isFullscreen ? 'Exit full screen' : 'Full screen'" @click="toggleFullscreen">
+            <svg v-if="!isFullscreen" width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5V2h3M12 5V2H9M2 9v3h3M12 9v3H9" /></svg>
+            <svg v-else width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 2v3H2M9 2v3h3M5 12V9H2M9 12V9h3" /></svg>
+          </button>
+        </div>
       </div>
 
-      <div class="demo-stage">
-        <div class="demo-zoom" :style="{ transform: stageTransform }">
-          <img class="demo-shot" :src="image" :alt="scene?.title || 'Fe-Mail Gorilla app'" :width="vp.width" :height="vp.height" loading="lazy" decoding="async" />
-          <svg class="demo-fx" :viewBox="`0 0 ${vp.width} ${vp.height}`" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
-            <!-- spotlight rings -->
-            <template v-for="(h, i) in scene?.hotspots || []" :key="i">
-              <rect class="demo-ring" :x="h.x - 6" :y="h.y - 6" :width="h.w + 12" :height="h.h + 12" rx="14" />
-              <g v-if="h.label" class="demo-tag" :transform="`translate(${h.x - 6}, ${h.y - 28})`">
-                <rect class="demo-tag-bg" width="9" height="18" :data-label="h.label" rx="5" :style="{ width: (h.label.length * 8.2 + 20) + 'px' }" />
-                <text class="demo-tag-tx" x="11" y="13">{{ h.label }}</text>
-              </g>
-            </template>
-            <!-- cursor + click ripple -->
-            <g v-show="cur.show && !reduced" :transform="`translate(${cur.x}, ${cur.y})`" class="demo-cursor">
-              <circle :r="rippleR" :opacity="rippleOpacity" class="demo-ripple" />
-              <path d="M0 0 L0 22 L6 16 L10 24 L13 22 L9 14 L17 14 Z" class="demo-pointer" />
-            </g>
-          </svg>
+      <div class="demo-stage" :class="{ 'is-reduced': reduced }">
+        <!-- crossfading frame -->
+        <Transition name="xfade">
+          <img
+            :key="image"
+            class="demo-shot"
+            :src="image"
+            :alt="scene?.title || 'Fe-Mail Gorilla app'"
+            :width="vp.width"
+            :height="vp.height"
+            loading="lazy"
+            decoding="async"
+          />
+        </Transition>
+
+        <!-- dim + gliding spotlight (box-shadow punches a bright hole) -->
+        <div class="demo-spot" :style="spotStyle" aria-hidden="true" />
+
+        <!-- annotation coachmark, anchored beside the highlight -->
+        <div class="demo-anno" :style="annoStyle" :data-side="annoSide">
+          <Transition name="anno" mode="out-in">
+            <div :key="idx" class="demo-anno-in">
+              <div class="demo-anno-top">
+                <span class="demo-anno-eyebrow"><span class="demo-eyedot" />{{ chapterLabel }}</span>
+                <span class="demo-anno-step">{{ stepNum }}<span class="demo-anno-step-dim"> / {{ stepTotal }}</span></span>
+              </div>
+              <h3 class="demo-anno-title">{{ scene?.title }}</h3>
+              <p class="demo-anno-text">{{ scene?.caption }}</p>
+            </div>
+          </Transition>
         </div>
-        <div class="demo-vignette" aria-hidden="true" />
       </div>
     </div>
 
-    <!-- Caption + progress -->
-    <div class="demo-foot">
-      <Transition name="cap" mode="out-in">
-        <div :key="idx" class="demo-caption">
-          <span class="demo-eyebrow"><span class="demo-eyedot" />{{ chapterLabel }}</span>
-          <h3 class="demo-title">{{ scene?.title }}</h3>
-          <p class="demo-sub">{{ scene?.caption }}</p>
-        </div>
-      </Transition>
-      <div class="demo-progress" role="presentation">
-        <button
-          v-for="(s, i) in scenes"
-          :key="s.id"
-          class="demo-seg"
-          :class="{ 'is-done': i < idx, 'is-active': i === idx }"
-          type="button"
-          :aria-label="`Go to: ${s.title}`"
-          @click="go(i)"
-        >
-          <span class="demo-seg-fill" :style="i === idx ? { transform: `scaleX(${sceneProgress})` } : undefined" />
-        </button>
-      </div>
+    <!-- progress rail -->
+    <div class="demo-progress" role="presentation">
+      <button
+        v-for="(s, i) in scenes"
+        :key="s.id"
+        class="demo-seg"
+        :class="{ 'is-done': i < idx, 'is-active': i === idx }"
+        type="button"
+        :aria-label="`Go to: ${s.title}`"
+        @click="go(i)"
+      >
+        <span class="demo-seg-fill" :style="i === idx ? { transform: `scaleX(${sceneProgress})` } : undefined" />
+      </button>
     </div>
   </section>
 </template>
 
 <style scoped>
-.demo {
-  --demo-radius: var(--radius-xl);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-}
+.demo { display: flex; flex-direction: column; gap: var(--space-4); }
 
 /* chapter rail */
 .demo-chapters { display: flex; flex-wrap: wrap; gap: var(--space-2); justify-content: center; }
 .demo-chip {
-  appearance: none;
-  border: 1px solid var(--color-rule);
-  background: var(--color-surface);
-  color: var(--color-ink-soft);
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  letter-spacing: var(--tracking-wide);
-  text-transform: uppercase;
-  padding: var(--space-1-5) var(--space-3);
-  border-radius: var(--radius-pill);
-  cursor: pointer;
+  appearance: none; border: 1px solid var(--color-rule); background: var(--color-surface);
+  color: var(--color-ink-soft); font-family: var(--font-mono); font-size: var(--text-xs);
+  letter-spacing: var(--tracking-wide); text-transform: uppercase;
+  padding: var(--space-1-5) var(--space-3); border-radius: var(--radius-pill); cursor: pointer;
   transition: color var(--dur-base) var(--ease-out), border-color var(--dur-base) var(--ease-out), background var(--dur-base) var(--ease-out);
 }
 .demo-chip:hover { border-color: var(--color-rule-strong); color: var(--color-ink); }
-.demo-chip.is-active {
-  color: var(--color-ink-on-pop);
-  background: var(--color-pop);
-  border-color: var(--color-pop);
-}
+.demo-chip.is-active { color: var(--color-ink-on-pop); background: var(--color-pop); border-color: var(--color-pop); }
 
 /* device frame */
 .demo-device {
-  border: 1px solid var(--color-rule);
-  border-radius: var(--demo-radius);
-  background: var(--color-surface);
-  box-shadow: var(--shadow-lg);
-  overflow: hidden;
+  border: 1px solid var(--color-rule); border-radius: var(--radius-xl);
+  background: var(--color-surface); box-shadow: var(--shadow-lg); overflow: hidden;
 }
 .demo-chrome {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-2-5, 10px) var(--space-4);
-  background: var(--color-surface-sunk);
-  border-bottom: 1px solid var(--color-rule);
+  display: flex; align-items: center; gap: var(--space-2);
+  padding: 10px var(--space-4); background: var(--color-surface-sunk); border-bottom: 1px solid var(--color-rule);
 }
 .demo-dot { width: 11px; height: 11px; border-radius: var(--radius-pill); background: var(--color-rule-strong); }
 .demo-dot:first-child { background: var(--color-pop); }
 .demo-url {
-  margin-left: var(--space-3);
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  color: var(--color-ink-dim);
-  background: var(--color-surface);
-  border: 1px solid var(--color-rule);
-  border-radius: var(--radius-pill);
-  padding: 3px var(--space-3);
+  margin-left: var(--space-3); font-family: var(--font-mono); font-size: var(--text-xs);
+  color: var(--color-ink-dim); background: var(--color-surface); border: 1px solid var(--color-rule);
+  border-radius: var(--radius-pill); padding: 3px var(--space-3);
 }
 .demo-url-path { color: var(--color-pop-deep); }
+.demo-actions { margin-left: auto; display: inline-flex; align-items: center; gap: var(--space-2); }
 .demo-play {
-  margin-left: auto;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px; height: 28px;
-  border: none;
-  border-radius: var(--radius-pill);
-  background: var(--color-pop);
-  color: var(--color-ink-on-pop);
-  cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border: none; border-radius: var(--radius-pill);
+  background: var(--color-pop); color: var(--color-ink-on-pop); cursor: pointer;
   transition: background var(--dur-fast) var(--ease-out);
 }
 .demo-play:hover { background: var(--color-pop-deep); }
 .demo-play svg { fill: currentColor; }
+.demo-icon-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border: 1px solid var(--color-rule); border-radius: var(--radius-pill);
+  background: var(--color-surface); color: var(--color-ink-soft); cursor: pointer;
+  transition: color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
+}
+.demo-icon-btn:hover { color: var(--color-ink); border-color: var(--color-rule-strong); }
 
 /* stage */
 .demo-stage { position: relative; aspect-ratio: 1440 / 900; overflow: hidden; background: var(--color-surface-sunk); }
-.demo-zoom { position: absolute; inset: 0; transform-origin: center; will-change: transform; }
-.demo-shot { width: 100%; height: 100%; object-fit: cover; display: block; }
-.demo-fx { position: absolute; inset: 0; width: 100%; height: 100%; }
-.demo-vignette {
-  position: absolute; inset: 0; pointer-events: none;
-  box-shadow: inset 0 0 0 1px rgba(24, 24, 27, 0.04), inset 0 -40px 80px -40px rgba(24, 24, 27, 0.08);
+.demo-shot { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/* dim + spotlight — the transparent box punches a bright hole via a huge box-shadow,
+   dimming everything else; CSS transitions on geometry make it glide between scenes. */
+.demo-spot {
+  position: absolute; pointer-events: none; border-radius: var(--radius-md);
+  border: 2px solid var(--color-pop);
+  box-shadow: 0 0 0 100vmax rgba(24, 24, 27, 0.34), 0 0 22px 2px var(--color-pop-glow);
+  transition: top 0.55s var(--ease-spring), left 0.55s var(--ease-spring),
+              width 0.55s var(--ease-spring), height 0.55s var(--ease-spring);
+  animation: spotPulse 2s var(--ease-out) infinite;
+}
+@keyframes spotPulse {
+  0%, 100% { box-shadow: 0 0 0 100vmax rgba(24, 24, 27, 0.34), 0 0 0 0 var(--color-pop-glow); }
+  50% { box-shadow: 0 0 0 100vmax rgba(24, 24, 27, 0.34), 0 0 0 6px var(--color-pop-glow); }
 }
 
-/* spotlight ring */
-.demo-ring {
-  fill: var(--color-pop);
-  fill-opacity: 0.06;
-  stroke: var(--color-pop);
-  stroke-width: 2.5;
-  stroke-opacity: 0.9;
-  animation: ringPulse 1.8s var(--ease-out) infinite;
+/* annotation coachmark */
+.demo-anno {
+  position: absolute; pointer-events: none; width: min(340px, 64%);
+  transform: translate(-50%, 0); margin-top: 16px;
+  transition: top 0.55s var(--ease-spring), left 0.55s var(--ease-spring);
+  z-index: 2;
 }
-@keyframes ringPulse { 0%, 100% { stroke-opacity: 0.85; } 50% { stroke-opacity: 0.35; } }
-.demo-tag-bg { height: 18px; fill: var(--color-pop); }
-.demo-tag-tx { fill: var(--color-ink-on-pop); font-family: var(--font-mono); font-size: 11px; font-weight: 600; }
+.demo-anno[data-side="top"] { transform: translate(-50%, -100%); margin-top: -16px; }
+.demo-anno-in {
+  background: var(--color-surface); border: 1px solid var(--color-rule);
+  border-radius: var(--radius-lg); box-shadow: var(--shadow-lg);
+  padding: var(--space-4) var(--space-4) var(--space-4-5, 18px);
+}
+/* pointer triangle aimed at the highlight */
+.demo-anno::before, .demo-anno::after {
+  content: ""; position: absolute; left: 50%; transform: translateX(-50%); width: 0; height: 0;
+  border-left: 9px solid transparent; border-right: 9px solid transparent;
+}
+.demo-anno[data-side="bottom"]::before { bottom: 100%; border-bottom: 9px solid var(--color-rule); }
+.demo-anno[data-side="bottom"]::after { bottom: calc(100% - 1.5px); border-bottom: 9px solid var(--color-surface); }
+.demo-anno[data-side="top"]::before { top: 100%; border-top: 9px solid var(--color-rule); }
+.demo-anno[data-side="top"]::after { top: calc(100% - 1.5px); border-top: 9px solid var(--color-surface); }
 
-/* cursor */
-.demo-pointer { fill: var(--color-ink); stroke: #fff; stroke-width: 1.2; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.3)); }
-.demo-ripple { fill: var(--color-pop); }
-
-/* caption + progress */
-.demo-foot { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--space-5); flex-wrap: wrap; }
-.demo-caption { max-width: 60ch; }
-.demo-eyebrow {
+.demo-anno-top { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.demo-anno-eyebrow {
   display: inline-flex; align-items: center; gap: var(--space-2);
   font-family: var(--font-mono); font-size: var(--text-xs); text-transform: uppercase;
   letter-spacing: var(--tracking-wide); color: var(--color-ink-dim);
 }
 .demo-eyedot { width: 6px; height: 6px; border-radius: var(--radius-pill); background: var(--color-pop); }
-.demo-title { margin: var(--space-2) 0 var(--space-1); font-family: var(--font-display); font-size: var(--text-2xl); font-weight: 700; color: var(--color-ink); letter-spacing: var(--tracking-tight); }
-.demo-sub { margin: 0; font-family: var(--font-body); font-size: var(--text-md); color: var(--color-ink-soft); line-height: var(--leading-normal); }
-
-.demo-progress { display: flex; gap: var(--space-1-5); flex: 1; min-width: 200px; max-width: 360px; }
-.demo-seg {
-  flex: 1; height: 4px; padding: 0; border: none; cursor: pointer;
-  border-radius: var(--radius-pill); background: var(--color-rule); overflow: hidden;
+.demo-anno-step { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-pop-deep); font-weight: 600; }
+.demo-anno-step-dim { color: var(--color-ink-dim); }
+.demo-anno-title {
+  margin: var(--space-2) 0 var(--space-1); font-family: var(--font-display); font-weight: 700;
+  font-size: var(--text-xl); line-height: var(--leading-snug); color: var(--color-ink); letter-spacing: var(--tracking-tight);
 }
+.demo-anno-text { margin: 0; font-family: var(--font-body); font-size: var(--text-sm); line-height: var(--leading-normal); color: var(--color-ink-soft); }
+
+/* progress rail */
+.demo-progress { display: flex; gap: var(--space-1-5); justify-content: center; max-width: 480px; margin: 0 auto; width: 100%; }
+.demo-seg { flex: 1; height: 4px; padding: 0; border: none; cursor: pointer; border-radius: var(--radius-pill); background: var(--color-rule); overflow: hidden; }
 .demo-seg.is-done { background: var(--color-pop); }
 .demo-seg-fill { display: block; height: 100%; width: 100%; background: var(--color-pop); transform: scaleX(0); transform-origin: left; }
 
-/* caption transition */
-.cap-enter-active, .cap-leave-active { transition: opacity var(--dur-base) var(--ease-out), transform var(--dur-base) var(--ease-out); }
-.cap-enter-from { opacity: 0; transform: translateY(8px); }
-.cap-leave-to { opacity: 0; transform: translateY(-6px); }
+/* full screen — the section becomes the fullscreen element; lay the device out
+   centered on a dark backdrop, sized to fit the viewport height (aspect 1440/900,
+   leaving room for the chapter rail + progress). */
+.demo.is-fs {
+  background: var(--color-ink);
+  padding: clamp(var(--space-4), 3vh, var(--space-7));
+  justify-content: center;
+  gap: var(--space-5);
+}
+.demo.is-fs .demo-device {
+  width: min(95vw, calc((100vh - 230px) * 1.6));
+  margin: 0 auto;
+  box-shadow: var(--shadow-pop-deep);
+}
+.demo.is-fs .demo-progress { max-width: min(95vw, calc((100vh - 230px) * 1.6)); }
+.demo.is-fs .demo-seg { background: rgba(255, 255, 255, 0.2); }
+.demo.is-fs .demo-seg.is-done { background: var(--color-pop); }
+
+/* transitions */
+.xfade-enter-active, .xfade-leave-active { transition: opacity 0.5s var(--ease-out); }
+.xfade-enter-from, .xfade-leave-to { opacity: 0; }
+.anno-enter-active, .anno-leave-active { transition: opacity var(--dur-base) var(--ease-out), transform var(--dur-base) var(--ease-out); }
+.anno-enter-from { opacity: 0; transform: translateY(6px); }
+.anno-leave-to { opacity: 0; transform: translateY(-4px); }
 
 @media (max-width: 720px) {
-  .demo-title { font-size: var(--text-xl); }
-  .demo-foot { flex-direction: column; align-items: stretch; }
-  .demo-progress { max-width: none; }
+  .demo-anno { width: min(280px, 78%); }
+  .demo-anno-title { font-size: var(--text-lg); }
 }
 
+/* reduced motion: no glide, no pulse, no crossfade, no autoplay */
+.demo-stage.is-reduced .demo-spot { transition: none; animation: none; }
+.demo-stage.is-reduced .demo-anno { transition: none; }
 @media (prefers-reduced-motion: reduce) {
-  .demo-ring { animation: none; }
-  .demo-zoom { transform: none !important; }
+  .demo-spot { animation: none; transition: none; }
+  .demo-anno { transition: none; }
+  .xfade-enter-active, .xfade-leave-active, .anno-enter-active, .anno-leave-active { transition: none; }
 }
 </style>
