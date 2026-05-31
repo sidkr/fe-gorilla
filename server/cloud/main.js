@@ -24,3 +24,5 @@ require("./suppression");
 require("./domains");
 require("./automations");
 require("./revenue");
+require("./apiKeys");
+require("./stores");

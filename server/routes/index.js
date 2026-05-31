@@ -7,5 +7,7 @@ module.exports = {
     require("./webhooks").mount(app);
     require("./imports").mount(app);
     require("./forms").mount(app);
+    require("./eventsApi").mount(app);
+    require("./ecommerceWebhooks").mount(app);
   },
 };

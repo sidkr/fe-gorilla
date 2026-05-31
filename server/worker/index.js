@@ -26,6 +26,7 @@ async function start() {
   // never ran until this registration.
   require("./jobs/importCsv").register(agenda);
   require("./jobs/automationTick").register(agenda);
+  require("./jobs/ingestConversion").register(agenda);
 
   await agenda.start();
   console.log(

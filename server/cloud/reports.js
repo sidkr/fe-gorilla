@@ -207,6 +207,10 @@ Parse.Cloud.define("getDashboardMetrics", async (request) => {
   // campaigns rather than relying on a server-side sum aggregation so this works
   // identically across parse-server versions.
   const totals = { sent: 0, delivered: 0, opens: 0, clicks: 0, bounces: 0, unsubscribes: 0 };
+  // Revenue rollup (RevenueAttribution §5) — summed from the same Campaign page
+  // pass off the denormalized revenue counters R1's ingest maintains. All money
+  // INTEGER MINOR UNITS; the dashboard formats. Single-org-currency assumption.
+  const revenue = { total: 0, orders: 0, aov: 0, currency: "USD" };
   const campaignQ = new Parse.Query("Campaign");
   campaignQ.equalTo("organization", org);
   campaignQ.select(
@@ -216,6 +220,8 @@ Parse.Cloud.define("getDashboardMetrics", async (request) => {
     "clickCount",
     "bounceCount",
     "unsubscribeCount",
+    "revenueTotal",
+    "orderCount",
   );
   campaignQ.limit(1000);
   const campaigns = await campaignQ.find({ sessionToken: st });
@@ -226,7 +232,10 @@ Parse.Cloud.define("getDashboardMetrics", async (request) => {
     totals.clicks += counter(c, "clickCount");
     totals.bounces += counter(c, "bounceCount");
     totals.unsubscribes += counter(c, "unsubscribeCount");
+    revenue.total += counter(c, "revenueTotal");
+    revenue.orders += counter(c, "orderCount");
   }
+  revenue.aov = revenue.orders > 0 ? Math.round(revenue.total / revenue.orders) : 0;
 
   // Setup-checklist booleans. Reuses the counts above where they overlap to
   // avoid redundant queries (audiences/contacts/campaigns are already known).
@@ -250,6 +259,7 @@ Parse.Cloud.define("getDashboardMetrics", async (request) => {
     contacts: { total: totalContacts, subscribed: subscribedContacts },
     campaigns: { total: totalCampaigns, byStatus },
     totals,
+    revenue, // { total, orders, aov, currency } — all money minor units
     rates: {
       open: rate(totals.opens, totals.delivered),
       click: rate(totals.clicks, totals.delivered),
@@ -259,6 +269,28 @@ Parse.Cloud.define("getDashboardMetrics", async (request) => {
     onboarding: { steps: onboarding.steps, complete: onboarding.complete },
   };
 });
+
+// Sum the attributed revenue + order count for one campaign from its Conversion
+// rows (RevenueAttribution §5). Money is INTEGER MINOR UNITS; the frontend
+// formats. Org-scoped via the caller's session token (ACL-isolated). Returns
+// honest zeros for a campaign with no conversions. Also surfaces the org's
+// currency (read off the first conversion; single-currency assumption for now).
+async function campaignRevenue(campaign, org, sessionToken) {
+  const q = new Parse.Query("Conversion");
+  q.equalTo("organization", org);
+  q.equalTo("campaign", campaign);
+  q.select("revenue", "currency");
+  q.limit(100000);
+  const convs = await q.find({ sessionToken });
+
+  let revenue = 0;
+  let currency = null;
+  for (const c of convs) {
+    revenue += counter(c, "revenue");
+    if (!currency) currency = c.get("currency") || null;
+  }
+  return { revenue, orders: convs.length, currency: currency || "USD" };
+}
 
 // Build the headline counters for a single campaign object. Prefers the
 // campaign's denormalized counters; if `sentCount` is absent (pipeline hasn't
@@ -288,6 +320,16 @@ async function buildCampaignReport(campaign, org, sessionToken) {
     delivered = Math.max(sent - bounces, 0);
   }
 
+  // Revenue block — attributed revenue / orders + the derived money metrics.
+  //   aov                 = revenue / orders           (avg order value)
+  //   conversionRate      = orders  / delivered        (orders per delivered email)
+  //   revenuePerRecipient = revenue / delivered        (avg revenue per delivered)
+  // All integer minor units; rates are fractions in [0, 1].
+  const { revenue, orders, currency } = await campaignRevenue(campaign, org, sessionToken);
+  const aov = orders > 0 ? Math.round(revenue / orders) : 0;
+  const conversionRate = rate(orders, delivered);
+  const revenuePerRecipient = delivered > 0 ? Math.round(revenue / delivered) : 0;
+
   return {
     id: campaign.id,
     name: campaign.get("name") || "",
@@ -301,6 +343,13 @@ async function buildCampaignReport(campaign, org, sessionToken) {
       bounce: rate(bounces, sent),
       unsubscribe: rate(unsubscribes, delivered),
     },
+    // Revenue block (minor units). The reports page formats with formatCurrency.
+    revenue,
+    orders,
+    aov,
+    conversionRate,
+    revenuePerRecipient,
+    currency,
   };
 }
 
@@ -532,5 +581,117 @@ Parse.Cloud.define("getCampaignRecipients", async (request) => {
     total,
     totalPages: Math.max(Math.ceil(total / perPage), 1),
     rows,
+  };
+});
+
+// ── getRevenueOverview ─────────────────────────────────────────────────────────
+// Org-wide attributed-revenue report (RevenueAttribution §5). Scans the org's
+// Conversion rows in a date range and rolls them up into:
+//   { totalRevenue, orderCount, aov, currency,
+//     trend: [{ day, revenue, orders }],            (one bucket per UTC day)
+//     topCampaigns: [{ campaignId, name, revenue, orders, aov }],
+//     byModel: [{ model, revenue, orders }],        (attribution-model split)
+//     attributed: { revenue, orders },              (campaign-linked)
+//     unattributed: { revenue, orders } }
+// All money INTEGER MINOR UNITS; the frontend formats. Org-scoped via the
+// caller's session token (ACL-isolated) + an explicit organization filter.
+// Returns clean zeros / empty arrays for an org with no conversions.
+//
+// params: { from?: ISO/date, to?: ISO/date }. Defaults to the last 30 days.
+function revenueDayKey(d) {
+  return (d instanceof Date ? d : new Date(d)).toISOString().slice(0, 10);
+}
+
+Parse.Cloud.define("getRevenueOverview", async (request) => {
+  const user = requireUser(request);
+  const st = user.getSessionToken();
+  const org = await getUserOrg(user, { useMasterKey: true });
+
+  const params = request.params || {};
+  const toDate = params.to ? new Date(params.to) : new Date();
+  const fromDate = params.from
+    ? new Date(params.from)
+    : new Date(Date.now() - 29 * 24 * 60 * 60 * 1000);
+
+  // Pull the org's conversions in range. occurredAt is the canonical event time;
+  // fall back to createdAt only when a row predates the field.
+  const q = new Parse.Query("Conversion");
+  q.equalTo("organization", org);
+  q.greaterThanOrEqualTo("occurredAt", new Date(revenueDayKey(fromDate) + "T00:00:00.000Z"));
+  q.lessThanOrEqualTo("occurredAt", new Date(toDate));
+  q.include("campaign");
+  q.limit(100000);
+  const convs = await q.find({ sessionToken: st });
+
+  let totalRevenue = 0;
+  let currency = null;
+  const byDay = {}; // day -> { day, revenue, orders }
+  const byCampaign = {}; // campaignId -> { campaignId, name, revenue, orders }
+  const byModel = {}; // model -> { model, revenue, orders }
+  let attRevenue = 0, attOrders = 0, unattRevenue = 0, unattOrders = 0;
+
+  for (const c of convs) {
+    const rev = counter(c, "revenue");
+    totalRevenue += rev;
+    if (!currency) currency = c.get("currency") || null;
+
+    const day = revenueDayKey(c.get("occurredAt") || c.get("createdAt"));
+    if (!byDay[day]) byDay[day] = { day, revenue: 0, orders: 0 };
+    byDay[day].revenue += rev;
+    byDay[day].orders += 1;
+
+    const model = c.get("attributionModel") || "unattributed";
+    if (!byModel[model]) byModel[model] = { model, revenue: 0, orders: 0 };
+    byModel[model].revenue += rev;
+    byModel[model].orders += 1;
+
+    const camp = c.get("campaign");
+    if (camp && camp.id) {
+      if (!byCampaign[camp.id]) {
+        byCampaign[camp.id] = {
+          campaignId: camp.id,
+          name: camp.get("name") || "(untitled)",
+          revenue: 0,
+          orders: 0,
+        };
+      }
+      byCampaign[camp.id].revenue += rev;
+      byCampaign[camp.id].orders += 1;
+      attRevenue += rev;
+      attOrders += 1;
+    } else {
+      unattRevenue += rev;
+      unattOrders += 1;
+    }
+  }
+
+  const orderCount = convs.length;
+  const aov = orderCount > 0 ? Math.round(totalRevenue / orderCount) : 0;
+
+  // Dense daily trend: one bucket per UTC day in [from, to], zero-filled.
+  const trend = [];
+  const cur = new Date(revenueDayKey(fromDate) + "T00:00:00.000Z");
+  const end = new Date(revenueDayKey(toDate) + "T00:00:00.000Z");
+  for (let guard = 0; cur <= end && guard < 1000; guard++) {
+    const day = cur.toISOString().slice(0, 10);
+    trend.push(byDay[day] || { day, revenue: 0, orders: 0 });
+    cur.setUTCDate(cur.getUTCDate() + 1);
+  }
+
+  const topCampaigns = Object.values(byCampaign)
+    .map((c) => ({ ...c, aov: c.orders > 0 ? Math.round(c.revenue / c.orders) : 0 }))
+    .sort((a, b) => b.revenue - a.revenue)
+    .slice(0, 10);
+
+  return {
+    totalRevenue,
+    orderCount,
+    aov,
+    currency: currency || "USD",
+    trend,
+    topCampaigns,
+    byModel: Object.values(byModel).sort((a, b) => b.revenue - a.revenue),
+    attributed: { revenue: attRevenue, orders: attOrders },
+    unattributed: { revenue: unattRevenue, orders: unattOrders },
   };
 });

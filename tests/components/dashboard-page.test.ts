@@ -321,7 +321,8 @@ describe("dashboard quick actions + empty states", () => {
     metrics.value = null;
     const w = mountDash();
     expect(w.find(".dash-error").exists()).toBe(false);
-    // KPI strip still rendered.
-    expect(w.findAll(".t-kpi")).toHaveLength(4);
+    // KPI strip still rendered: 4 engagement tiles + 2 revenue tiles
+    // (Attributed revenue, Avg order value) added by revenue reporting.
+    expect(w.findAll(".t-kpi")).toHaveLength(6);
   });
 });

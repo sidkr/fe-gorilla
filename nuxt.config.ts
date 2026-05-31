@@ -89,6 +89,10 @@ export default defineNuxtConfig({
     // double-opt-in confirm, and the embed.js snippet. Same proxy pattern as the
     // tracking endpoints so embedded form URLs resolve through the same origin.
     "/f/**":      { proxy: `http://localhost:${process.env.PARSE_PORT || 8080}/f/**` },
+
+    // Ecommerce order webhooks (Shopify/WooCommerce → revenue attribution).
+    // Public, HMAC-verified, served by the Express server like the other hooks.
+    "/webhooks/**": { proxy: `http://localhost:${process.env.PARSE_PORT || 8080}/webhooks/**` },
   },
 
   // Marketing pages prerendered to static HTML at build time (SEO + speed),

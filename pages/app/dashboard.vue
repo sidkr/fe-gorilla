@@ -78,6 +78,16 @@ function fmtNum(n) {
 function fmtPct(fraction) {
   return `${((fraction || 0) * 100).toFixed(1)}%`;
 }
+// Money is stored as integer MINOR UNITS (cents); format in the frontend.
+// Single org currency (default USD) per the revenue architecture.
+function fmtMoney(minorUnits, currency = "USD") {
+  const major = Number(minorUnits || 0) / 100;
+  try {
+    return new Intl.NumberFormat("en-US", { style: "currency", currency, maximumFractionDigits: 2 }).format(major);
+  } catch {
+    return `${major.toLocaleString("en-US")} ${currency}`;
+  }
+}
 
 // ── KPI strip ─────────────────────────────────────────────────────────────--
 // Active campaigns = sending + scheduled. Subscribers = subscribed contacts.
@@ -87,9 +97,13 @@ const kpis = computed(() => {
   const m = metrics.value;
   const byStatus = m?.campaigns?.byStatus || {};
   const active = (byStatus.sending || 0) + (byStatus.scheduled || 0);
+  const rev = m?.revenue || { total: 0, orders: 0, aov: 0, currency: "USD" };
+  const cur = rev.currency || "USD";
   return [
     { label: "Active campaigns",     value: fmtNum(active),                          delta: `${fmtNum(m?.campaigns?.total || 0)} total`, deltaDirection: "neutral" },
     { label: "Subscribers",          value: fmtNum(m?.contacts?.subscribed || 0),    delta: `${fmtNum(m?.contacts?.total || 0)} contacts`, deltaDirection: "neutral" },
+    { label: "Attributed revenue",   value: fmtMoney(rev.total, cur),                delta: `${fmtNum(rev.orders)} orders`, deltaDirection: "neutral" },
+    { label: "Avg order value",      value: fmtMoney(rev.aov, cur),                  delta: "revenue ÷ orders", deltaDirection: "neutral" },
     { label: "Avg open rate",        value: fmtPct(m?.rates?.open),                  delta: "lifetime", deltaDirection: "neutral" },
     { label: "Avg click rate",       value: fmtPct(m?.rates?.click),                 delta: "lifetime", deltaDirection: "neutral" },
   ];

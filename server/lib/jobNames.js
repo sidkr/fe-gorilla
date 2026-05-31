@@ -11,4 +11,5 @@ module.exports = {
   WEBHOOK_INGEST: "webhook-ingest",
   IMPORT_CSV: "import-csv",
   AUTOMATION_TICK: "automation-tick",
+  INGEST_CONVERSION: "ingest-conversion",
 };

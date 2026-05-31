@@ -2,18 +2,31 @@
 //
 // GET  /t/o/:token  → 1x1 GIF + EmailEvent { type: "open" }
 // GET  /t/c/:token  → 302 → originalUrl + EmailEvent { type: "click", linkUrl }
+// GET  /t/p/:token  → 1x1 GIF + enqueue ingest-conversion (sourceType "pixel") — R2
 // GET  /u/:token    → confirmation page
 // POST /u/:token    → unsubscribe (confirm form + List-Unsubscribe-Post one-click)
 //
 // All tokens are HMAC-signed via server/lib/trackingTokens.js. The token is not
 // a secret (it carries a sendId), so an invalid OPEN token still returns the GIF
 // rather than leaking via a different status. Mounted BEFORE Parse's /api.
+//
+// R2 additions (revenue attribution):
+//   - GET /t/p/:token conversion pixel. The token encodes the sendId (same HMAC
+//     scheme; payload discriminator t === "p"), so the pixel needs no API key.
+//     We read value/orderId/currency from the query string, resolve the
+//     CampaignSend → org → contact email, and enqueue the shared
+//     ingest-conversion job (sourceType "pixel"). Respond fast (1x1 GIF),
+//     enqueue async.
+//   The click redirect itself is left untouched (clean 302 to the original
+//   URL) — attribution is resolved from the sendId carried in the pixel token,
+//   so we never mutate the recipient's destination URL.
 const express = require("express");
 const Parse = require("parse/node");
 
 const { verifyToken } = require("../lib/trackingTokens");
 const { bumpCounter, setFirst } = require("../lib/campaignCounters");
 const { addSuppression } = require("../lib/suppression");
+const { getAgenda } = require("../lib/agendaInstance");
 
 const MK = { useMasterKey: true };
 
@@ -140,6 +153,43 @@ async function recordUnsub(payload) {
   }
 }
 
+// ── conversion pixel (R2) ──────────────────────────────────────────────────--
+// Resolve the send → org + contact email, then enqueue the shared ingest job.
+// Fire-and-forget; the GIF has already been returned by the time this runs.
+async function recordConversionPixel(payload, req) {
+  const send = await loadSend(payload.sendId);
+  if (!send) return;
+  const org = send.get("organization");
+  if (!org) return;
+
+  const { value, orderId, currency } = req.query || {};
+  if (!orderId) return; // need an idempotency key to record anything
+
+  // Money is integer minor units; accept only a non-negative integer string.
+  const revenue = value != null && /^\d+$/.test(String(value)) ? Number(value) : 0;
+  const cur =
+    typeof currency === "string" && /^[A-Za-z]{3}$/.test(currency)
+      ? currency.toUpperCase()
+      : "USD";
+  const contact = send.get("contact");
+  const email =
+    contact && typeof contact.get === "function" ? contact.get("email") : null;
+
+  // Pass the send's contact email so the ingest job resolves the same contact
+  // and runs attribution through its existing (R1) contract — we don't edit it.
+  // getAgenda() is async (resolves once Mongo is connected); await it first.
+  const agenda = await getAgenda();
+  await agenda.now("ingest-conversion", {
+    org,
+    email: email || null,
+    orderId: String(orderId),
+    sourceType: "pixel",
+    revenue,
+    currency: cur,
+    raw: { via: "pixel", query: req.query, sendId: payload.sendId },
+  });
+}
+
 // ── HTML pages ───────────────────────────────────────────────────────────────
 function htmlShell(title, body) {
   return `<!doctype html>
@@ -205,7 +255,11 @@ function mount(app) {
     res.status(200).end(PIXEL);
   });
 
-  // Click redirect.
+  // Click redirect — 302 to the recipient's original destination, untouched.
+  // (We deliberately do NOT mutate the URL: appending an attribution param can
+  // break signed/strict destination URLs and is visible to recipients. Revenue
+  // attribution is resolved by the /t/p conversion pixel via the sendId in its
+  // own token, so the click path needs no handoff param.)
   app.get("/t/c/:token", (req, res) => {
     const payload = verifyToken(req.params.token);
     if (!payload || payload.t !== "c" || !payload.url) {
@@ -215,6 +269,22 @@ function mount(app) {
       console.error("[tracking] click record failed:", err && err.message),
     );
     res.redirect(302, payload.url);
+  });
+
+  // Conversion pixel (R2). GET /t/p/:token?value=<int>&orderId=<id>&currency=USD
+  // The token encodes the sendId; no API key needed (it's HMAC-signed). Respond
+  // fast with the GIF; enqueue the ingest job out-of-band.
+  app.get("/t/p/:token", (req, res) => {
+    const payload = verifyToken(req.params.token);
+    if (payload && payload.t === "p") {
+      recordConversionPixel(payload, req).catch((err) =>
+        console.error("[tracking] conversion pixel failed:", err && err.message),
+      );
+    }
+    res.set("Cache-Control", "no-store, no-cache, must-revalidate, private");
+    res.set("Pragma", "no-cache");
+    res.type("gif");
+    res.status(200).end(PIXEL);
   });
 
   // Unsubscribe confirmation page.
@@ -256,4 +326,5 @@ module.exports = {
   recordOpen,
   recordClick,
   recordUnsub,
+  recordConversionPixel,
 };
