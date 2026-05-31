@@ -1,21 +1,19 @@
-import Parse from "parse/dist/parse.min.js";
+import { useCloud } from "~/composables/app/useCloud";
 
 /**
  * useSuppression — manual suppression management (F-28).
- * Mirrors the cloud functions in server/cloud/suppression.js.
+ * Mirrors the cloud functions in server/cloud/suppression.js. Goes through
+ * useCloud().runCloud (NOT Parse.Cloud.run directly) so calls hit the SDK
+ * instance the parse.client plugin initialized and get error/session-expiry
+ * normalization.
  */
 export function useSuppression() {
-  async function listSuppressions(params: { search?: string; page?: number } = {}) {
-    return await Parse.Cloud.run("listSuppressions", params);
-  }
-
-  async function addSuppressions(payload: { emails: string; reason?: string }) {
-    return await Parse.Cloud.run("addSuppressions", payload);
-  }
-
-  async function removeSuppression(id: string) {
-    return await Parse.Cloud.run("removeSuppression", { id });
-  }
-
-  return { listSuppressions, addSuppressions, removeSuppression };
+  const { runCloud } = useCloud();
+  return {
+    listSuppressions: (params: { search?: string; page?: number } = {}) =>
+      runCloud("listSuppressions", params),
+    addSuppressions: (payload: { emails: string; reason?: string }) =>
+      runCloud("addSuppressions", payload),
+    removeSuppression: (id: string) => runCloud("removeSuppression", { id }),
+  };
 }

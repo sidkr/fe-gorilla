@@ -220,7 +220,39 @@ TI-*, CR-07/14/35/36, RPT-T01-04, TEN-01-04, TPL-T01-03.
 
 ---
 
-## 6. Tooling & how to run
+## 6. Growth-phase journeys (CSV import, signup forms, automations, domains, suppression)
+
+Surfaces shipped in `7d55da2`. The **`orgUser` fixture now exists** (P0 done), so authed browser journeys are no longer blocked. Public flows use a fresh unauthenticated context.
+
+### 6.1 CSV contact import (P0)
+Surfaces: `/app/audiences/[id]` import affordance + `components/app/import/*`, `POST /api/imports/upload`, the `import-csv` worker job, `server/cloud/imports.js`.
+- **Pre:** orgUser + an existing audience.
+- **Steps:** open the audience → Import → upload a small CSV (`email,firstName,…`) → map columns (incl. a custom field if defined) → affirm consent → start → poll the ImportJob progress to done.
+- **Expect:** summary shows imported/updated/skipped; mapped contacts appear; an invalid-row file surfaces the skip/error count; re-importing the same file **updates by email, no duplicates**.
+
+### 6.2 Hosted signup form + double-opt-in (P0, **public flow**)
+Surfaces: `/app/forms`, `/app/forms/[id]`; public Express `GET /f/:id`, `POST /f/:id`, `GET /f/confirm/:token`, `GET /f/:id/embed.js`.
+- **Pre:** orgUser creates + publishes a form (fields, target audience, double-opt-in ON).
+- **Steps (NEW unauthenticated context — a real visitor):** `GET /f/:id` → fill email (+ name) → submit → "check your inbox" → retrieve the confirm token (from the `MockSentMessage` outbox via REST+master key) → `GET /f/confirm/:token` → "you're subscribed".
+- **Expect:** Contact created `pending` → `subscribed` after confirm; `consent.source` = the form; added to the form's audience; `embed.js` serves JS; the form's submission count increments on the authed side.
+
+### 6.3 Automations / journeys (P1)
+Surfaces: `/app/automations`, `/app/automations/[id]`; `server/cloud/automations.js`, `automationRecipes.js`, the `automation-tick` worker job.
+- **Pre:** orgUser + an audience with a contact.
+- **Steps:** create from a recipe (e.g. welcome series) → set trigger (contact added / joins audience) → activate → fire the trigger → run the tick → assert step 1 fires (a send queued / `MockSentMessage` for the enrolled contact).
+- **Expect:** enrollment created; step advances; a send is produced; pausing halts progression. Mark not-yet-built steps `test.fixme`.
+
+### 6.4 Domain verification (P1)
+Surfaces: `/app/settings/domains`; `server/cloud/domains.js`.
+- **Steps:** add `acme.com` → see generated SPF/DKIM/DMARC records → Verify (stub/real per env) → status reflects pending/verified; remediation copy on failure.
+- **Expect:** a SendingDomain row with status transitions; records displayed; org B can't see org A's domains.
+
+### 6.5 Suppression management (P1)
+Surfaces: `/app/settings/suppression`; `server/cloud/suppression.js`.
+- **Steps:** view list → search by email → manually add an address (reason `manual`) → confirm a later send to it is skipped (ties to §1b/§2) → remove a `manual`/`unsubscribe` entry; `hard_bounce`/`complaint` are **not removable**.
+- **Expect:** list paginates + searches; manual add/remove works with the irrevocable rule enforced; tenant-isolated.
+
+## 7. Tooling & how to run
 
 | Layer | Tool | Env | Command |
 |---|---|---|---|
