@@ -45,7 +45,11 @@ function onDelete(isFooter: boolean) {
 </script>
 
 <template>
-  <div :class="['bht', { 'bht--selected': selected }]" @click.stop>
+  <!-- @mousedown.prevent keeps focus on an inline-editable block's
+       contenteditable while a toolbar button is pressed. Without it, pressing
+       a button blurs the editor mid-click → a re-render swallows the click and
+       delete/duplicate/move silently no-op on heading/paragraph blocks. -->
+  <div :class="['bht', { 'bht--selected': selected }]" @click.stop @mousedown.prevent>
     <button
       type="button"
       class="bht-btn"
