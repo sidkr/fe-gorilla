@@ -24,7 +24,12 @@ test("homepage renders the live demo player", async ({ page }) => {
   await expect(section.locator(".demo-anno-title")).toBeVisible();
   await expect(section.locator(".demo-chip").first()).toBeVisible();
   await expect(section.locator(".demo-seg")).toHaveCount(9);
+  await expect(section.getByRole("button", { name: /full screen/i })).toBeVisible();
 
-  await page.waitForTimeout(1200);
+  // The full-screen toggle calls requestFullscreen() on a trusted click (works in
+  // real browsers; headless has no display surface, so we don't assert it engaged).
+  await section.getByRole("button", { name: /full screen/i }).click();
+
+  await page.waitForTimeout(1000);
   await section.screenshot({ path: path.join(ROOT, "test-results/home-preview.jpg"), type: "jpeg", quality: 90 });
 });

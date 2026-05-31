@@ -25,6 +25,7 @@ const manifest = ref<Manifest | null>(null);
 const idx = ref(0);
 const playing = ref(false);
 const reduced = ref(false);
+const isFullscreen = ref(false);
 const root = ref<HTMLElement | null>(null);
 const sceneProgress = ref(0);
 
@@ -88,14 +89,42 @@ onMounted(async () => {
       const e = entries[0];
       const visible = !!e?.isIntersecting && e.intersectionRatio >= 0.4;
       if (visible && !reduced.value) play();
-      else pause();
+      else if (!isFullscreen.value) pause();
     },
     { threshold: [0, 0.4, 0.75] },
   );
   if (root.value) io.observe(root.value);
+
+  document.addEventListener("fullscreenchange", onFsChange);
+  document.addEventListener("webkitfullscreenchange", onFsChange as EventListener);
 });
 
-onBeforeUnmount(() => { cancelAnimationFrame(raf); io?.disconnect(); });
+onBeforeUnmount(() => {
+  cancelAnimationFrame(raf);
+  io?.disconnect();
+  document.removeEventListener("fullscreenchange", onFsChange);
+  document.removeEventListener("webkitfullscreenchange", onFsChange as EventListener);
+});
+
+// ── Full screen ──────────────────────────────────────────────────────────────
+function fsElement(): Element | null {
+  return document.fullscreenElement || (document as any).webkitFullscreenElement || null;
+}
+async function toggleFullscreen() {
+  const el = root.value as (HTMLElement & { webkitRequestFullscreen?: () => Promise<void> }) | null;
+  if (!el) return;
+  try {
+    if (fsElement()) {
+      await (document.exitFullscreen?.() ?? (document as any).webkitExitFullscreen?.());
+    } else {
+      await (el.requestFullscreen?.() ?? el.webkitRequestFullscreen?.());
+    }
+  } catch { /* fullscreen denied / unsupported — ignore */ }
+}
+function onFsChange() {
+  isFullscreen.value = fsElement() === root.value;
+  if (isFullscreen.value && !reduced.value) play();
+}
 
 function play() {
   if (playing.value || !scenes.value.length || reduced.value) return;
@@ -128,7 +157,7 @@ function loop() {
 </script>
 
 <template>
-  <section ref="root" class="demo" aria-label="Fe-Mail Gorilla product demo">
+  <section ref="root" class="demo" :class="{ 'is-fs': isFullscreen }" aria-label="Fe-Mail Gorilla product demo">
     <!-- Chapter rail -->
     <div class="demo-chapters" role="tablist" aria-label="Demo chapters">
       <button
@@ -148,10 +177,16 @@ function loop() {
       <div class="demo-chrome">
         <span class="demo-dot" /><span class="demo-dot" /><span class="demo-dot" />
         <span class="demo-url">app.gorilla.email<span class="demo-url-path">/{{ scene?.id ?? "dashboard" }}</span></span>
-        <button class="demo-play" type="button" :aria-label="playing ? 'Pause demo' : 'Play demo'" @click="toggle">
-          <svg v-if="playing" width="13" height="13" viewBox="0 0 12 12"><rect x="2" y="1.5" width="3" height="9" rx="1" /><rect x="7" y="1.5" width="3" height="9" rx="1" /></svg>
-          <svg v-else width="13" height="13" viewBox="0 0 12 12"><path d="M3 1.8 10 6 3 10.2Z" /></svg>
-        </button>
+        <div class="demo-actions">
+          <button class="demo-play" type="button" :aria-label="playing ? 'Pause demo' : 'Play demo'" @click="toggle">
+            <svg v-if="playing" width="13" height="13" viewBox="0 0 12 12"><rect x="2" y="1.5" width="3" height="9" rx="1" /><rect x="7" y="1.5" width="3" height="9" rx="1" /></svg>
+            <svg v-else width="13" height="13" viewBox="0 0 12 12"><path d="M3 1.8 10 6 3 10.2Z" /></svg>
+          </button>
+          <button class="demo-icon-btn" type="button" :aria-label="isFullscreen ? 'Exit full screen' : 'Full screen'" @click="toggleFullscreen">
+            <svg v-if="!isFullscreen" width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5V2h3M12 5V2H9M2 9v3h3M12 9v3H9" /></svg>
+            <svg v-else width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 2v3H2M9 2v3h3M5 12V9H2M9 12V9h3" /></svg>
+          </button>
+        </div>
       </div>
 
       <div class="demo-stage" :class="{ 'is-reduced': reduced }">
@@ -237,14 +272,22 @@ function loop() {
   border-radius: var(--radius-pill); padding: 3px var(--space-3);
 }
 .demo-url-path { color: var(--color-pop-deep); }
+.demo-actions { margin-left: auto; display: inline-flex; align-items: center; gap: var(--space-2); }
 .demo-play {
-  margin-left: auto; display: inline-flex; align-items: center; justify-content: center;
+  display: inline-flex; align-items: center; justify-content: center;
   width: 28px; height: 28px; border: none; border-radius: var(--radius-pill);
   background: var(--color-pop); color: var(--color-ink-on-pop); cursor: pointer;
   transition: background var(--dur-fast) var(--ease-out);
 }
 .demo-play:hover { background: var(--color-pop-deep); }
 .demo-play svg { fill: currentColor; }
+.demo-icon-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border: 1px solid var(--color-rule); border-radius: var(--radius-pill);
+  background: var(--color-surface); color: var(--color-ink-soft); cursor: pointer;
+  transition: color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
+}
+.demo-icon-btn:hover { color: var(--color-ink); border-color: var(--color-rule-strong); }
 
 /* stage */
 .demo-stage { position: relative; aspect-ratio: 1440 / 900; overflow: hidden; background: var(--color-surface-sunk); }
@@ -308,6 +351,24 @@ function loop() {
 .demo-seg { flex: 1; height: 4px; padding: 0; border: none; cursor: pointer; border-radius: var(--radius-pill); background: var(--color-rule); overflow: hidden; }
 .demo-seg.is-done { background: var(--color-pop); }
 .demo-seg-fill { display: block; height: 100%; width: 100%; background: var(--color-pop); transform: scaleX(0); transform-origin: left; }
+
+/* full screen — the section becomes the fullscreen element; lay the device out
+   centered on a dark backdrop, sized to fit the viewport height (aspect 1440/900,
+   leaving room for the chapter rail + progress). */
+.demo.is-fs {
+  background: var(--color-ink);
+  padding: clamp(var(--space-4), 3vh, var(--space-7));
+  justify-content: center;
+  gap: var(--space-5);
+}
+.demo.is-fs .demo-device {
+  width: min(95vw, calc((100vh - 230px) * 1.6));
+  margin: 0 auto;
+  box-shadow: var(--shadow-pop-deep);
+}
+.demo.is-fs .demo-progress { max-width: min(95vw, calc((100vh - 230px) * 1.6)); }
+.demo.is-fs .demo-seg { background: rgba(255, 255, 255, 0.2); }
+.demo.is-fs .demo-seg.is-done { background: var(--color-pop); }
 
 /* transitions */
 .xfade-enter-active, .xfade-leave-active { transition: opacity 0.5s var(--ease-out); }
