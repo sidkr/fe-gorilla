@@ -136,10 +136,13 @@ function triggerCsvDownload(filename: string, csv: string) {
         <h1>Reports</h1>
         <p class="rep-lede">Campaign performance, audience health, and deliverability at a glance.</p>
       </div>
-      <Button variant="ghost" :disabled="exporting || demo" :loading="exporting" @click="onExport">
-        <template #leading><Icon name="download" size="sm" /></template>
-        {{ exporting ? "Exporting…" : "Export CSV" }}
-      </Button>
+      <div class="rep-header-actions">
+        <NuxtLink to="/app/reports/revenue" class="rep-revenue-link">Revenue report →</NuxtLink>
+        <Button variant="ghost" :disabled="exporting || demo" :loading="exporting" @click="onExport">
+          <template #leading><Icon name="download" size="sm" /></template>
+          {{ exporting ? "Exporting…" : "Export CSV" }}
+        </Button>
+      </div>
     </header>
 
     <p v-if="error" class="rep-error">{{ error }}</p>
@@ -175,6 +178,12 @@ function triggerCsvDownload(filename: string, csv: string) {
   flex-wrap: wrap;
 }
 .rep-header-text { min-width: 0; }
+.rep-header-actions { display: flex; align-items: center; gap: var(--space-4); }
+.rep-revenue-link {
+  font-family: var(--font-body); font-size: var(--text-sm); font-weight: 600;
+  color: var(--link-color); text-decoration: none; white-space: nowrap;
+}
+.rep-revenue-link:hover { text-decoration: underline; }
 .rep-header h1 {
   font-family: var(--font-display);
   font-size: var(--text-3xl);

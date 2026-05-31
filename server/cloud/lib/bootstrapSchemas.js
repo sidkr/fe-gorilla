@@ -206,6 +206,10 @@ async function bootstrapSchemas() {
     // Send-pipeline fields: opt-out flag + soft-bounce promotion counter.
     field(s, e, "unsubscribed", "Boolean");
     field(s, e, "softBounceCount", "Number");
+    // Lifetime-value rollup (Revenue R1) — maintained by the ingest job.
+    field(s, e, "totalRevenue", "Number"); // integer minor units
+    field(s, e, "orderCount", "Number");
+    field(s, e, "lastOrderAt", "Date");
     // Unique compound: one contact per email per org (CSV dedupe key).
     index(s, e, "contact_org_email_unique", { organization: 1, email: 1 });
     index(s, e, "contact_org_status", { organization: 1, status: 1 });
@@ -282,6 +286,10 @@ async function bootstrapSchemas() {
     field(s, e, "clickCount", "Number");
     field(s, e, "bounceCount", "Number");
     field(s, e, "unsubscribeCount", "Number");
+    // Revenue counters (Revenue R1) — $inc'd by the ingest-conversion job.
+    field(s, e, "revenueTotal", "Number"); // integer minor units
+    field(s, e, "conversionCount", "Number");
+    field(s, e, "orderCount", "Number");
     index(s, e, "campaign_org_status_created", { organization: 1, status: 1, createdAt: -1 });
     s.setCLP(authOnlyCLP());
   });
@@ -449,6 +457,60 @@ async function bootstrapSchemas() {
     field(s, e, "context", "Object");
     index(s, e, "enroll_status_nextrun", { status: 1, nextRunAt: 1 });
     index(s, e, "enroll_automation_contact", { automation: 1, contact: 1 });
+    s.setCLP(authOnlyCLP());
+  });
+
+  // ── Conversion (Revenue R1 — attributed/unattributed orders) ────────────────
+  await ensureClass("Conversion", (s, e) => {
+    field(s, e, "organization", "Pointer", { targetClass: "Organization" });
+    field(s, e, "contact", "Pointer", { targetClass: "Contact" });
+    field(s, e, "campaign", "Pointer", { targetClass: "Campaign" });
+    field(s, e, "campaignSend", "Pointer", { targetClass: "CampaignSend" });
+    field(s, e, "orderId", "String");
+    field(s, e, "sourceType", "String"); // shopify|woocommerce|api|pixel|manual
+    field(s, e, "revenue", "Number"); // INTEGER MINOR UNITS (e.g. cents)
+    field(s, e, "currency", "String"); // ISO 4217
+    field(s, e, "itemCount", "Number");
+    field(s, e, "occurredAt", "Date");
+    field(s, e, "attributionModel", "String"); // last_click|last_open|unattributed
+    field(s, e, "attributionWindowDays", "Number");
+    field(s, e, "raw", "Object");
+    // UNIQUE idempotency key — webhook retries / pixel double-fires don't double-count.
+    index(s, e, "conversion_org_order_source_unique", { organization: 1, orderId: 1, sourceType: 1 });
+    index(s, e, "conversion_org_occurred", { organization: 1, occurredAt: -1 });
+    index(s, e, "conversion_campaign", { campaign: 1 });
+    index(s, e, "conversion_contact", { contact: 1 });
+    s.setCLP(authOnlyCLP());
+  });
+
+  // ── ApiKey (Revenue R2 — inbound events API auth; NOT per-tenant) ───────────
+  // Self-stamps org + ACL in createApiKey, so it is deliberately kept out of
+  // PER_TENANT_CLASSES. Only a hash of the raw key is stored.
+  await ensureClass("ApiKey", (s, e) => {
+    field(s, e, "organization", "Pointer", { targetClass: "Organization" });
+    field(s, e, "name", "String");
+    field(s, e, "keyPrefix", "String");
+    field(s, e, "keyHash", "String");
+    field(s, e, "scopes", "Array");
+    field(s, e, "lastUsedAt", "Date");
+    field(s, e, "revokedAt", "Date");
+    index(s, e, "apikey_prefix_unique", { keyPrefix: 1 });
+    index(s, e, "apikey_org", { organization: 1 });
+    s.setCLP(authOnlyCLP());
+  });
+
+  // ── StoreConnection (Revenue R3 — connected Shopify/WooCommerce store) ───────
+  await ensureClass("StoreConnection", (s, e) => {
+    field(s, e, "organization", "Pointer", { targetClass: "Organization" });
+    field(s, e, "provider", "String"); // shopify|woocommerce|bigcommerce|custom
+    field(s, e, "shopDomain", "String");
+    field(s, e, "status", "String"); // connected|pending|error
+    field(s, e, "webhookSecret", "String");
+    field(s, e, "accessToken", "String");
+    field(s, e, "installedAt", "Date");
+    field(s, e, "lastEventAt", "Date");
+    field(s, e, "settings", "Object"); // { attributionWindowDays, currency }
+    index(s, e, "store_org_provider_domain_unique", { organization: 1, provider: 1, shopDomain: 1 });
     s.setCLP(authOnlyCLP());
   });
 

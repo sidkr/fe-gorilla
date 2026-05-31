@@ -23,6 +23,11 @@ const COUNTER_FIELDS = new Set([
   "clickCount",
   "bounceCount",
   "unsubscribeCount",
+  // Revenue attribution rollups (RevenueAttribution R1). revenueTotal is in
+  // integer minor units (e.g. cents); the others are plain counts.
+  "revenueTotal",
+  "conversionCount",
+  "orderCount",
 ]);
 
 function toCampaignPointer(campaignId) {
@@ -49,6 +54,36 @@ async function bumpCounter(campaignId, field, by = 1) {
   }
   campaign.increment(field, by);
   await campaign.save(null, MK);
+  return campaign;
+}
+
+// Atomically bump SEVERAL Campaign counters in one save. `deltas` is a map of
+// { field: amount }. Every field must be a known COUNTER_FIELDS member. Uses
+// Parse.increment per field so the save compiles to a single multi-field $inc —
+// safe under concurrent ingest. Used by the revenue ingest job to bump
+// revenueTotal / conversionCount / orderCount together.
+async function bumpCampaignCounters(campaignId, deltas) {
+  const campaign = toCampaignPointer(campaignId);
+  if (!campaign) {
+    throw new Parse.Error(
+      Parse.Error.VALIDATION_ERROR,
+      "bumpCampaignCounters requires a campaign.",
+    );
+  }
+  let touched = false;
+  for (const [field, by] of Object.entries(deltas || {})) {
+    if (!COUNTER_FIELDS.has(field)) {
+      throw new Parse.Error(
+        Parse.Error.VALIDATION_ERROR,
+        `bumpCampaignCounters: unknown counter field "${field}".`,
+      );
+    }
+    if (by) {
+      campaign.increment(field, by);
+      touched = true;
+    }
+  }
+  if (touched) await campaign.save(null, MK);
   return campaign;
 }
 
@@ -96,6 +131,7 @@ async function finalizeCampaignIfComplete(campaignId) {
 
 module.exports = {
   bumpCounter,
+  bumpCampaignCounters,
   setFirst,
   finalizeCampaignIfComplete,
   COUNTER_FIELDS,

@@ -5,9 +5,11 @@
 // pipeline exists (no CampaignSend / EmailEvent rows yet).
 import { computed, onMounted, reactive, ref, watch } from "vue";
 import { useRoute } from "vue-router";
+import Parse from "parse";
 import { useAudiences } from "~/composables/app/useAudiences";
 import { useContacts } from "~/composables/app/useContacts";
 import { useCustomFields } from "~/composables/app/useCustomFields";
+import { useFormatters } from "~/composables/shared/useFormatters";
 import ImportWizard from "~/components/app/import/ImportWizard.vue";
 
 definePageMeta({
@@ -18,6 +20,7 @@ definePageMeta({
 const route = useRoute();
 const audienceId = computed(() => String(route.params.id));
 
+const { formatCurrency, formatNumber, formatDate: formatDateF } = useFormatters();
 const { getAudience } = useAudiences();
 const {
   listContacts,
@@ -347,9 +350,37 @@ const drawerTab = ref("details"); // "details" | "activity"
 function openDrawer(c) {
   drawerContact.value = c;
   drawerTab.value = "details";
+  loadDrawerLtv(c);
 }
 function closeDrawer() {
   drawerContact.value = null;
+  drawerLtv.value = null;
+}
+
+// ── Contact lifetime value (F-revenue) ────────────────────────────────────────
+// totalRevenue / orderCount / lastOrderAt are denormalized onto Contact by the
+// revenue ingest (RevenueAttribution §3). totalRevenue is INTEGER MINOR UNITS;
+// formatCurrency renders it. We read it straight off Parse (the documented
+// app-data pattern) so the drawer shows real LTV even if the list payload
+// doesn't carry these fields. Honest zeros when the contact has no orders.
+const drawerLtv = ref(null);
+async function loadDrawerLtv(c) {
+  // Seed from the list payload if present so there's no flash, then refresh.
+  drawerLtv.value = {
+    totalRevenue: Number(c?.totalRevenue || 0),
+    orderCount: Number(c?.orderCount || 0),
+    lastOrderAt: c?.lastOrderAt || null,
+  };
+  try {
+    const obj = await new Parse.Query("Contact").get(c.id);
+    drawerLtv.value = {
+      totalRevenue: Number(obj.get("totalRevenue") || 0),
+      orderCount: Number(obj.get("orderCount") || 0),
+      lastOrderAt: obj.get("lastOrderAt") ? obj.get("lastOrderAt").toISOString() : null,
+    };
+  } catch {
+    // Keep the seeded values on failure (ACL / offline) — non-fatal.
+  }
 }
 function openDrawerById(id) {
   const c = contacts.value.find((x) => x.id === id);
@@ -757,6 +788,17 @@ const drawerCustomFields = computed(() => {
             </dd>
             <dt>List membership</dt><dd>{{ (drawerContact.lists || []).length }} list(s)</dd>
             <dt>Added</dt><dd>{{ formatDate(drawerContact.createdAt) }}</dd>
+          </dl>
+
+          <!-- Lifetime value (revenue attribution). Money is minor units. -->
+          <h3 class="ad-drawer-subhead">Lifetime value</h3>
+          <dl class="ad-deflist">
+            <dt>Total revenue</dt>
+            <dd>{{ formatCurrency(drawerLtv ? drawerLtv.totalRevenue : 0) }}</dd>
+            <dt>Orders</dt>
+            <dd>{{ formatNumber(drawerLtv ? drawerLtv.orderCount : 0) }}</dd>
+            <dt>Last order</dt>
+            <dd>{{ drawerLtv && drawerLtv.lastOrderAt ? formatDateF(drawerLtv.lastOrderAt) : "—" }}</dd>
           </dl>
 
           <template v-if="drawerCustomFields.length">
