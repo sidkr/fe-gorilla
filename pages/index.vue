@@ -756,4 +756,12 @@ useHead({
       .footer-grid { grid-template-columns: 1fr 1fr; }
       .nav-links { display: none; }
     }
+    @media (max-width: 400px) {
+      /* iPhone-SE-class: stop the big display h1, the two-up CTA buttons, and the
+         hero figure from forcing a horizontal scrollbar. */
+      .hero h1 { font-size: var(--text-4xl); overflow-wrap: anywhere; }
+      .hero .lede { font-size: var(--text-md); }
+      .hero-cta { flex-wrap: wrap; }
+      .hero-figure { max-width: 100%; }
+    }
 </style>

@@ -12,6 +12,11 @@
 @media (max-width: 600px) {
   .wrap { padding: 0 var(--space-5); }
 }
+@media (max-width: 380px) {
+  /* iPhone-SE-class widths: tighter still so the nav (brand + hamburger) and
+     content fit without a horizontal scrollbar. */
+  .wrap { padding: 0 var(--space-3); }
+}
 
 /* Long content (code, URLs, tables) must never push the page wider than the
    viewport on mobile. */

@@ -99,4 +99,9 @@ watch(() => route.fullPath, () => { open.value = false; });
   .nv-links, .nv-cta { display: none; }
   .nv-burger { display: flex; }
 }
+/* Very small phones: show just the logomark (hide the wordmark) so the brand +
+   hamburger always fit. */
+@media (max-width: 400px) {
+  .nv-brand > :last-child { display: none; }
+}
 </style>

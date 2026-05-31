@@ -102,5 +102,7 @@ const columns = [
 .fe26 .sym { padding: 4px 6px; font-weight: 600; }
 .fe26 .name { padding: 4px 6px; background: var(--color-ink); color: var(--color-ink-on-pop); letter-spacing: var(--tracking-wider); }
 
-@media (max-width: 960px) { .ft-grid { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 960px) { .ft-grid { grid-template-columns: 1fr 1fr; gap: var(--space-6) var(--space-5); } }
+/* On small phones the 2-col grid + large gap overflows; go single column. */
+@media (max-width: 420px) { .ft-grid { grid-template-columns: 1fr; gap: var(--space-6); } }
 </style>

@@ -270,7 +270,11 @@ function loop() {
   margin-left: var(--space-3); font-family: var(--font-mono); font-size: var(--text-xs);
   color: var(--color-ink-dim); background: var(--color-surface); border: 1px solid var(--color-rule);
   border-radius: var(--radius-pill); padding: 3px var(--space-3);
+  /* Truncate rather than push the play/fullscreen actions past the viewport on
+     narrow phones (the chrome bar is a non-wrapping flex row). */
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+.demo-actions { flex-shrink: 0; }
 .demo-url-path { color: var(--color-pop-deep); }
 .demo-actions { margin-left: auto; display: inline-flex; align-items: center; gap: var(--space-2); }
 .demo-play {
