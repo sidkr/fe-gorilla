@@ -58,6 +58,12 @@ function num(v, fallback) {
   return Number.isFinite(n) ? n : fallback;
 }
 
+// MJML's <mj-social-element name> for a platform. "x" has no dedicated icon,
+// so it falls back to the Twitter glyph. Mirrors registry.ts.
+function mjmlSocialName(platform) {
+  return platform === "x" ? "twitter" : String(platform || "twitter");
+}
+
 // ── Block → MJML mappers ─────────────────────────────────────────────────────
 // One mapper per block type. Each returns a fragment of MJML that lives inside
 // an <mj-column>. Kept deliberately close to registry.ts's compileMjml stubs so
@@ -113,6 +119,35 @@ const BLOCK_MJML = {
     return `<mj-spacer height="${num(props.height, 24)}px" />`;
   },
 
+  social(props = {}) {
+    const links = Array.isArray(props.links) ? props.links : [];
+    const els = links
+      .filter((l) => l && l.url)
+      .map(
+        (l) =>
+          `<mj-social-element name="${esc(mjmlSocialName(l.platform))}" href="${esc(l.url)}" />`,
+      )
+      .join("");
+    if (!els) return "";
+    return `<mj-social mode="horizontal" align="${esc(
+      props.align || "center",
+    )}" icon-size="22px">${els}</mj-social>`;
+  },
+
+  product(props = {}) {
+    const align = esc(props.align || "center");
+    const parts = [];
+    if (props.image)
+      parts.push(`<mj-image src="${esc(props.image)}" alt="${esc(props.alt)}" align="${align}" />`);
+    if (props.name)
+      parts.push(`<mj-text align="${align}" font-size="16px" font-weight="700">${esc(props.name)}</mj-text>`);
+    if (props.price)
+      parts.push(`<mj-text align="${align}" color="#C53030" font-weight="600">${esc(props.price)}</mj-text>`);
+    if (props.buttonLabel)
+      parts.push(`<mj-button background-color="#FF4E4E" color="#FFFFFF" href="${esc(props.buttonHref || "#")}" align="${align}" border-radius="8px">${esc(props.buttonLabel)}</mj-button>`);
+    return parts.join("");
+  },
+
   footer(props = {}) {
     const parts = [];
     parts.push(
@@ -144,7 +179,30 @@ const BLOCK_MJML = {
   },
 };
 
+// A "columns" block is SECTION-level: it emits its own <mj-section> with one
+// <mj-column> per column, so the columns sit side by side (the regular
+// single-column wrapper can't do that). Each column stacks image/heading/text/
+// button vertically. Returns a full <mj-section>…</mj-section> string.
+function columnsToSection(props = {}) {
+  const cols = Array.isArray(props.columns) ? props.columns : [];
+  if (!cols.length) return "";
+  const colsMjml = cols
+    .map((c = {}) => {
+      const parts = [];
+      if (c.image) parts.push(`<mj-image src="${esc(c.image)}" alt="${esc(c.alt)}" />`);
+      if (c.heading) parts.push(`<mj-text font-size="18px" font-weight="700">${esc(c.heading)}</mj-text>`);
+      if (c.text) parts.push(`<mj-text font-size="14px" line-height="1.6">${esc(c.text)}</mj-text>`);
+      if (c.buttonLabel)
+        parts.push(`<mj-button background-color="#FF4E4E" color="#FFFFFF" href="${esc(c.buttonHref || "#")}" border-radius="8px">${esc(c.buttonLabel)}</mj-button>`);
+      return `<mj-column>${parts.join("")}</mj-column>`;
+    })
+    .join("");
+  return `<mj-section background-color="#FFFFFF" padding="24px">${colsMjml}</mj-section>`;
+}
+
 // Build the full MJML document from a body + optional canvas background.
+// Runs of normal blocks are grouped into a single-column <mj-section>; a
+// "columns" block flushes that run and emits its own multi-column section.
 // Unknown/empty blocks are skipped so a partially-saved body never aborts.
 function buildMjml(body, opts = {}) {
   const blocks = Array.isArray(body && body.blocks) ? body.blocks : [];
@@ -152,22 +210,38 @@ function buildMjml(body, opts = {}) {
     ? esc(opts.bodyBg)
     : "#F2F2F7";
 
-  const fragments = [];
+  const sections = [];
+  let colBuffer = []; // fragments for the current single-column section
+  const flush = () => {
+    if (!colBuffer.length) return;
+    sections.push(
+      `<mj-section background-color="#FFFFFF" padding="24px"><mj-column>${colBuffer.join("\n")}</mj-column></mj-section>`,
+    );
+    colBuffer = [];
+  };
+
   for (const block of blocks) {
     if (!block || typeof block.type !== "string") continue;
-    const mapper = BLOCK_MJML[block.type];
-    if (!mapper) continue; // unknown type — skip, don't throw
     try {
+      if (block.type === "columns") {
+        flush();
+        const sec = columnsToSection(block.props || {});
+        if (sec) sections.push(sec);
+        continue;
+      }
+      const mapper = BLOCK_MJML[block.type];
+      if (!mapper) continue; // unknown type — skip, don't throw
       const frag = mapper(block.props || {});
-      if (frag) fragments.push(frag);
+      if (frag) colBuffer.push(frag);
     } catch (_) {
       // A single malformed block shouldn't sink the whole compile.
     }
   }
+  flush();
 
-  const inner = fragments.length
-    ? fragments.join("\n")
-    : '<mj-text color="#8E8E93">This email has no content yet.</mj-text>';
+  const inner = sections.length
+    ? sections.join("\n")
+    : '<mj-section background-color="#FFFFFF" padding="24px"><mj-column><mj-text color="#8E8E93">This email has no content yet.</mj-text></mj-column></mj-section>';
 
   return [
     "<mjml>",
@@ -175,11 +249,7 @@ function buildMjml(body, opts = {}) {
     '<mj-attributes><mj-all font-family="Helvetica, Arial, sans-serif" /></mj-attributes>',
     "</mj-head>",
     `<mj-body background-color="${bg}">`,
-    '<mj-section background-color="#FFFFFF" padding="24px">',
-    "<mj-column>",
     inner,
-    "</mj-column>",
-    "</mj-section>",
     "</mj-body>",
     "</mjml>",
   ].join("\n");
