@@ -125,6 +125,37 @@ describe("suppression management cloud functions", () => {
     ).rejects.toMatchObject({ code: Parse.Error.OBJECT_NOT_FOUND });
   });
 
+  it("removeSuppression refuses to remove an irrevocable reason (hard_bounce / complaint)", async () => {
+    const a = await signUp("SuppIrrevCo");
+    const Suppression = Parse.Object.extend("Suppression");
+    const Organization = Parse.Object.extend("Organization");
+
+    for (const reason of ["hard_bounce", "complaint"]) {
+      const email = `${reason}@perma.com`;
+      // The manual-add UI only writes reason "manual", so seed the pipeline-written
+      // reason directly. Setting organization makes the tenancy beforeSave stamp
+      // the org-role ACL, so the org user can read it back through listSuppressions.
+      const s = new Suppression();
+      s.set("email", email);
+      s.set("reason", reason);
+      s.set("organization", Organization.createWithoutData(a.orgId));
+      await s.save(null, { useMasterKey: true });
+
+      // The cloud fn rejects removal with OPERATION_FORBIDDEN.
+      await expect(
+        Parse.Cloud.run("removeSuppression", { id: s.id }, as(a.sessionToken)),
+      ).rejects.toMatchObject({ code: Parse.Error.OPERATION_FORBIDDEN });
+
+      // The row survives, and no "remove" audit log was written for it.
+      const list = (await Parse.Cloud.run("listSuppressions", {}, as(a.sessionToken))) as any;
+      expect(list.results.find((r: any) => r.email === email)).toBeTruthy();
+      const auditQ = new Parse.Query("SuppressionAuditLog");
+      auditQ.equalTo("email", email);
+      auditQ.equalTo("action", "remove");
+      expect(await auditQ.first({ useMasterKey: true })).toBeUndefined();
+    }
+  });
+
   it("isolates suppressions across orgs", async () => {
     const a = await signUp("SuppIsoA");
     const b = await signUp("SuppIsoB");

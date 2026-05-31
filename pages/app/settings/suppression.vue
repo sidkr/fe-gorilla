@@ -66,6 +66,13 @@ function reasonTone(reason: string): "danger" | "neutral" {
   return "neutral";
 }
 
+// Hard bounces and complaints are permanently suppressed — re-mailing them wrecks
+// deliverability (and complaints carry legal risk), so they can't be removed. The
+// removeSuppression cloud fn enforces this too; the UI just hides the affordance.
+function isIrrevocable(reason: string): boolean {
+  return reason === "complaint" || reason === "hard_bounce";
+}
+
 function fmtDate(iso: string | null) {
   return iso ? new Date(iso).toLocaleDateString() : "—";
 }
@@ -181,7 +188,15 @@ async function remove(r: Suppression) {
           <td class="sup-dim">{{ r.campaignId || "—" }}</td>
           <td class="sup-dim">{{ fmtDate(r.addedAt) }}</td>
           <td class="sup-td-actions">
+            <span
+              v-if="isIrrevocable(r.reason)"
+              class="sup-locked"
+              title="Hard bounces and complaints are permanently suppressed and can't be removed."
+            >
+              🔒 Permanent
+            </span>
             <button
+              v-else
               type="button"
               class="sup-link sup-link--danger"
               :disabled="busyId === r.id"
@@ -276,6 +291,7 @@ async function remove(r: Suppression) {
 .sup-link:hover { text-decoration: underline; }
 .sup-link:disabled { opacity: 0.5; cursor: default; }
 .sup-link--danger { color: var(--color-danger); }
+.sup-locked { display: inline-flex; align-items: center; gap: 4px; padding: 0 var(--space-2); color: var(--color-ink-dim); font-size: var(--text-xs); font-weight: 600; white-space: nowrap; cursor: help; }
 
 .sup-pager { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); }
 
