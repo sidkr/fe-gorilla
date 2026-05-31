@@ -22,6 +22,12 @@ const PAGE_SIZE = 50;
 // Reasons the manual surface understands. Anything else collapses to "manual".
 const MANUAL_REASONS = ["manual", "unsubscribe"];
 
+// Irrevocable reasons (Sending.md §5): a hard bounce or a spam complaint must
+// stay suppressed — re-sending to these addresses wrecks deliverability/sender
+// reputation and, for complaints, can violate anti-spam law. They are the
+// highest-rank reasons (REASON_RANK 3) and CANNOT be removed from the list.
+const IRREVOCABLE_REASONS = ["hard_bounce", "complaint"];
+
 function requireUser(request) {
   if (!request.user) {
     throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, "You must be signed in.");
@@ -149,6 +155,17 @@ Parse.Cloud.define("removeSuppression", async (request) => {
   q.equalTo("objectId", id);
   const obj = await q.first(MK);
   if (!obj) throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, "Suppression not found.");
+
+  // Irrevocable reasons (hard bounce / complaint) can never be un-suppressed.
+  // Re-mailing them tanks deliverability and, for complaints, risks legal
+  // exposure. Reject before writing the audit row or destroying anything.
+  const reason = obj.get("reason");
+  if (IRREVOCABLE_REASONS.includes(reason)) {
+    throw new Parse.Error(
+      Parse.Error.OPERATION_FORBIDDEN,
+      `This address is permanently suppressed (${reason}) and cannot be removed.`,
+    );
+  }
 
   const email = obj.get("email");
 

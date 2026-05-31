@@ -13,13 +13,11 @@
 //   • Per-row "Remove" link gated behind a native window.confirm(), which writes a
 //     SuppressionAuditLog row then destroys the Suppression.
 //
-// The irrevocable rule (hard_bounce/complaint must NOT be un-suppressible) lives
-// in Sending.md / server/lib only as a *reason-ranking* guard that prevents a
-// softer reason from DOWNGRADING a harder one. It is NOT enforced on the
-// management surface: `removeSuppression` deletes a row of ANY reason, and the
-// page renders the "Remove" link for every row unconditionally. So the last
-// journey step (assert a hard_bounce row is not removable) is asserted as a
-// documented gap — see the test.fixme below.
+// The irrevocable rule (hard_bounce/complaint must NOT be un-suppressible) is now
+// enforced on the management surface: removeSuppression rejects those reasons with
+// OPERATION_FORBIDDEN, and the page renders a "🔒 Permanent" lock instead of a
+// Remove link for them. The reason-ranking guard in server/lib (which prevents a
+// softer reason from DOWNGRADING a harder one) is a separate, complementary layer.
 //
 // Seeding: a hard_bounce row can't be produced through this UI (manual add is
 // always reason "manual"), so we insert one via a master-key REST write into the
@@ -28,20 +26,19 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { test, expect, type APIRequestContext, type OrgUser } from "../setup/playwrightFixtures";
+
+// ESM context (repo is "type": "module") — __dirname is undefined; derive it.
+const HERE = path.dirname(fileURLToPath(import.meta.url));
 
 test.describe.configure({ mode: "serial", timeout: 120_000 });
 
-// ENVIRONMENT BLOCKER (not a gap in this surface): the dev server currently
-// fails to compile `pages/app/automations/[id].vue` ("Unterminated string
-// constant"), which poisons Vite's route/client bundle for the WHOLE /app/*
-// shell — every authed page renders a blank, un-hydrated document (confirmed:
-// /app/settings/suppression returns the empty Nuxt shell, a _nuxt chunk 404s,
-// and the same failure hits the pre-existing authed-smoke spec). No assertion
-// against rendered DOM can pass until that file compiles. This is an app-side
-// fix, out of scope for a tests-only change. We skip the browser body here so
-// the suite stays green; remove this guard once the app shell boots again.
-const APP_SHELL_BROKEN = true;
+// RESOLVED 2026-05-30: pages/app/automations/[id].vue compiles again (the nested
+// `{{ "{{…}}" }}` mustache that threw "Unterminated string constant" and poisoned
+// the whole /app/* client bundle is fixed via v-pre, commit b19cb6f). The app
+// shell boots, so the browser bodies below render and this guard is lifted.
+const APP_SHELL_BROKEN = false;
 test.skip(
   APP_SHELL_BROKEN,
   "Blocked: pages/app/automations/[id].vue fails to compile, so no /app/* page renders (see header).",
@@ -51,7 +48,7 @@ const APP_ID = process.env.PARSE_APP_ID || "gorilla";
 
 function masterKey(): string {
   if (process.env.PARSE_MASTER_KEY) return process.env.PARSE_MASTER_KEY;
-  const txt = fs.readFileSync(path.resolve(__dirname, "../../server/local.env"), "utf8");
+  const txt = fs.readFileSync(path.resolve(HERE, "../../server/local.env"), "utf8");
   const m = txt.match(/^PARSE_MASTER_KEY=(.+)$/m);
   if (!m) throw new Error("PARSE_MASTER_KEY not found in env or server/local.env");
   return m[1].trim();
@@ -165,10 +162,9 @@ test("manually add an address, find it via search, then remove it", async ({ pag
 // key (the manual-add UI can't produce one), then assert the management surface
 // blocks its removal.
 //
-// CURRENT BEHAVIOR (documented gap): neither the page nor the removeSuppression
-// cloud fn enforces this — the "Remove" link renders for every row and the cloud
-// fn destroys a row of any reason. So this assertion is parked as test.fixme
-// until the irrevocable rule is wired into the management surface.
+// ENFORCED: the page renders a "🔒 Permanent" lock instead of a Remove link for
+// hard_bounce/complaint rows, and removeSuppression rejects those reasons with
+// OPERATION_FORBIDDEN even if the call is forced. Both legs are asserted below.
 // ─────────────────────────────────────────────────────────────────────────────
 test("a hard_bounce entry surfaces a (danger) reason pill in the list", async ({
   page,
@@ -184,30 +180,40 @@ test("a hard_bounce entry surfaces a (danger) reason pill in the list", async ({
   await expect(rowFor(page, hardEmail).getByText("hard_bounce", { exact: true })).toBeVisible();
 });
 
-test.fixme(
-  "a hard_bounce / complaint entry is NOT removable (irrevocable rule)",
-  async ({ page, orgUser, request }) => {
-    // GAP: removeSuppression deletes any reason and the page renders Remove for
-    // every row. When the irrevocable rule lands on the management surface
-    // (Remove hidden/disabled for hard_bounce|complaint, or the cloud fn rejects
-    // the removal), drop the .fixme and the assertions below should hold.
-    const hardEmail = `bounced_${Date.now().toString(36)}@example.com`;
-    await seedSuppression(request, orgUser, hardEmail, "hard_bounce");
+test("a hard_bounce / complaint entry is NOT removable (irrevocable rule)", async ({
+  page,
+  orgUser,
+  request,
+}) => {
+  const hardEmail = `bounced_${Date.now().toString(36)}@example.com`;
+  const supId = await seedSuppression(request, orgUser, hardEmail, "hard_bounce");
 
-    await page.goto("/app/settings/suppression");
-    const row = rowFor(page, hardEmail);
-    await expect(row).toBeVisible({ timeout: 15_000 });
+  await page.goto("/app/settings/suppression");
+  const row = rowFor(page, hardEmail);
+  await expect(row).toBeVisible({ timeout: 15_000 });
 
-    // Expectation once enforced: the Remove affordance is hidden or disabled.
-    const remove = row.getByRole("button", { name: "Remove" });
-    await expect(remove).toBeDisabled();
+  // UI: no Remove affordance — a "Permanent" lock renders in its place.
+  await expect(row.getByRole("button", { name: "Remove" })).toHaveCount(0);
+  await expect(row.getByText(/Permanent/i)).toBeVisible();
 
-    // And even if forced, the cloud call should be rejected (row stays).
-    page.once("dialog", (d) => d.accept());
-    await remove.click({ force: true }).catch(() => {});
-    await expect(row).toBeVisible();
-  },
-);
+  // Defense-in-depth: forcing the cloud call is rejected (OPERATION_FORBIDDEN),
+  // so the row survives. Call removeSuppression directly as the org user.
+  const res = await request.post(`/api/functions/removeSuppression`, {
+    headers: {
+      "X-Parse-Application-Id": APP_ID,
+      "X-Parse-Session-Token": orgUser.sessionToken,
+      "Content-Type": "application/json",
+    },
+    data: { id: supId },
+  });
+  expect(res.ok(), "removeSuppression should reject an irrevocable reason").toBeFalsy();
+  const body = await res.json();
+  expect(body.code, `expected OPERATION_FORBIDDEN (119), got ${JSON.stringify(body)}`).toBe(119);
+
+  // The row is still present after a reload.
+  await page.reload();
+  await expect(rowFor(page, hardEmail)).toBeVisible({ timeout: 15_000 });
+});
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tenant isolation — a second org never sees the first org's suppressions.

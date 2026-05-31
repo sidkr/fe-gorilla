@@ -46,10 +46,11 @@ import { test, expect } from "../setup/playwrightFixtures";
 
 test.describe.configure({ mode: "serial", timeout: 120_000 });
 
-// Flip to true once composables/app/useDomains.ts uses an initialized Parse SDK
-// (useCloud().runCloud) so the page's cloud calls succeed. Until then the cloud
-// journey is skipped with a fixme marker rather than left to fail.
-const DOMAINS_CLOUD_OK = false;
+// RESOLVED 2026-05-30: composables/app/useDomains.ts now goes through
+// useCloud().runCloud against the initialized SDK (the direct-import blocker in
+// the header is fixed, commit b19cb6f), so the page's cloud calls succeed and the
+// full add → records → verify journey is armed.
+const DOMAINS_CLOUD_OK = true;
 
 const DOMAINS_URL = "/app/settings/domains";
 

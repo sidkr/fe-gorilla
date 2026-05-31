@@ -15,6 +15,14 @@
 import { test as base, expect, type APIRequestContext, type Page } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+// The repo is `"type": "module"`, so Playwright loads spec/helper files as ESM
+// where `__dirname` is undefined. Deriving it from import.meta.url keeps the
+// master-key file read working — previously it threw, and because teardown wraps
+// deleteUser in `.catch(() => {})`, the failure was swallowed and test users
+// leaked into the dev Mongo on every run.
+const HERE = path.dirname(fileURLToPath(import.meta.url));
 
 const APP_ID = process.env.PARSE_APP_ID || "gorilla";
 // The web origin proxies /api/** to Parse, so a single base covers both the
@@ -26,7 +34,7 @@ const API_BASE = process.env.PARSE_SERVER_URL || `${WEB_BASE}/api`;
 // is fine — never call this fixture in prod.
 function readMasterKey(): string {
   if (process.env.PARSE_MASTER_KEY) return process.env.PARSE_MASTER_KEY;
-  const envPath = path.resolve(__dirname, "../../server/local.env");
+  const envPath = path.resolve(HERE, "../../server/local.env");
   const txt = fs.readFileSync(envPath, "utf8");
   const m = txt.match(/^PARSE_MASTER_KEY=(.+)$/m);
   if (!m) throw new Error("PARSE_MASTER_KEY not found in env or server/local.env");

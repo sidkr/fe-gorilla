@@ -256,7 +256,11 @@ async function automationsReachable(request: APIRequestContext): Promise<boolean
 // change `test.fixme(` below to `test(`. The in-body reachability guard
 // (automationsReachable) additionally SKIPs — never fails — if a stale stack is
 // somehow still in front of it.
-test.fixme("automation journey: install recipe → activate → trigger fires step 1 send → pause halts progression", async ({
+// ARMED 2026-05-30: the automations cloud module is loaded on current code and
+// automationTick is registered in the worker (commit b19cb6f). The in-body
+// automationsReachable() guard still SKIPs (never fails) if a stale stack is in
+// front of it, so flipping fixme→test is safe.
+test("automation journey: install recipe → activate → trigger fires step 1 send → pause halts progression", async ({
   page,
   request,
   orgUser,
@@ -291,7 +295,9 @@ test.fixme("automation journey: install recipe → activate → trigger fires st
   expect(automationId, "could not capture the automation id from the URL").toBeTruthy();
 
   // Builder loaded: name field shows the recipe name, steps rendered, draft.
-  await expect(page.locator(".bu-name input")).toHaveValue("Welcome series", {
+  // The shared <TextInput> renders the <input> as its root, so the `bu-name`
+  // class lands on the input itself (no descendant input). Target by placeholder.
+  await expect(page.getByPlaceholder("Automation name")).toHaveValue("Welcome series", {
     timeout: 20_000,
   });
   // The send_email step 0 surfaces its subject in the canvas summary.
