@@ -1,0 +1,359 @@
+{
+  "version": 1,
+  "viewport": {
+    "width": 1440,
+    "height": 900,
+    "scale": 2
+  },
+  "generatedAt": "2026-05-31T02:55:59.503Z",
+  "chapters": [
+    {
+      "id": "overview",
+      "label": "Overview"
+    },
+    {
+      "id": "audience",
+      "label": "Audience"
+    },
+    {
+      "id": "design",
+      "label": "Design"
+    },
+    {
+      "id": "measure",
+      "label": "Measure"
+    },
+    {
+      "id": "automate",
+      "label": "Automate"
+    }
+  ],
+  "scenes": [
+    {
+      "id": "dashboard",
+      "chapter": "overview",
+      "title": "Your command center",
+      "caption": "Campaigns, subscribers, and revenue — the whole picture on one screen.",
+      "image": "/demo/frames/01-dashboard.jpg",
+      "w": 1440,
+      "h": 900,
+      "hold": 3600,
+      "kenburns": {
+        "scaleFrom": 1,
+        "scaleTo": 1.06,
+        "panTo": [
+          -30,
+          -18
+        ]
+      },
+      "hotspots": [
+        {
+          "x": 272,
+          "y": 168,
+          "w": 1136,
+          "h": 329,
+          "label": "Live metrics"
+        }
+      ],
+      "cursor": [
+        {
+          "x": 720,
+          "y": 300,
+          "t": 400,
+          "click": false
+        },
+        {
+          "x": 840,
+          "y": 332,
+          "t": 1400,
+          "click": false
+        }
+      ]
+    },
+    {
+      "id": "audiences",
+      "chapter": "audience",
+      "title": "Build your audience",
+      "caption": "Group subscribers into lists — each one a card you can grow and segment.",
+      "image": "/demo/frames/02-audiences.jpg",
+      "w": 1440,
+      "h": 900,
+      "hold": 3200,
+      "kenburns": {
+        "scaleFrom": 1,
+        "scaleTo": 1.05,
+        "panTo": [
+          0,
+          -20
+        ]
+      },
+      "hotspots": [
+        {
+          "x": 272,
+          "y": 402,
+          "w": 1136,
+          "h": 318,
+          "label": "Your lists"
+        }
+      ],
+      "cursor": [
+        {
+          "x": 1322,
+          "y": 70,
+          "t": 700,
+          "click": true
+        }
+      ]
+    },
+    {
+      "id": "contacts",
+      "chapter": "audience",
+      "title": "Every contact, organized",
+      "caption": "Search, filter, and tag a full contact table — import a CSV in seconds.",
+      "image": "/demo/frames/03-contacts.jpg",
+      "w": 1440,
+      "h": 900,
+      "hold": 3600,
+      "hotspots": [
+        {
+          "x": 272,
+          "y": 185,
+          "w": 1136,
+          "h": 44,
+          "label": "Search & filter"
+        },
+        {
+          "x": 1087,
+          "y": 92,
+          "w": 152,
+          "h": 44,
+          "label": "One-click import"
+        }
+      ],
+      "cursor": [
+        {
+          "x": 412,
+          "y": 207,
+          "t": 600,
+          "click": false
+        },
+        {
+          "x": 1163,
+          "y": 114,
+          "t": 1800,
+          "click": true
+        }
+      ]
+    },
+    {
+      "id": "editor",
+      "chapter": "design",
+      "title": "Design without code",
+      "caption": "Drag blocks onto the canvas and edit in place — a real email, no HTML.",
+      "image": "/demo/frames/04-editor.jpg",
+      "w": 1440,
+      "h": 900,
+      "hold": 4200,
+      "kenburns": {
+        "scaleFrom": 1,
+        "scaleTo": 1.04,
+        "panTo": [
+          0,
+          0
+        ]
+      },
+      "hotspots": [
+        {
+          "x": 0,
+          "y": 0,
+          "w": 240,
+          "h": 900,
+          "label": "Edit properties"
+        }
+      ],
+      "cursor": [
+        {
+          "x": 180,
+          "y": 360,
+          "t": 500,
+          "click": false
+        },
+        {
+          "x": 720,
+          "y": 420,
+          "t": 1600,
+          "click": false
+        },
+        {
+          "x": 1180,
+          "y": 380,
+          "t": 2800,
+          "click": false
+        }
+      ]
+    },
+    {
+      "id": "reports",
+      "chapter": "measure",
+      "title": "See what's working",
+      "caption": "Opens, clicks, bounces, and trends — updated as every send lands.",
+      "image": "/demo/frames/05-reports.jpg",
+      "w": 1440,
+      "h": 900,
+      "hold": 3600,
+      "kenburns": {
+        "scaleFrom": 1,
+        "scaleTo": 1.06,
+        "panTo": [
+          -20,
+          -24
+        ]
+      },
+      "hotspots": [
+        {
+          "x": 272,
+          "y": 168,
+          "w": 1136,
+          "h": 206,
+          "label": "Engagement at a glance"
+        }
+      ],
+      "cursor": [
+        {
+          "x": 840,
+          "y": 270,
+          "t": 800,
+          "click": false
+        }
+      ]
+    },
+    {
+      "id": "revenue",
+      "chapter": "measure",
+      "title": "Tie email to revenue",
+      "caption": "Attributed revenue, orders, and AOV — prove what email is really worth.",
+      "image": "/demo/frames/06-revenue.jpg",
+      "w": 1440,
+      "h": 900,
+      "hold": 3400,
+      "hotspots": [
+        {
+          "x": 272,
+          "y": 198,
+          "w": 1136,
+          "h": 156,
+          "label": "Revenue, attributed"
+        }
+      ],
+      "cursor": [
+        {
+          "x": 840,
+          "y": 276,
+          "t": 800,
+          "click": false
+        }
+      ]
+    },
+    {
+      "id": "segments",
+      "chapter": "audience",
+      "title": "Target the right people",
+      "caption": "Compose rules and watch the matching count update live as you build.",
+      "image": "/demo/frames/07-segments.jpg",
+      "w": 1440,
+      "h": 900,
+      "hold": 3800,
+      "hotspots": [
+        {
+          "x": 1088,
+          "y": 149,
+          "w": 320,
+          "h": 884,
+          "label": "Live match count"
+        }
+      ],
+      "cursor": [
+        {
+          "x": 380,
+          "y": 360,
+          "t": 500,
+          "click": false
+        },
+        {
+          "x": 620,
+          "y": 430,
+          "t": 1600,
+          "click": false
+        },
+        {
+          "x": 1248,
+          "y": 591,
+          "t": 2700,
+          "click": false
+        }
+      ]
+    },
+    {
+      "id": "automations",
+      "chapter": "automate",
+      "title": "Put it on autopilot",
+      "caption": "Welcome series, win-backs, drip flows — trigger once, run forever.",
+      "image": "/demo/frames/08-automations.jpg",
+      "w": 1440,
+      "h": 900,
+      "hold": 3600,
+      "kenburns": {
+        "scaleFrom": 1,
+        "scaleTo": 1.05,
+        "panTo": [
+          0,
+          -30
+        ]
+      },
+      "hotspots": [
+        {
+          "x": 272,
+          "y": 196,
+          "w": 752,
+          "h": 743,
+          "label": "Multi-step flows"
+        }
+      ],
+      "cursor": [
+        {
+          "x": 560,
+          "y": 420,
+          "t": 800,
+          "click": false
+        }
+      ]
+    },
+    {
+      "id": "templates",
+      "chapter": "design",
+      "title": "Start from a template",
+      "caption": "Dozens of polished, on-brand starting points — or build from blank.",
+      "image": "/demo/frames/09-templates.jpg",
+      "w": 1440,
+      "h": 900,
+      "hold": 3200,
+      "hotspots": [
+        {
+          "x": 272,
+          "y": 300,
+          "w": 1136,
+          "h": 32768,
+          "label": "Ready-to-send designs"
+        }
+      ],
+      "cursor": [
+        {
+          "x": 700,
+          "y": 380,
+          "t": 700,
+          "click": false
+        }
+      ]
+    }
+  ]
+}

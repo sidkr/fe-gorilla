@@ -58,7 +58,7 @@ useHead({
             Sign up free
             <template #trailing><Icon name="arrow-right" /></template>
           </Button>
-          <Button variant="ghost" size="lg" href="#">See live demo</Button>
+          <Button variant="ghost" size="lg" href="#demo">See live demo</Button>
         </div>
         <p class="hero-trust">Free for your first 10,000 emails / month · no card required</p>
       </div>
@@ -110,6 +110,19 @@ useHead({
           <div class="label">Average composer-to-send time</div>
         </div>
       </div>
+    </div>
+  </section>
+
+  <!-- ── LIVE DEMO ───────────────────────────────────────── -->
+  <section id="demo" class="block demo-block">
+    <div class="wrap">
+      <div class="sect-head">
+        <SectionEyebrow>See it in motion</SectionEyebrow>
+        <h2>The whole product, in ninety seconds.</h2>
+        <p class="sect-sub">A real walkthrough — captured straight from the app. Build an
+          audience, design a campaign, send it, and watch the revenue land.</p>
+      </div>
+      <MarketingDemoPlayer />
     </div>
   </section>
 
@@ -554,6 +567,24 @@ useHead({
       letter-spacing: var(--tracking-tighter);
       color: var(--color-ink);
     }
+    .sect-sub {
+      margin: var(--space-4) 0 0;
+      font-family: var(--font-body);
+      font-size: var(--text-lg);
+      line-height: var(--leading-normal);
+      color: var(--color-ink-soft);
+    }
+
+    /* ── Live demo ─────────────────────────────────────────── */
+    .demo-block {
+      scroll-margin-top: 90px; /* clear the sticky nav when jumped to via #demo */
+      background:
+        radial-gradient(120% 80% at 50% 0%, var(--color-pop-bg) 0%, transparent 55%),
+        var(--color-surface);
+      border-top: 1px solid var(--color-rule);
+      border-bottom: 1px solid var(--color-rule);
+    }
+    .demo-block .sect-head { max-width: 720px; margin-left: auto; margin-right: auto; text-align: center; }
 
     /* ── Feature trio ──────────────────────────────────────── */
     .features {
