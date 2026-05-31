@@ -23,3 +23,4 @@ require("./forms");
 require("./suppression");
 require("./domains");
 require("./automations");
+require("./revenue");
