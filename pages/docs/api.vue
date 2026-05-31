@@ -126,6 +126,7 @@ useHead({
   padding: var(--space-5);
   border-radius: var(--radius-lg);
   overflow-x: auto;
+  max-width: 100%;
   margin: 0 0 var(--space-5);
 }
 .mk-prose pre code {

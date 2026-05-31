@@ -2,12 +2,23 @@
    Loaded after tokens.css (see nuxt.config css[]). Keep this tiny — design
    values come from tokens.css. */
 
-/* Centered content container — the marketing-wide layout primitive. */
+/* Centered content container — the marketing-wide layout primitive. Tighter
+   side padding on phones so content gets more room. */
 .wrap {
   max-width: var(--container-max);
   margin: 0 auto;
   padding: 0 var(--container-pad);
 }
+@media (max-width: 600px) {
+  .wrap { padding: 0 var(--space-5); }
+}
+
+/* Long content (code, URLs, tables) must never push the page wider than the
+   viewport on mobile. */
+.mk-prose { min-width: 0; }
+.mk-prose pre { max-width: 100%; overflow-x: auto; }
+.mk-prose code { overflow-wrap: anywhere; }
+.mk-prose table { display: block; max-width: 100%; overflow-x: auto; }
 
 /* Long-form prose for legal / docs / changelog pages. Readable measure,
    on-brand type, generous rhythm. */
