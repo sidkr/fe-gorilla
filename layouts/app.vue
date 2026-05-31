@@ -12,6 +12,31 @@ const auth = useAuthStore();
 const router = useRouter();
 const route = useRoute();
 
+// Left-nav sections. Active state is PREFIX-based so a CHILD route keeps its
+// PARENT highlighted — e.g. /app/audiences/:id lights up "Audiences",
+// /app/campaigns/:id/edit lights up "Campaigns", /app/reports/revenue lights up
+// "Reports", /app/settings/senders lights up "Settings". Nuxt emits flat sibling
+// routes (index and [id] are separate records, not nested), so the built-in
+// router-link-active — which matches on the route-record hierarchy — never lights
+// the parent on a detail page. Hence the explicit path-prefix check below.
+const navItems = [
+  { to: "/app/dashboard", label: "Dashboard", icon: `<path d="M3 11.5 12 4l9 7.5"/><path d="M5 10.5V20h5v-5h4v5h5v-9.5"/>` },
+  { to: "/app/campaigns", label: "Campaigns", icon: `<path d="M21 3 11 13"/><path d="M21 3l-7 18-3-8-8-3 18-7z"/>` },
+  { to: "/app/automations", label: "Automations", icon: `<circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 6a3 3 0 0 0-3 3v6a3 3 0 0 1-3 3M9 6h6"/>` },
+  { to: "/app/audiences", label: "Audiences", icon: `<circle cx="9" cy="8" r="3.2"/><path d="M3 19c0-3.3 2.7-5.4 6-5.4s6 2.1 6 5.4"/><circle cx="16.5" cy="9" r="2.4"/><path d="M15.5 13.8c2.8 0 5 1.6 5 4.2"/>` },
+  { to: "/app/forms", label: "Forms", icon: `<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h4"/>` },
+  { to: "/app/segments", label: "Segments", icon: `<circle cx="9" cy="12" r="5.5"/><circle cx="15" cy="12" r="5.5"/>` },
+  { to: "/app/templates", label: "Templates", icon: `<path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5"/><path d="M9 13h7M9 17h5"/>` },
+  { to: "/app/reports", label: "Reports", icon: `<path d="M4 20V10"/><path d="M10 20V4"/><path d="M16 20v-8"/><path d="M3 20h18"/>` },
+  { to: "/app/settings", label: "Settings", icon: `<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>` },
+];
+
+// A nav section is active when the route IS it or sits UNDER it (child route).
+function isSectionActive(to) {
+  const p = route.path;
+  return p === to || p.startsWith(to + "/");
+}
+
 // Pages may opt into a full-bleed main area by setting
 // `definePageMeta({ appWidth: 'full' })`. Useful for surfaces like the editor
 // where the 3-pane internal grid needs every available pixel on wide screens.
@@ -68,92 +93,21 @@ async function onLogout() {
       </div>
 
       <!-- ── Nav links ────────────────────────────────────────────── -->
+      <!-- Active state is prefix-based (isSectionActive) so child/detail routes
+           keep their parent section highlighted. See the script for why the
+           built-in router-link-active isn't enough here. -->
       <nav class="nav" aria-label="App sections">
-        <NuxtLink to="/app/dashboard" class="nav-item">
+        <NuxtLink
+          v-for="item in navItems"
+          :key="item.to"
+          :to="item.to"
+          class="nav-item"
+          :class="{ 'is-active': isSectionActive(item.to) }"
+          :aria-current="isSectionActive(item.to) ? 'page' : undefined"
+        >
           <span class="nav-stripe" aria-hidden="true"></span>
-          <svg class="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M3 11.5 12 4l9 7.5"/>
-            <path d="M5 10.5V20h5v-5h4v5h5v-9.5"/>
-          </svg>
-          <span class="nav-label">Dashboard</span>
-        </NuxtLink>
-
-        <NuxtLink to="/app/campaigns" class="nav-item">
-          <span class="nav-stripe" aria-hidden="true"></span>
-          <svg class="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M21 3 11 13"/>
-            <path d="M21 3l-7 18-3-8-8-3 18-7z"/>
-          </svg>
-          <span class="nav-label">Campaigns</span>
-        </NuxtLink>
-
-        <NuxtLink to="/app/automations" class="nav-item">
-          <span class="nav-stripe" aria-hidden="true"></span>
-          <svg class="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <circle cx="6" cy="6" r="3" />
-            <circle cx="6" cy="18" r="3" />
-            <path d="M18 6a3 3 0 0 0-3 3v6a3 3 0 0 1-3 3M9 6h6" />
-          </svg>
-          <span class="nav-label">Automations</span>
-        </NuxtLink>
-
-        <NuxtLink to="/app/audiences" class="nav-item">
-          <span class="nav-stripe" aria-hidden="true"></span>
-          <svg class="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <circle cx="9" cy="8" r="3.2"/>
-            <path d="M3 19c0-3.3 2.7-5.4 6-5.4s6 2.1 6 5.4"/>
-            <circle cx="16.5" cy="9" r="2.4"/>
-            <path d="M15.5 13.8c2.8 0 5 1.6 5 4.2"/>
-          </svg>
-          <span class="nav-label">Audiences</span>
-        </NuxtLink>
-
-        <NuxtLink to="/app/forms" class="nav-item">
-          <span class="nav-stripe" aria-hidden="true"></span>
-          <svg class="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <rect x="4" y="3" width="16" height="18" rx="2" />
-            <path d="M8 8h8M8 12h8M8 16h4" />
-          </svg>
-          <span class="nav-label">Forms</span>
-        </NuxtLink>
-
-        <NuxtLink to="/app/segments" class="nav-item">
-          <span class="nav-stripe" aria-hidden="true"></span>
-          <svg class="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <circle cx="9" cy="12" r="5.5"/>
-            <circle cx="15" cy="12" r="5.5"/>
-          </svg>
-          <span class="nav-label">Segments</span>
-        </NuxtLink>
-
-        <NuxtLink to="/app/templates" class="nav-item">
-          <span class="nav-stripe" aria-hidden="true"></span>
-          <svg class="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M6 3h9l4 4v14H6z"/>
-            <path d="M14 3v5h5"/>
-            <path d="M9 13h7M9 17h5"/>
-          </svg>
-          <span class="nav-label">Templates</span>
-        </NuxtLink>
-
-        <NuxtLink to="/app/reports" class="nav-item">
-          <span class="nav-stripe" aria-hidden="true"></span>
-          <svg class="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M4 20V10"/>
-            <path d="M10 20V4"/>
-            <path d="M16 20v-8"/>
-            <path d="M3 20h18"/>
-          </svg>
-          <span class="nav-label">Reports</span>
-        </NuxtLink>
-
-        <NuxtLink to="/app/settings" class="nav-item">
-          <span class="nav-stripe" aria-hidden="true"></span>
-          <svg class="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <circle cx="12" cy="12" r="3"/>
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-          </svg>
-          <span class="nav-label">Settings</span>
+          <svg class="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" v-html="item.icon"></svg>
+          <span class="nav-label">{{ item.label }}</span>
         </NuxtLink>
       </nav>
 
@@ -314,12 +268,12 @@ async function onLogout() {
 }
 .nav-item:hover .nav-icon { color: var(--color-ink-soft); }
 
-.nav-item.router-link-active {
+.nav-item.is-active {
   color: var(--color-ink);
   background: var(--color-surface-2);
 }
-.nav-item.router-link-active .nav-icon { color: var(--color-pop); }
-.nav-item.router-link-active .nav-stripe { background: var(--color-pop); }
+.nav-item.is-active .nav-icon { color: var(--color-pop); }
+.nav-item.is-active .nav-stripe { background: var(--color-pop); }
 
 .nav-item:focus-visible {
   outline: none;
