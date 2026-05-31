@@ -353,6 +353,15 @@ async function handle(data, deps = {}) {
         contact.set("email", email);
         contact.set("status", "subscribed");
         contact.set("customFields", cleaned);
+        // Stamp the tenant explicitly. The worker saves with the master key and
+        // no request.user, so the tenancy beforeSave can't infer the org — its
+        // master-key path returns early WITHOUT setting organization or the
+        // org-role ACL (see server/cloud/tenantHooks.js). Setting organization
+        // here makes beforeSave stamp the matching ACL, so imported contacts are
+        // both org-scoped and readable by the org's members. Without this, the
+        // contacts save but listContacts (org-filtered, ACL-enforced) can't see
+        // them — the list shows "No contacts yet" even though the count is right.
+        contact.set("organization", org);
       }
 
       // Standard string fields: set when provided (last-write-wins on dup-in-file).

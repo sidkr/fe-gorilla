@@ -28,20 +28,19 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { test, expect, type APIRequestContext, type OrgUser } from "../setup/playwrightFixtures";
+
+// ESM context (repo is "type": "module") — __dirname is undefined; derive it.
+const HERE = path.dirname(fileURLToPath(import.meta.url));
 
 test.describe.configure({ mode: "serial", timeout: 120_000 });
 
-// ENVIRONMENT BLOCKER (not a gap in this surface): the dev server currently
-// fails to compile `pages/app/automations/[id].vue` ("Unterminated string
-// constant"), which poisons Vite's route/client bundle for the WHOLE /app/*
-// shell — every authed page renders a blank, un-hydrated document (confirmed:
-// /app/settings/suppression returns the empty Nuxt shell, a _nuxt chunk 404s,
-// and the same failure hits the pre-existing authed-smoke spec). No assertion
-// against rendered DOM can pass until that file compiles. This is an app-side
-// fix, out of scope for a tests-only change. We skip the browser body here so
-// the suite stays green; remove this guard once the app shell boots again.
-const APP_SHELL_BROKEN = true;
+// RESOLVED 2026-05-30: pages/app/automations/[id].vue compiles again (the nested
+// `{{ "{{…}}" }}` mustache that threw "Unterminated string constant" and poisoned
+// the whole /app/* client bundle is fixed via v-pre, commit b19cb6f). The app
+// shell boots, so the browser bodies below render and this guard is lifted.
+const APP_SHELL_BROKEN = false;
 test.skip(
   APP_SHELL_BROKEN,
   "Blocked: pages/app/automations/[id].vue fails to compile, so no /app/* page renders (see header).",
@@ -51,7 +50,7 @@ const APP_ID = process.env.PARSE_APP_ID || "gorilla";
 
 function masterKey(): string {
   if (process.env.PARSE_MASTER_KEY) return process.env.PARSE_MASTER_KEY;
-  const txt = fs.readFileSync(path.resolve(__dirname, "../../server/local.env"), "utf8");
+  const txt = fs.readFileSync(path.resolve(HERE, "../../server/local.env"), "utf8");
   const m = txt.match(/^PARSE_MASTER_KEY=(.+)$/m);
   if (!m) throw new Error("PARSE_MASTER_KEY not found in env or server/local.env");
   return m[1].trim();

@@ -21,6 +21,11 @@ const os = require("os");
 const path = require("path");
 const crypto = require("crypto");
 const Parse = require("parse/node");
+// verifySession runs a master-key _Session query, which needs the standalone
+// Node SDK initialized (appId + masterKey + serverURL). bootstrapSchemas already
+// does this at boot, but initialize here too so the route is self-sufficient and
+// order-independent — initParseClient() is idempotent (guarded internally).
+const { initParseClient } = require("../lib/parseClient");
 
 const MAX_BYTES = 100 * 1024 * 1024; // ~100MB cap
 const PREVIEW_ROWS = 5;
@@ -55,6 +60,13 @@ function stripBom(s) {
 
 // Verify the caller is signed in via their Parse session token. Returns the
 // user, or null if missing/invalid.
+//
+// We resolve the session with a master-key query on _Session rather than
+// Parse.User.become(token): become() mutates the SDK's global "current user"
+// singleton and the Node SDK rejects it outright with "It is not memory-safe to
+// become a user in a server environment" — so it threw on every request and this
+// route always 401'd. The session lookup is the memory-safe, concurrency-safe
+// server pattern (the same master-key approach the worker uses everywhere).
 async function verifySession(req) {
   const token =
     req.get("X-Parse-Session-Token") ||
@@ -62,13 +74,21 @@ async function verifySession(req) {
     "";
   if (!token) return null;
   try {
-    return await Parse.User.become(token);
+    const q = new Parse.Query(Parse.Session);
+    q.equalTo("sessionToken", token);
+    q.include("user");
+    const session = await q.first({ useMasterKey: true });
+    return (session && session.get("user")) || null;
   } catch (_) {
     return null;
   }
 }
 
 function mount(app) {
+  // Ensure the standalone Node SDK is initialized so verifySession's master-key
+  // _Session query works regardless of bootstrap ordering. Idempotent.
+  initParseClient();
+
   const router = express.Router();
 
   router.post("/api/imports/upload", async (req, res) => {

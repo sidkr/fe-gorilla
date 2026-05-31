@@ -140,8 +140,12 @@ test("opening Import CSV shows the upload step of the wizard", async ({
 //       require("./jobs/importCsv").register(agenda);
 // ─────────────────────────────────────────────────────────────────────────────
 test.describe(() => {
+  // RESOLVED 2026-05-30: the import backend is reachable on current code — the
+  // imports route + startContactImport/getImportJob cloud fns load, and the
+  // import-csv worker job is now registered in server/worker/index.js (commit
+  // b19cb6f), so ImportJobs progress past "pending" to "done". Armed.
   test.fixme(
-    true,
+    false,
     "import backend not reachable on the running dev server: upload route + " +
       "startContactImport/getImportJob cloud fns are absent (Parse code 141), " +
       "and the import-csv worker job is unregistered in server/worker/index.js " +
