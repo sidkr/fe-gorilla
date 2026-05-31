@@ -21,7 +21,9 @@
     "test:watch": "vitest",
     "e2e": "playwright test",
     "e2e:headed": "playwright test --headed",
-    "e2e:install": "playwright install --with-deps chromium"
+    "e2e:install": "playwright install --with-deps chromium",
+    "demo:seed": "node scripts/demo/seed.mjs",
+    "demo:capture": "node scripts/demo/seed.mjs && playwright test -c playwright.demo.config.ts"
   },
   "dependencies": {
     "@aws-sdk/client-sesv2": "^3.700.0",
