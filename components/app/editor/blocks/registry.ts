@@ -22,15 +22,27 @@ import ButtonBlock from "./ButtonBlock.vue";
 import DividerBlock from "./DividerBlock.vue";
 import SpacerBlock from "./SpacerBlock.vue";
 import FooterBlock from "./FooterBlock.vue";
+import ColumnsBlock from "./ColumnsBlock.vue";
+import SocialBlock from "./SocialBlock.vue";
+import ProductBlock from "./ProductBlock.vue";
 
 export type BlockType =
   | "heading"
   | "paragraph"
   | "image"
   | "button"
+  | "columns"
+  | "social"
+  | "product"
   | "divider"
   | "spacer"
   | "footer";
+
+// MJML's <mj-social-element name="…"> for a platform. X has no dedicated icon,
+// so it maps to the Twitter glyph.
+function mjmlSocialName(platform: string): string {
+  return platform === "x" ? "twitter" : platform;
+}
 
 export interface Block<P = Record<string, unknown>> {
   id: string;
@@ -170,6 +182,88 @@ export const registry: Record<BlockType, BlockDefinition> = {
     },
   },
 
+  columns: {
+    type: "columns",
+    label: "Columns",
+    description: "Side-by-side layout",
+    iconPath: "M4 5h7v14H4zM13 5h7v14h-7z",
+    default: () => ({
+      columns: [
+        { image: "https://images.unsplash.com/photo-1519748771451-a94c596fad67?w=400&q=80&auto=format&fit=crop", alt: "", heading: "First column", text: "A short supporting line for this column.", buttonLabel: "", buttonHref: "" },
+        { image: "https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=400&q=80&auto=format&fit=crop", alt: "", heading: "Second column", text: "A short supporting line for this column.", buttonLabel: "", buttonHref: "" },
+      ],
+    }),
+    Render: ColumnsBlock,
+    Inspect: ColumnsBlock,
+    // Note: the SERVER compiler (campaigns.js) emits this as its OWN mj-section
+    // with one mj-column per column — this client stub mirrors that shape.
+    compileMjml(props: any) {
+      const cols = Array.isArray(props.columns) ? props.columns : [];
+      const colMjml = cols
+        .map((c: any) => {
+          const parts: string[] = [];
+          if (c.image) parts.push(`<mj-image src="${escapeAttr(c.image)}" alt="${escapeAttr(c.alt)}" />`);
+          if (c.heading) parts.push(`<mj-text font-size="18px" font-weight="700">${escapeAttr(c.heading)}</mj-text>`);
+          if (c.text) parts.push(`<mj-text font-size="14px" line-height="1.6">${escapeAttr(c.text)}</mj-text>`);
+          if (c.buttonLabel) parts.push(`<mj-button background-color="#FF4E4E" color="#FFFFFF" href="${escapeAttr(c.buttonHref || "#")}" border-radius="8px">${escapeAttr(c.buttonLabel)}</mj-button>`);
+          return `<mj-column>${parts.join("")}</mj-column>`;
+        })
+        .join("");
+      return `<mj-section background-color="#FFFFFF" padding="24px">${colMjml}</mj-section>`;
+    },
+  },
+
+  social: {
+    type: "social",
+    label: "Social",
+    description: "Social media links",
+    iconPath: "M8 12a2 2 0 1 1-4 0 2 2 0 0 1 4 0zM20 6a2 2 0 1 1-4 0 2 2 0 0 1 4 0zM20 18a2 2 0 1 1-4 0 2 2 0 0 1 4 0zM8.6 11.1l6.8-3.2M8.6 12.9l6.8 3.2",
+    default: () => ({
+      links: [
+        { platform: "x", url: "https://x.com/yourbrand" },
+        { platform: "instagram", url: "https://instagram.com/yourbrand" },
+      ],
+      align: "center",
+    }),
+    Render: SocialBlock,
+    Inspect: SocialBlock,
+    compileMjml(props: any) {
+      const links = Array.isArray(props.links) ? props.links : [];
+      const els = links
+        .filter((l: any) => l && l.url)
+        .map((l: any) => `<mj-social-element name="${escapeAttr(mjmlSocialName(l.platform))}" href="${escapeAttr(l.url)}" />`)
+        .join("");
+      if (!els) return "";
+      return `<mj-social mode="horizontal" align="${escapeAttr(props.align || "center")}" icon-size="22px">${els}</mj-social>`;
+    },
+  },
+
+  product: {
+    type: "product",
+    label: "Product",
+    description: "Image, price + CTA",
+    iconPath: "M4 4h7l9 9-7 7-9-9V4zM8.5 8.5h.01",
+    default: () => ({
+      image: "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=500&q=80&auto=format&fit=crop",
+      alt: "",
+      name: "Heavyweight cotton tee",
+      price: "$48.00",
+      buttonLabel: "Shop now",
+      buttonHref: "https://example.com/product",
+      align: "center",
+    }),
+    Render: ProductBlock,
+    Inspect: ProductBlock,
+    compileMjml(props: any) {
+      const parts: string[] = [];
+      if (props.image) parts.push(`<mj-image src="${escapeAttr(props.image)}" alt="${escapeAttr(props.alt)}" align="${escapeAttr(props.align || "center")}" />`);
+      if (props.name) parts.push(`<mj-text align="${escapeAttr(props.align || "center")}" font-size="16px" font-weight="700">${escapeAttr(props.name)}</mj-text>`);
+      if (props.price) parts.push(`<mj-text align="${escapeAttr(props.align || "center")}" color="#C53030" font-weight="600">${escapeAttr(props.price)}</mj-text>`);
+      if (props.buttonLabel) parts.push(`<mj-button background-color="#FF4E4E" color="#FFFFFF" href="${escapeAttr(props.buttonHref || "#")}" align="${escapeAttr(props.align || "center")}" border-radius="8px">${escapeAttr(props.buttonLabel)}</mj-button>`);
+      return parts.join("");
+    },
+  },
+
   divider: {
     type: "divider",
     label: "Divider",
@@ -253,6 +347,9 @@ export const blockTypesInOrder: BlockType[] = [
   "paragraph",
   "image",
   "button",
+  "columns",
+  "social",
+  "product",
   "divider",
   "spacer",
 ];
