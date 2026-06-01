@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fe-Mail Gorilla · Documentation</title>
+  <!-- Client-side rendering deps (CDN). The docs server stays zero-dependency;
+       rendering (markdown, diagrams, code highlight) happens in the browser. -->
+  <link rel="stylesheet"
+        href="https://cdn.jsdelivr.net/npm/github-markdown-css@5.6.1/github-markdown-light.min.css" />
+  <link rel="stylesheet"
+        href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github.min.css" />
+  <style>
+    :root {
+      --pop: #FF4E4E; --pop-deep: #D63A3A;
+      --bg: #FAFAFB; --surface: #FFFFFF; --ink: #0F1115; --ink-soft: #5A6068;
+      --ink-dim: #8B919E; --rule: #E8EAED; --rule-strong: #D8DCE1;
+      --sidebar-w: 290px;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; height: 100%; background: var(--bg); }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+      color: var(--ink); display: grid; grid-template-columns: var(--sidebar-w) 1fr; height: 100vh;
+    }
+    /* ── Sidebar ── */
+    .side {
+      border-right: 1px solid var(--rule); background: var(--surface);
+      display: flex; flex-direction: column; height: 100vh; overflow-y: auto;
+    }
+    .brand {
+      display: flex; align-items: center; gap: 10px; padding: 20px 22px 16px;
+      border-bottom: 1px solid var(--rule); position: sticky; top: 0; background: var(--surface); z-index: 2;
+    }
+    .brand svg { flex: 0 0 auto; }
+    .brand b { font-size: 15px; font-weight: 800; letter-spacing: -0.01em; }
+    .brand span { display: block; font-size: 11px; color: var(--ink-dim); font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.08em; margin-top: 1px; }
+    nav { padding: 12px 12px 32px; }
+    nav .navlink {
+      display: block; padding: 9px 12px; margin: 2px 0; border-radius: 8px;
+      color: var(--ink-soft); text-decoration: none; font-size: 14px; font-weight: 500;
+      line-height: 1.3; border: 1px solid transparent;
+    }
+    nav .navlink:hover { background: var(--bg); color: var(--ink); }
+    nav .navlink.active { background: #FFF1F1; color: var(--pop-deep); border-color: #FFD9D9; font-weight: 600; }
+    nav .toc { margin: 2px 0 10px 8px; padding-left: 10px; border-left: 1px solid var(--rule); }
+    nav .toc a { display: block; padding: 4px 8px; font-size: 12.5px; color: var(--ink-dim);
+      text-decoration: none; border-radius: 6px; line-height: 1.35; }
+    nav .toc a:hover { color: var(--ink); background: var(--bg); }
+    nav .toc a.h3 { padding-left: 18px; font-size: 12px; }
+    /* ── Content ── */
+    .main { overflow-y: auto; height: 100vh; }
+    .markdown-body {
+      box-sizing: border-box; max-width: 920px; margin: 0 auto; padding: 56px 56px 120px;
+    }
+    .markdown-body h1, .markdown-body h2 { letter-spacing: -0.015em; }
+    .markdown-body h2 { padding-top: 8px; border-bottom: 1px solid var(--rule); }
+    .markdown-body a { color: var(--pop-deep); }
+    .markdown-body table { display: table; width: 100%; }
+    .markdown-body code { background: #F4F5F7; }
+    .markdown-body pre { background: #F6F8FA; border: 1px solid var(--rule); border-radius: 10px; }
+    .markdown-body .mermaid {
+      background: var(--surface); border: 1px solid var(--rule); border-radius: 12px;
+      padding: 18px; margin: 18px 0; text-align: center; overflow-x: auto;
+    }
+    .markdown-body blockquote { border-left-color: var(--pop); color: var(--ink-soft); }
+    .scrolltop {
+      position: fixed; right: 22px; bottom: 22px; width: 40px; height: 40px; border-radius: 50%;
+      background: var(--ink); color: #fff; border: 0; cursor: pointer; opacity: 0; transition: opacity .2s;
+      font-size: 18px; line-height: 40px; text-align: center; box-shadow: 0 6px 20px -6px rgba(0,0,0,.4);
+    }
+    .scrolltop.show { opacity: .9; }
+    .empty { padding: 80px; color: var(--ink-dim); text-align: center; }
+    /* ── Click-to-zoom modal (diagrams + images) ── */
+    .markdown-body .mermaid, .markdown-body img { cursor: zoom-in; }
+    .zoom-overlay {
+      position: fixed; inset: 0; z-index: 50; display: none; cursor: zoom-out;
+      align-items: center; justify-content: center; padding: 40px;
+      background: rgba(15, 17, 21, 0.8); overflow: auto;
+    }
+    .zoom-overlay.open { display: flex; }
+    .zoom-inner {
+      background: #fff; border-radius: 12px; padding: 24px; max-height: 92vh;
+      overflow: auto; box-shadow: 0 24px 80px -20px rgba(0,0,0,.6);
+    }
+    /* Size the diagram/image to the VIEWPORT (not 100% of the shrink-wrapped box)
+       so it actually enlarges. height:auto keeps the aspect ratio; tall diagrams
+       scroll inside .zoom-inner (max-height + overflow above). */
+    .zoom-inner svg, .zoom-inner img {
+      display: block; width: min(1500px, 90vw) !important; max-width: 90vw !important; height: auto !important;
+    }
+    .zoom-close {
+      position: fixed; top: 18px; right: 22px; width: 42px; height: 42px; border-radius: 50%;
+      border: 0; background: #fff; color: var(--ink); font-size: 22px; line-height: 42px;
+      text-align: center; cursor: pointer; z-index: 51; box-shadow: 0 6px 20px -6px rgba(0,0,0,.5);
+    }
+    .zoom-hint {
+      position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
+      color: #fff; font-size: 12px; opacity: .7; z-index: 51; pointer-events: none;
+    }
+    @media (max-width: 800px) {
+      body { grid-template-columns: 1fr; }
+      .side { display: none; }
+      .markdown-body { padding: 32px 20px 100px; }
+    }
+  </style>
+</head>
+<body>
+  <aside class="side">
+    <div class="brand">
+      <svg width="26" height="26" viewBox="0 0 64 64" aria-hidden="true">
+        <path d="M14 22 C14 11 21 4 32 4 C43 4 50 11 50 22 L50 36 C50 47 43 56 32 60 C21 56 14 47 14 36 Z" fill="#FF4E4E"/>
+        <path d="M14 22 L50 22 L50 28 L14 28 Z" fill="#D63A3A"/>
+        <rect x="19" y="33" width="9" height="2.2" rx="0.5" fill="#0F1115"/>
+        <rect x="36" y="33" width="9" height="2.2" rx="0.5" fill="#0F1115"/>
+        <path d="M22 45 L42 45 L38 53 L26 53 Z" fill="#D63A3A"/>
+      </svg>
+      <div><b>Fe-Mail Gorilla</b><span>Documentation</span></div>
+    </div>
+    <nav id="nav"></nav>
+  </aside>
+  <main class="main" id="main">
+    <article class="markdown-body" id="content"><div class="empty">Loading…</div></article>
+  </main>
+  <button class="scrolltop" id="scrolltop" title="Back to top">↑</button>
+
+  <!-- Click-to-zoom modal: a diagram/image clone is dropped into #zoomInner. -->
+  <div class="zoom-overlay" id="zoom" role="dialog" aria-modal="true" aria-label="Zoomed view">
+    <button class="zoom-close" id="zoomClose" title="Close (Esc)" aria-label="Close">×</button>
+    <div class="zoom-inner" id="zoomInner"></div>
+    <div class="zoom-hint">Click anywhere or press Esc to close</div>
+  </div>
+
+  <script type="module">
+    import { marked } from 'https://cdn.jsdelivr.net/npm/marked@12.0.2/lib/marked.esm.js';
+
+    // Syntax-highlight + diagrams are BEST-EFFORT. They load via dynamic import
+    // in try/catch so a single CDN hiccup (or being offline) degrades to plain
+    // markdown instead of blanking the whole page. marked is the only hard dep.
+    let hljs = null, mermaid = null;
+    try { hljs = (await import('https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/+esm')).default; } catch (_) { /* code stays unhighlighted */ }
+    try {
+      mermaid = (await import('https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.esm.min.mjs')).default;
+      mermaid.initialize({
+        startOnLoad: false, securityLevel: 'loose', theme: 'base',
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif',
+        flowchart: { useMaxWidth: true, htmlLabels: true, curve: 'basis', padding: 14 },
+        sequence: { actorMargin: 60, mirrorActors: false, messageFontWeight: 500 },
+        themeVariables: {
+          primaryColor: '#FFF1F1', primaryBorderColor: '#FF4E4E', primaryTextColor: '#1A1A1A',
+          lineColor: '#9AA1AC', fontSize: '14px',
+          actorBkg: '#FFF1F1', actorBorder: '#FF4E4E', actorTextColor: '#1A1A1A',
+          signalColor: '#5A6068', signalTextColor: '#1A1A1A',
+          labelBoxBkgColor: '#FFF6E5', labelBoxBorderColor: '#E0A92E', labelTextColor: '#5A4300',
+          noteBkgColor: '#FFF6E5', noteBorderColor: '#E0A92E', noteTextColor: '#5A4300',
+          sequenceNumberColor: '#fff',
+        },
+      });
+    } catch (_) { /* diagrams stay as code blocks */ }
+
+    const nav = document.getElementById('nav');
+    const content = document.getElementById('content');
+    const main = document.getElementById('main');
+    let docs = [];
+    let headings = [];
+
+    const slugify = (s) => s.toLowerCase().replace(/[^\w]+/g, '-').replace(/(^-|-$)/g, '');
+
+    async function loadManifest() {
+      docs = await (await fetch('/docs.json')).json();
+      renderNav();
+    }
+
+    function renderNav(activeSlug) {
+      nav.innerHTML = docs.map((d) => {
+        const active = d.slug === activeSlug;
+        const toc = active && headings.length
+          ? `<div class="toc">${headings.map((h) =>
+              `<a href="#/${d.slug}#${h.id}" class="${h.level === 3 ? 'h3' : ''}">${h.text}</a>`).join('')}</div>`
+          : '';
+        return `<a class="navlink ${active ? 'active' : ''}" href="#/${d.slug}">${d.title}</a>${toc}`;
+      }).join('');
+    }
+
+    // Render via default marked, then post-process the DOM. Doing the mermaid /
+    // anchor / highlight work on the rendered DOM (not via a custom marked
+    // Renderer) keeps the viewer robust across marked major-version API changes.
+    function enhance() {
+      // 1) mermaid: <pre><code class="language-mermaid"> → <div class="mermaid">
+      content.querySelectorAll('pre > code.language-mermaid').forEach((code) => {
+        const div = document.createElement('div');
+        div.className = 'mermaid';
+        div.textContent = code.textContent;
+        code.parentElement.replaceWith(div);
+      });
+      // 2) syntax highlight remaining code blocks (if hljs loaded)
+      if (hljs) content.querySelectorAll('pre > code').forEach((code) => { try { hljs.highlightElement(code); } catch (_) {} });
+      // 3) heading anchors + TOC
+      headings = [];
+      content.querySelectorAll('h2, h3').forEach((h) => {
+        const id = slugify(h.textContent);
+        h.id = id;
+        headings.push({ id, text: h.textContent, level: h.tagName === 'H3' ? 3 : 2 });
+      });
+    }
+
+    async function render() {
+      const raw = location.hash.replace(/^#\//, '');
+      const [slug, anchor] = raw.split('#');
+      const doc = docs.find((d) => d.slug === slug) || docs[0];
+      if (!doc) { content.innerHTML = '<div class="empty">No documents found in /documentation.</div>'; return; }
+      let md;
+      try { md = await (await fetch('/documentation/' + doc.file)).text(); }
+      catch { content.innerHTML = '<div class="empty">Could not load ' + doc.file + '</div>'; return; }
+      marked.setOptions({ gfm: true, breaks: false });
+      content.innerHTML = marked.parse(md);
+      enhance();
+      renderNav(doc.slug);
+      if (mermaid) { try { await mermaid.run({ nodes: content.querySelectorAll('.mermaid') }); } catch (e) { /* diagram parse error → leave source */ } }
+      document.title = doc.title + ' · Gorilla Docs';
+      if (anchor) { const el = document.getElementById(anchor); if (el) el.scrollIntoView({ behavior: 'smooth' }); }
+      else main.scrollTo(0, 0);
+    }
+
+    const scrolltop = document.getElementById('scrolltop');
+    main.addEventListener('scroll', () => scrolltop.classList.toggle('show', main.scrollTop > 600));
+    scrolltop.addEventListener('click', () => main.scrollTo({ top: 0, behavior: 'smooth' }));
+
+    // ── Click-to-zoom: open a clone of a clicked diagram/image in the modal ──
+    const zoom = document.getElementById('zoom');
+    const zoomInner = document.getElementById('zoomInner');
+    function openZoom(node) {
+      const clone = node.cloneNode(true);
+      if (clone.tagName && clone.tagName.toLowerCase() === 'svg') {
+        // Strip mermaid's intrinsic width/height + inline max-width so the CSS
+        // (min(1500px, 90vw)) actually drives the size.
+        clone.removeAttribute('width'); clone.removeAttribute('height'); clone.style.maxWidth = '';
+      }
+      zoomInner.innerHTML = '';
+      zoomInner.appendChild(clone);
+      zoom.classList.add('open');
+    }
+    function closeZoom() { zoom.classList.remove('open'); zoomInner.innerHTML = ''; }
+    // Delegate clicks inside the rendered doc: a mermaid <svg> or any <img> zooms.
+    content.addEventListener('click', (e) => {
+      const target = e.target.closest('.mermaid svg, .markdown-body img');
+      if (target) openZoom(target);
+    });
+    zoom.addEventListener('click', closeZoom);          // click anywhere on the overlay closes
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeZoom(); });
+
+    window.addEventListener('hashchange', render);
+    try {
+      await loadManifest();
+      if (!location.hash) location.hash = '#/' + (docs[0] ? docs[0].slug : 'index');
+      await render();
+    } catch (err) {
+      content.innerHTML = '<div class="empty">Failed to load docs: ' + (err && err.message || err) +
+        '<br><br>Is <code>npm run docs</code> running? Check the browser console.</div>';
+    }
+  </script>
+</body>
+</html>

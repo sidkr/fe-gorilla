@@ -17,6 +17,7 @@
     "worker": "NODE_ENV=production node ./server/worker/index.js",
     "start": "NODE_ENV=production pm2 start ./server/index.js --name gorilla && NODE_ENV=production pm2 start ./server/worker/index.js --name gorilla-worker",
     "mocks": "node ./scripts/mocks-server.cjs",
+    "docs": "node ./scripts/docs-server.cjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "e2e": "playwright test",

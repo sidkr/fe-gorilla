@@ -321,7 +321,7 @@ describe("[id].vue — dynamic custom-field form (registry-driven)", () => {
 });
 
 describe("[id].vue — selection + bulk bar (B-08..B-11)", () => {
-  const rows = [contact({ id: "r1", email: "r1@x.com" }), contact({ id: "r2", email: "r2@x.com" })];
+  const rows = [contact({ id: "r1", email: "r1@example.com" }), contact({ id: "r2", email: "r2@example.com" })];
 
   it("B-10: the bulk bar is hidden until a row is selected", async () => {
     const w = await mountPage({ rows, total: 2, fields: [] });
@@ -343,9 +343,9 @@ describe("[id].vue — selection + bulk bar (B-08..B-11)", () => {
 
   it("B-09: per-row toggle is additive and Clear resets", async () => {
     const w = await mountPage({ rows, total: 2, fields: [] });
-    await w.find('input[aria-label="Select r1@x.com"]').setValue(true);
+    await w.find('input[aria-label="Select r1@example.com"]').setValue(true);
     expect(w.find(".ad-bulkbar-count").text()).toContain("1 selected");
-    await w.find('input[aria-label="Select r2@x.com"]').setValue(true);
+    await w.find('input[aria-label="Select r2@example.com"]').setValue(true);
     expect(w.find(".ad-bulkbar-count").text()).toContain("2 selected");
     const clear = w.findAll(".ad-bulkbar .btn").find((b) => b.text() === "Clear")!;
     await clear.trigger("click");
@@ -378,7 +378,7 @@ describe("[id].vue — selection + bulk bar (B-08..B-11)", () => {
 
 describe("[id].vue — search debounce + filter reset (F-09/F-10) + pager (F-12)", () => {
   it("F-09: search is debounced (one extra load after 350ms) and resets to page 0", async () => {
-    const rows = Array.from({ length: 5 }, (_, i) => contact({ id: `p${i}`, email: `p${i}@x.com` }));
+    const rows = Array.from({ length: 5 }, (_, i) => contact({ id: `p${i}`, email: `p${i}@example.com` }));
     const w = await mountPage({ rows, total: 5, fields: [] });
     expect(listContacts).toHaveBeenCalledTimes(1); // initial onMounted load
 
@@ -427,7 +427,7 @@ describe("[id].vue — search debounce + filter reset (F-09/F-10) + pager (F-12)
   });
 
   it("F-12: with two pages, Next is enabled on page 0 and advances the query", async () => {
-    const rows = Array.from({ length: 25 }, (_, i) => contact({ id: `n${i}`, email: `n${i}@x.com` }));
+    const rows = Array.from({ length: 25 }, (_, i) => contact({ id: `n${i}`, email: `n${i}@example.com` }));
     const w = await mountPage({ rows, total: 50, fields: [] }); // perPage 25 → 2 pages
     const next = w.findAll(".ad-pager .btn").find((b) => b.text() === "Next")!;
     expect(next.attributes("disabled")).toBeUndefined();

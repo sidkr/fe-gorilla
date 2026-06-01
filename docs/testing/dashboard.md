@@ -60,7 +60,7 @@
 | D-S04 | Integration | Fresh org → all onboarding steps false | `signUp` → `onboarding(st)` | `steps` all `false`; `complete:false` | P0 |
 | D-S05 | Integration | Audience/contact counts move on List + Contact create | Create 1 List; 3 contacts `status:"subscribed"`; 1 `status:"unsubscribed"`; `dashboard(st)` | `audiences:1`; `contacts.total:4`; `contacts.subscribed:3`; `totals.sent:0` | P0 |
 | D-S06 | Integration | Onboarding audience+contact flip true | Before: `onboarding` shows both false. Create List + 1 Contact; re-read | `steps.audience:true`, `steps.contact:true`, `complete:false` | P0 |
-| D-S07 | Integration | senderIdentity flips on `defaultFromEmail` | `senderIdentity:false`; `setDefaultFromEmail(orgId, "hi@x.com")`; re-read | `steps.senderIdentity:true` | P0 |
+| D-S07 | Integration | senderIdentity flips on `defaultFromEmail` | `senderIdentity:false`; `setDefaultFromEmail(orgId, "hi@example.com")`; re-read | `steps.senderIdentity:true` | P0 |
 | D-S08 | Integration | senderIdentity is whitespace-sensitive | Set `defaultFromEmail` to `"   "` (spaces only) via master key; read onboarding | `steps.senderIdentity:false` (server uses `.trim().length > 0`) | P1 |
 | D-S09 | Integration | campaign flips on any draft; sent only on a `sent` campaign | Create campaign `status:"draft"` → `steps.campaign:true`, `steps.sent:false`. Create campaign `status:"sent"` → `steps.sent:true` | As stated | P0 |
 | D-S10 | Integration | Campaigns bucketed by status + total | Create campaigns `["draft","draft","sending","sent"]`; `dashboard(st)` | `campaigns.total:4`; `byStatus.draft:2`, `byStatus.sending:1`, `byStatus.sent:1`, `byStatus.scheduled:0` | P0 |

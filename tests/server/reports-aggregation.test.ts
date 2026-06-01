@@ -208,7 +208,7 @@ describe("campaign report cloud functions (populated data)", () => {
     it("RPT-R06: sent falls back to the CampaignSend row count when no sentCount", async () => {
       const u = await signUp("R06Co", "r06@example.com");
       const c = await makeCampaign(u.sessionToken);
-      for (let i = 0; i < 3; i++) await makeSend(u.sessionToken, c, { email: `s${i}@x.com` });
+      for (let i = 0; i < 3; i++) await makeSend(u.sessionToken, c, { email: `s${i}@example.com` });
 
       const r = await report(u.sessionToken, c.id);
       expect(r.counts.sent).toBe(3);
@@ -273,8 +273,8 @@ describe("campaign report cloud functions (populated data)", () => {
       const u = await signUp("B02Co", "b02@example.com");
       const st = u.sessionToken;
       const c = await makeCampaign(st, { deliveredCount: 100 });
-      const c1 = await makeContact(st, { email: "c1@x.com" });
-      const c2 = await makeContact(st, { email: "c2@x.com" });
+      const c1 = await makeContact(st, { email: "c1@example.com" });
+      const c2 = await makeContact(st, { email: "c2@example.com" });
       const URL_A = "https://example.com/a";
       const URL_B = "https://example.com/b";
 
@@ -374,7 +374,7 @@ describe("campaign report cloud functions (populated data)", () => {
       const batch = [];
       for (let i = 0; i < 120; i++) {
         const s = new CampaignSend();
-        s.set({ campaign: c, email: `r${i}@x.com`, status: "sent" });
+        s.set({ campaign: c, email: `r${i}@example.com`, status: "sent" });
         batch.push(s);
       }
       await Parse.Object.saveAll(batch, { sessionToken: st });
@@ -422,12 +422,12 @@ describe("campaign report cloud functions (populated data)", () => {
     // Shared fixture for the filter cases: a campaign with a mix of statuses.
     async function seedMixedSends(st: string, c: any) {
       // 2 opened, 1 clicked (also opened), 1 bounced, 1 unsubscribed, 1 plain sent.
-      await makeSend(st, c, { email: "o1@x.com", opened: true });
-      await makeSend(st, c, { email: "o2@x.com", opened: true });
-      await makeSend(st, c, { email: "cl@x.com", opened: true, clicked: true });
-      await makeSend(st, c, { email: "b@x.com", status: "bounced" });
-      await makeSend(st, c, { email: "un@x.com", status: "unsubscribed" });
-      await makeSend(st, c, { email: "plain@x.com", status: "sent" });
+      await makeSend(st, c, { email: "o1@example.com", opened: true });
+      await makeSend(st, c, { email: "o2@example.com", opened: true });
+      await makeSend(st, c, { email: "cl@example.com", opened: true, clicked: true });
+      await makeSend(st, c, { email: "b@example.com", status: "bounced" });
+      await makeSend(st, c, { email: "un@example.com", status: "unsubscribed" });
+      await makeSend(st, c, { email: "plain@example.com", status: "sent" });
     }
 
     it("RPT-P07: filter opened returns only opened rows", async () => {
@@ -497,7 +497,7 @@ describe("campaign report cloud functions (populated data)", () => {
       const st = u.sessionToken;
       const c = await makeCampaign(st);
       const contact = await makeContact(st, {
-        email: "person@x.com",
+        email: "person@example.com",
         firstName: "Ada",
         lastName: "Lovelace",
       });
@@ -505,7 +505,7 @@ describe("campaign report cloud functions (populated data)", () => {
       const clickedAt = new Date("2026-05-13T11:00:00.000Z");
       await makeSend(st, c, {
         contact,
-        email: "person@x.com",
+        email: "person@example.com",
         status: "sent",
         opened: true,
         clicked: true,
@@ -516,7 +516,7 @@ describe("campaign report cloud functions (populated data)", () => {
       const res = await recipients(st, { campaignId: c.id });
       expect(res.rows).toHaveLength(1);
       const row = res.rows[0];
-      expect(row.email).toBe("person@x.com");
+      expect(row.email).toBe("person@example.com");
       expect(row.firstName).toBe("Ada");
       expect(row.lastName).toBe("Lovelace");
       expect(row.status).toBe("sent");
@@ -531,7 +531,7 @@ describe("campaign report cloud functions (populated data)", () => {
       const u = await signUp("P14Co", "p14@example.com");
       const st = u.sessionToken;
       const c = await makeCampaign(st);
-      const contact = await makeContact(st, { email: "fallback@x.com" });
+      const contact = await makeContact(st, { email: "fallback@example.com" });
       // Send with no email but a contact that has one.
       await makeSend(st, c, { contact });
       // Send with neither email nor contact.
@@ -539,7 +539,7 @@ describe("campaign report cloud functions (populated data)", () => {
 
       const res = await recipients(st, { campaignId: c.id });
       const emails = res.rows.map((r) => r.email).sort();
-      expect(emails).toContain("fallback@x.com");
+      expect(emails).toContain("fallback@example.com");
       expect(emails).toContain("");
     });
 
@@ -548,9 +548,9 @@ describe("campaign report cloud functions (populated data)", () => {
       const st = u.sessionToken;
       const c = await makeCampaign(st);
       // Save sequentially so createdAt strictly increases.
-      const first = await makeSend(st, c, { email: "first@x.com" });
-      const second = await makeSend(st, c, { email: "second@x.com" });
-      const third = await makeSend(st, c, { email: "third@x.com" });
+      const first = await makeSend(st, c, { email: "first@example.com" });
+      const second = await makeSend(st, c, { email: "second@example.com" });
+      const third = await makeSend(st, c, { email: "third@example.com" });
 
       const res = await recipients(st, { campaignId: c.id });
       expect(res.rows.map((r) => r.id)).toEqual([third.id, second.id, first.id]);
@@ -602,8 +602,8 @@ describe("campaign report cloud functions (populated data)", () => {
       const ca = await makeCampaign(a.sessionToken);
       const cb = await makeCampaign(b.sessionToken);
       // 3 sends for A, 1 for B.
-      for (let i = 0; i < 3; i++) await makeSend(a.sessionToken, ca, { email: `a${i}@x.com` });
-      await makeSend(b.sessionToken, cb, { email: "b0@x.com" });
+      for (let i = 0; i < 3; i++) await makeSend(a.sessionToken, ca, { email: `a${i}@example.com` });
+      await makeSend(b.sessionToken, cb, { email: "b0@example.com" });
 
       const resA = await recipients(a.sessionToken, { campaignId: ca.id });
       const resB = await recipients(b.sessionToken, { campaignId: cb.id });

@@ -109,7 +109,7 @@ SEO, decorative.
 | INT-07 | Integration | Anonymous cannot create tenant object | `new List().save()` with no session, no master key | Rejected | P0 |
 | INT-08 | Integration | Duplicate signup → 202 | Sign up `dupe@example.com`; sign up again as `Dupe@Example.com` (different case) | Second rejects with `code: 202` (USERNAME_TAKEN; email-taken normalized to 202 too) | P0 |
 | INT-09 | Integration | Missing username/password rejected | `signUpWithOrg` with `{}` or password only | Rejects `OTHER_CAUSE` ("username and password are required") | P1 |
-| INT-10 | Integration | Company-name derivation fallback | Sign up with `company:""`, `name:"Bob"` then with neither (only username) | `orgName` === `"Bob's organization"`; with only `carl@x.com` → `"carl's organization"` | P2 |
+| INT-10 | Integration | Company-name derivation fallback | Sign up with `company:""`, `name:"Bob"` then with neither (only username) | `orgName` === `"Bob's organization"`; with only `carl@example.com` → `"carl's organization"` | P2 |
 | INT-11 | Integration | Slug uniqueness across same-named orgs | Two signups with `company:"Acme"` | Both succeed; the two `slug`s differ (random suffix); both start `acme-` | P1 |
 | INT-12 | Integration | Returned session token is usable | Take `sessionToken` from `signUpWithOrg`, run an authed `getMyOrg` with it | Succeeds — confirms the explicit `logIn` mint in step (e) works | P0 |
 | INT-13 | Integration | Failed org step cleans up the user (no orphan) | Force a failure after user create (e.g. invalid org save) and assert the user is destroyed | No `_User` lingers for that username; a subsequent signup with same username succeeds | P2 |

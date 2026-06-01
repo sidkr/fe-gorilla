@@ -85,8 +85,8 @@ describe("send pipeline foundation", () => {
 
     it("never returns the same messageId twice", async () => {
       const adapter = ses.getSesAdapter();
-      const a = await adapter.sendEmail({ to: "a@x.com", subject: "s", html: "<p/>" });
-      const b = await adapter.sendEmail({ to: "b@x.com", subject: "s", html: "<p/>" });
+      const a = await adapter.sendEmail({ to: "a@example.com", subject: "s", html: "<p/>" });
+      const b = await adapter.sendEmail({ to: "b@example.com", subject: "s", html: "<p/>" });
       expect(a.messageId).not.toBe(b.messageId);
     });
   });

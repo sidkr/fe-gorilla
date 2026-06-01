@@ -169,8 +169,8 @@ describe("segments-extra: preview cache + kind-switch + empty rules", () => {
       await c.save(null, { sessionToken: dSession });
     };
     // Start with 2 subscribed contacts in DivergeCo.
-    await makeSub("one@x.com");
-    await makeSub("two@x.com");
+    await makeSub("one@example.com");
+    await makeSub("two@example.com");
 
     const rules = {
       op: "and",
@@ -186,7 +186,7 @@ describe("segments-extra: preview cache + kind-switch + empty rules", () => {
     expect(dynamicSeg.lastCount).toBe(2);
 
     // Add a THIRD subscribed contact to DivergeCo.
-    await makeSub("three@x.com");
+    await makeSub("three@example.com");
 
     // SD-02: static eval ignores the newcomer — still the frozen snapshot of 2.
     const staticEval = (await dRun("evaluateSegment", { id: staticSeg.id })) as { count: number };
