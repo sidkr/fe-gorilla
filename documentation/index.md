@@ -30,13 +30,24 @@ ingestion** for bounces/complaints. Everything is **multi-tenant** — one
 
 ```mermaid
 flowchart LR
-  U["Browser"] -->|"marketing: prerendered HTML"| NX["Nuxt / Nitro :3001"]
+  U["🌐 Browser"] -->|"marketing: prerendered HTML"| NX["▲ Nuxt / Nitro :3001"]
   U -->|"/app SPA + /api"| NX
-  NX -->|"proxy /api,/t,/u,/f"| EX["Express + Parse Server :8090"]
-  EX <--> M[("MongoDB")]
-  WK["Worker · Agenda"] <--> M
-  WK -->|"sendEmail"| SES["SES adapter"]
+  NX -->|"proxy /api,/t,/u,/f"| EX["🚂 Express + Parse :8090"]
+  EX <--> M[("🍃 MongoDB")]
+  WK["⚙️ Worker · Agenda"] <--> M
+  WK -->|"sendEmail"| SES["✉️ SES adapter"]
   SES -.->|"bounces/complaints via SNS"| EX
+
+  classDef fe fill:#FFE3E3,stroke:#FF4E4E,stroke-width:1.5px,color:#7A1414;
+  classDef api fill:#E5EAFF,stroke:#3B53D6,stroke-width:1.5px,color:#1B2A7A;
+  classDef worker fill:#FFF1D6,stroke:#D98A14,stroke-width:1.5px,color:#7A4D08;
+  classDef data fill:#D7F7E3,stroke:#16A34A,stroke-width:1.5px,color:#08431F;
+  classDef ext fill:#ECE3FF,stroke:#7C3AED,stroke-width:1.5px,color:#3B1E7A;
+  class U,NX fe
+  class EX api
+  class WK worker
+  class M data
+  class SES ext
 ```
 
 ## Running the docs site

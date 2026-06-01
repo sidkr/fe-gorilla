@@ -24,16 +24,16 @@ ORM**: app code talks to Parse directly.
 
 ```mermaid
 flowchart TB
-  subgraph rp["Request plane"]
-    NX["Nuxt 3 / Nitro<br/>:3001 (web)"]
-    EX["Express + Parse Server v7<br/>:8090 (api)"]
+  subgraph rp["📥 Request plane"]
+    NX["▲ Nuxt 3 / Nitro<br/>:3001 (web)"]
+    EX["🚂 Express + Parse Server v7<br/>:8090 (api)"]
   end
-  subgraph wp["Work plane"]
-    WK["Worker<br/>Agenda consumer"]
+  subgraph wp["⚙️ Work plane"]
+    WK["⚙️ Worker<br/>Agenda consumer"]
   end
-  M[("MongoDB<br/>app data + agendaJobs")]
-  SES["SES adapter<br/>mock / real"]
-  SNS["AWS SNS<br/>bounce/complaint"]
+  M[("🍃 MongoDB<br/>app data + agendaJobs")]
+  SES["✉️ SES adapter<br/>mock / real"]
+  SNS["📣 AWS SNS<br/>bounce/complaint"]
 
   NX -->|"proxy /api /t /u /f /webhooks"| EX
   EX <--> M
@@ -42,7 +42,24 @@ flowchart TB
   WK -->|"sendEmail"| SES
   SNS -->|"POST /api/webhooks/ses"| EX
   EX -.->|"enqueue WEBHOOK_INGEST"| M
+
+  classDef fe fill:#FFE3E3,stroke:#FF4E4E,stroke-width:1.5px,color:#7A1414;
+  classDef api fill:#E5EAFF,stroke:#3B53D6,stroke-width:1.5px,color:#1B2A7A;
+  classDef worker fill:#FFF1D6,stroke:#D98A14,stroke-width:1.5px,color:#7A4D08;
+  classDef data fill:#D7F7E3,stroke:#16A34A,stroke-width:1.5px,color:#08431F;
+  classDef ext fill:#ECE3FF,stroke:#7C3AED,stroke-width:1.5px,color:#3B1E7A;
+  class NX fe
+  class EX api
+  class WK worker
+  class M data
+  class SES,SNS ext
+  style rp fill:#FFF6F6,stroke:#FFC9C9,color:#7A1414
+  style wp fill:#FFFBEF,stroke:#F2D49A,color:#7A4D08
 ```
+
+> **Diagram legend** — flowchart nodes are color-coded by role: 🟥 frontend ·
+> 🟦 API / backend · 🟨 worker / async · 🟩 data / storage · 🟪 external (AWS).
+> The same palette is used in every flowchart below.
 
 **Decision — Parse-direct data layer (no ORM/API layer).** Components and cloud
 functions use `Parse.Query` / `Parse.Object` / `Parse.Cloud.run` directly.
@@ -78,9 +95,9 @@ Production: `npm run start` runs `gorilla` (API) and `gorilla-worker` under pm2.
 
 ```mermaid
 sequenceDiagram
-  participant P as Process
-  participant Parse as Parse Server
-  participant Mongo
+  participant P as 🚂 API process
+  participant Parse as 🅿️ Parse Server
+  participant Mongo as 🍃 Mongo
   P->>P: dotenv (local.env / .env)
   P->>P: trust proxy = 1
   P->>P: exit(1) if no PARSE_MASTER_KEY
@@ -128,15 +145,23 @@ This is encoded in `nuxt.config.ts`:
 
 ```mermaid
 flowchart LR
-  subgraph pre["Prerendered HTML"]
+  subgraph pre["📄 Prerendered HTML"]
     H["/  /login  /signup<br/>/features/*  /legal/*  …"]
   end
-  subgraph spa["CSR SPA (ssr:false)"]
+  subgraph spa["⚡ CSR SPA (ssr:false)"]
     A["/app/**"]
   end
-  subgraph prox["Proxied to Express"]
+  subgraph prox["🔀 Proxied to Express"]
     PX["/api/**  /t/**  /u/**<br/>/f/**  /webhooks/**"]
   end
+
+  classDef fe fill:#FFE3E3,stroke:#FF4E4E,stroke-width:1.5px,color:#7A1414;
+  classDef api fill:#E5EAFF,stroke:#3B53D6,stroke-width:1.5px,color:#1B2A7A;
+  class H,A fe
+  class PX api
+  style pre fill:#FFF6F6,stroke:#FFC9C9
+  style spa fill:#FFF6F6,stroke:#FFC9C9
+  style prox fill:#F4F7FF,stroke:#C7D4FF
 ```
 
 **Decision — CSR for `/app/*`.** The Parse session token lives in `localStorage`,
@@ -202,12 +227,23 @@ failure — Mongo has no multi-doc transaction here).
 
 ```mermaid
 flowchart TB
-  Q["client query<br/>(session token)"] --> CLP{"CLP:<br/>authenticated?"}
-  CLP -- no --> X1["deny"]
-  CLP -- yes --> ACL{"Row ACL:<br/>role org_(id)_members?"}
-  ACL -- no --> X2["row invisible"]
-  ACL -- yes --> OK["rows returned"]
-  MK["worker / cloud<br/>(master key)"] -->|"bypasses ACL"| OK
+  Q["👤 client query<br/>(session token)"] --> CLP{"🔐 CLP:<br/>authenticated?"}
+  CLP -- no --> X1["⛔ deny"]
+  CLP -- yes --> ACL{"🛡️ Row ACL:<br/>role org_(id)_members?"}
+  ACL -- no --> X2["🚫 row invisible"]
+  ACL -- yes --> OK["✅ rows returned"]
+  MK["🔑 worker / cloud<br/>(master key)"] -->|"bypasses ACL"| OK
+
+  classDef fe fill:#FFE3E3,stroke:#FF4E4E,stroke-width:1.5px,color:#7A1414;
+  classDef worker fill:#FFF1D6,stroke:#D98A14,stroke-width:1.5px,color:#7A4D08;
+  classDef data fill:#D7F7E3,stroke:#16A34A,stroke-width:1.5px,color:#08431F;
+  classDef decision fill:#FFF7E0,stroke:#E0A92E,stroke-width:1.5px,color:#5A4300;
+  classDef danger fill:#FEE2E2,stroke:#DC2626,stroke-width:1.5px,color:#7A0E0E;
+  class Q fe
+  class CLP,ACL decision
+  class X1,X2 danger
+  class OK data
+  class MK worker
 ```
 
 1. **CLP** (`authOnlyCLP`) — every per-tenant class requires authentication for all
@@ -323,12 +359,12 @@ The core product flow, three stages across the request plane and work plane.
 
 ```mermaid
 sequenceDiagram
-  participant Editor
-  participant CF as scheduleSend (cloud)
-  participant Q as Agenda
-  participant FO as campaignFanout (worker)
-  participant SE as sendEmail (worker)
-  participant SES
+  participant Editor as 🧑 Editor
+  participant CF as ☁️ scheduleSend
+  participant Q as 📨 Agenda
+  participant FO as ⚙️ campaignFanout
+  participant SE as ✉️ sendEmail
+  participant SES as 📮 SES
   Editor->>CF: scheduleSend(campaignId, when)
   CF->>CF: guards: status, compiledHtml, subject,<br/>fromEmail, audience≥1, DOMAIN GUARD
   CF->>CF: status = queued (SAVE before enqueue)
@@ -444,13 +480,25 @@ verification against the cert at `SigningCertURL`, requiring the host to match
 
 ```mermaid
 flowchart LR
-  SNS["SNS notification"] --> ING["webhookIngest"]
-  ING -->|"delivery"| D["delivered + counter"]
-  ING -->|"hard bounce"| HB["suppress + bounced"]
-  ING -->|"complaint"| C["suppress + complaint"]
-  HB --> AP{"rate &gt; threshold<br/>&amp; volume ≥ 1000?"}
+  SNS["📣 SNS notification"] --> ING["⚙️ webhookIngest"]
+  ING -->|"delivery"| D["✅ delivered + counter"]
+  ING -->|"hard bounce"| HB["⚠️ suppress + bounced"]
+  ING -->|"complaint"| C["🚩 suppress + complaint"]
+  HB --> AP{"📊 rate &gt; threshold<br/>&amp; volume ≥ 1000?"}
   C --> AP
-  AP -- yes --> PAUSE["org.sendingPaused = true<br/>pause ALL in-flight campaigns"]
+  AP -- yes --> PAUSE["⛔ org.sendingPaused = true<br/>pause ALL in-flight campaigns"]
+
+  classDef worker fill:#FFF1D6,stroke:#D98A14,stroke-width:1.5px,color:#7A4D08;
+  classDef data fill:#D7F7E3,stroke:#16A34A,stroke-width:1.5px,color:#08431F;
+  classDef ext fill:#ECE3FF,stroke:#7C3AED,stroke-width:1.5px,color:#3B1E7A;
+  classDef decision fill:#FFF7E0,stroke:#E0A92E,stroke-width:1.5px,color:#5A4300;
+  classDef danger fill:#FEE2E2,stroke:#DC2626,stroke-width:1.5px,color:#7A0E0E;
+  class SNS ext
+  class ING worker
+  class D data
+  class HB,C decision
+  class AP decision
+  class PAUSE danger
 ```
 
 **Org auto-pause** is the **shared-domain reputation safety net**: thresholds are
