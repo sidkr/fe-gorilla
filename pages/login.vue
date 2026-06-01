@@ -215,6 +215,16 @@ async function onSubmit() {
     grid-template-columns: 1fr 1fr;
     min-height: 100vh;
   }
+  /* On mobile: single column, drop the decorative promo panel, tighten padding. */
+  @media (max-width: 760px) {
+    .page { grid-template-columns: 1fr; }
+    /* Specificity must beat the later base `.col` rule (display:flex / padding). */
+    .col.col-promo { display: none; }
+    .page .col { padding: var(--space-6) var(--space-5); }
+  }
+  @media (max-width: 380px) {
+    .page .col { padding: var(--space-5) var(--space-4); }
+  }
 
   /* ── Columns ─────────────────────────────────────────────────────────── */
   .col {

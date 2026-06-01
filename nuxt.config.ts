@@ -13,7 +13,7 @@ export default defineNuxtConfig({
   // result". Ignoring the tree keeps Nitro out of the backend entirely.
   ignore: ["server/**"],
 
-  css: ["~/assets/css/tokens.css"],
+  css: ["~/assets/css/tokens.css", "~/assets/css/marketing.css"],
 
   // Auto-import components by directory. Subdirectory prefixes self-document
   // which side a component belongs to:
@@ -99,7 +99,17 @@ export default defineNuxtConfig({
   // replacing the per-route `prerender: true` rules (see routeRules note above).
   nitro: {
     prerender: {
-      routes: ["/", "/login", "/signup"],
+      routes: [
+        "/", "/login", "/signup", "/pricing",
+        // Product
+        "/features", "/features/editor", "/features/segments", "/features/reports", "/features/automations",
+        // Resources
+        "/docs", "/docs/api", "/templates", "/deliverability", "/changelog",
+        // Company
+        "/about", "/customers", "/careers", "/press", "/contact",
+        // Legal
+        "/legal/terms", "/legal/privacy", "/legal/gdpr", "/legal/dpa", "/security",
+      ],
     },
   },
 

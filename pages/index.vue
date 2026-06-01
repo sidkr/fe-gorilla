@@ -1,4 +1,8 @@
 <script setup>
+// Nav + footer come from layouts/marketing.vue (shared chrome). This page
+// supplies only its own sections.
+definePageMeta({ layout: "marketing" });
+
 useHead({
   title: "Fe-Mail Gorilla",
   titleTemplate: null,  // use the raw title verbatim — nothing appended
@@ -18,26 +22,8 @@ useHead({
 
 <template>
 
-  <!-- ── NAV ─────────────────────────────────────────────── -->
-  <nav class="nav">
-    <div class="wrap nav-inner">
-      <NuxtLink to="/" class="brand" aria-label="Fe-Mail Gorilla home">
-        <BrandMark :size="34" />
-        <BrandWordmark :height="34" />
-      </NuxtLink>
-      <ul class="nav-links">
-        <li><a href="#">Product</a></li>
-        <li><a href="#">Pricing</a></li>
-        <li><a href="#">Customers</a></li>
-        <li><a href="#">Changelog</a></li>
-        <li><a href="#">Docs</a></li>
-      </ul>
-      <div class="nav-cta">
-        <Button variant="subtle" size="sm" to="/login">Sign in</Button>
-        <Button variant="primary" size="sm" to="/signup">Sign up free</Button>
-      </div>
-    </div>
-  </nav>
+  <!-- Nav is provided by layouts/marketing.vue -->
+
 
   <!-- ── HERO ────────────────────────────────────────────── -->
   <section class="hero">
@@ -267,66 +253,7 @@ useHead({
     </div>
   </section>
 
-  <!-- ── FOOTER ──────────────────────────────────────────── -->
-  <footer>
-    <div class="wrap">
-      <div class="footer-grid">
-        <div class="footer-brand">
-          <a href="#" class="brand">
-            <BrandMark :size="28" />
-            <BrandWordmark :height="28" />
-          </a>
-          <p class="blurb">Fe-Mail Gorilla — iron-forged email marketing for teams that want their campaigns to actually arrive.</p>
-        </div>
-        <div class="footer-col">
-          <h4>Product</h4>
-          <ul>
-            <li><a href="#">Editor</a></li>
-            <li><a href="#">Segments</a></li>
-            <li><a href="#">Reports</a></li>
-            <li><a href="#">Automations</a></li>
-            <li><a href="#">Pricing</a></li>
-          </ul>
-        </div>
-        <div class="footer-col">
-          <h4>Resources</h4>
-          <ul>
-            <li><a href="#">Docs</a></li>
-            <li><a href="#">API reference</a></li>
-            <li><a href="#">Templates</a></li>
-            <li><a href="#">Deliverability guide</a></li>
-            <li><a href="#">Changelog</a></li>
-          </ul>
-        </div>
-        <div class="footer-col">
-          <h4>Company</h4>
-          <ul>
-            <li><a href="#">About</a></li>
-            <li><a href="#">Customers</a></li>
-            <li><a href="#">Careers</a></li>
-            <li><a href="#">Press kit</a></li>
-            <li><a href="#">Contact</a></li>
-          </ul>
-        </div>
-        <div class="footer-col">
-          <h4>Legal</h4>
-          <ul>
-            <li><a href="#">Terms</a></li>
-            <li><a href="#">Privacy</a></li>
-            <li><a href="#">GDPR</a></li>
-            <li><a href="#">DPA</a></li>
-            <li><a href="#">Security</a></li>
-          </ul>
-        </div>
-      </div>
-      <div class="footer-bottom">
-        <span class="meta">© 2026 Fe-Mail Gorilla · Forged for email</span>
-        <span class="fe26" aria-label="Iron, element 26">
-          <span class="num">26</span><span class="sym">Fe</span><span class="name">Iron</span>
-        </span>
-      </div>
-    </div>
-  </footer>
+  <!-- Footer is provided by layouts/marketing.vue -->
 
 </template>
 
@@ -828,5 +755,13 @@ useHead({
       .stat .num { font-size: var(--text-4xl); }
       .footer-grid { grid-template-columns: 1fr 1fr; }
       .nav-links { display: none; }
+    }
+    @media (max-width: 400px) {
+      /* iPhone-SE-class: stop the big display h1, the two-up CTA buttons, and the
+         hero figure from forcing a horizontal scrollbar. */
+      .hero h1 { font-size: var(--text-4xl); overflow-wrap: anywhere; }
+      .hero .lede { font-size: var(--text-md); }
+      .hero-cta { flex-wrap: wrap; }
+      .hero-figure { max-width: 100%; }
     }
 </style>
