@@ -1,0 +1,64 @@
+name: CI
+
+# The green gate. Runs the vitest suite (server cloud fns, worker jobs, SES
+# adapter, component tests) on every push and PR. Make this a REQUIRED check on
+# main so a regression can't merge silently.
+#
+# Mongo: Parse data runs on an in-memory Mongo per test file (mongodb-memory-
+# server), but the Agenda QUEUE connects separately to PARSE_DATABASE_URI
+# (default mongodb://localhost:27017/gorilla — see server/lib/agendaInstance.js).
+# Tests that enqueue (scheduleSend, pause/resume) need a real Mongo at 27017, the
+# same dependency CLAUDE.md documents for local dev. The service below provides it.
+#
+# Playwright e2e is intentionally NOT here yet: it needs a running dev server.
+# Add a separate, non-required e2e job once the suite boots a throwaway stack.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Cancel superseded runs on the same ref to save CI minutes.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Unit + integration (vitest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      # Backs the Agenda job queue (the enqueue path in scheduleSend / pause /
+      # resume). Parse itself uses an in-memory Mongo per test file.
+      mongo:
+        image: mongo:7
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.runCommand({ ping: 1 })'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      # mongodb-memory-server downloads a Mongo binary on first run. Cache it so
+      # every CI run doesn't re-download (~hundreds of MB).
+      - name: Cache mongodb-memory-server binaries
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/mongodb-binaries
+          key: mongodb-binaries-${{ runner.os }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test

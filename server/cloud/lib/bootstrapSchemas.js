@@ -532,6 +532,18 @@ async function bootstrapSchemas() {
     index(s, e, "mock_message_id", { messageId: 1 });
     s.setCLP(masterKeyOnlyCLP());
   });
+
+  // ── WorkerHeartbeat (liveness signal; NOT per-tenant) ───────────────────────-
+  // The worker upserts a singleton row (name "worker") with `beatAt` on every
+  // ops tick. The API server's /ready endpoint reads it to tell whether the
+  // worker (and therefore the send/automation queue) is alive. Master-key-only —
+  // never reachable by a client session.
+  await ensureClass("WorkerHeartbeat", (s, e) => {
+    field(s, e, "name", "String");
+    field(s, e, "beatAt", "Date");
+    index(s, e, "heartbeat_name", { name: 1 });
+    s.setCLP(masterKeyOnlyCLP());
+  });
 }
 
 module.exports = { bootstrapSchemas };

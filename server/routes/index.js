@@ -3,6 +3,7 @@
 // Add a new domain by creating the file and listing it here.
 module.exports = {
   mount(app) {
+    require("./health").mount(app);
     require("./tracking").mount(app);
     require("./webhooks").mount(app);
     require("./imports").mount(app);

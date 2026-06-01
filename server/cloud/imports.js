@@ -21,6 +21,7 @@
 
 const Parse = require("parse/node");
 const { getUserOrg } = require("./lib/tenancy");
+const { assertSafeImportPath } = require("../lib/importPaths");
 
 // Job-name constant (jobNames.js is locked in this lane; mirror the worker's
 // local fallback). INTEGRATION DELTA: add IMPORT_CSV to server/lib/jobNames.js
@@ -141,6 +142,14 @@ Parse.Cloud.define("startContactImport", async (request) => {
       "No uploaded file. Upload a CSV first.",
     );
   }
+  // SECURITY: never trust a client-supplied path. Constrain it to a freshly
+  // uploaded temp file (os.tmpdir()/import-<32hex>.csv) — otherwise a signed-in
+  // user could point the worker at /etc/passwd, server/local.env (master key),
+  // or another tenant's leftover upload. See server/lib/importPaths.js.
+  const safeFilePath = assertSafeImportPath(
+    p.filePath,
+    (msg) => new Parse.Error(Parse.Error.OTHER_CAUSE, msg),
+  );
 
   // Consent capture is mandatory unless the list opts out (F-29:
   // AudienceList.requireConsent, default on).
@@ -151,7 +160,7 @@ Parse.Cloud.define("startContactImport", async (request) => {
   const job = new ImportJob();
   job.set("organization", org); // explicit (tenantHooks also stamps on create)
   job.set("listId", list.id);
-  job.set("filePath", String(p.filePath));
+  job.set("filePath", safeFilePath);
   job.set("fileName", p.fileName ? String(p.fileName) : "");
   job.set("hasHeader", p.hasHeader !== false);
   job.set("mapping", mapping);

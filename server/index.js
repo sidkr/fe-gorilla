@@ -13,6 +13,11 @@ if (!process.env.PARSE_MASTER_KEY) {
   process.exit(1);
 }
 
+// In production, refuse to boot with config that would make sending unsafe
+// (forgeable tracking tokens, localhost links, missing AWS creds). No-op in
+// dev/test. See server/lib/env.js.
+require("./lib/env").assertProductionConfig();
+
 const config = {
   databaseURI: process.env.PARSE_DATABASE_URI || "mongodb://localhost:27017/gorilla",
   appId:       process.env.PARSE_APP_ID        || "gorilla",
@@ -81,6 +86,12 @@ async function start() {
     try {
       const { bootstrapSchemas } = require("./cloud/lib/bootstrapSchemas");
       await bootstrapSchemas();
+      // Upgrade the `*_unique` indexes to ACTUAL unique constraints. Parse's
+      // addIndex only makes non-unique indexes, so this must run after the
+      // schema bootstrap (which creates the non-unique versions). Migrates
+      // stale indexes; logs (never crashes) on pre-existing duplicate data.
+      const { ensureUniqueIndexes } = require("./cloud/lib/uniqueIndexes");
+      await ensureUniqueIndexes();
     } catch (err) {
       console.warn("[bootstrapSchemas] non-fatal:", err && err.message);
     }

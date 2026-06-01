@@ -8,8 +8,12 @@
 // agenda.start() so every handler is registered before processing begins.
 const { initParseClient } = require("../lib/parseClient");
 const { getAgenda } = require("../lib/agendaInstance");
+const { assertProductionConfig } = require("../lib/env");
 
 async function start() {
+  // Refuse to boot in production without the secrets/links the send path needs
+  // (forgeable tokens / localhost URLs otherwise). No-op in dev/test.
+  assertProductionConfig();
   initParseClient();
   const agenda = await getAgenda();
 
@@ -27,6 +31,8 @@ async function start() {
   require("./jobs/importCsv").register(agenda);
   require("./jobs/automationTick").register(agenda);
   require("./jobs/ingestConversion").register(agenda);
+  // Ops maintenance: worker heartbeat (for /ready) + stuck-campaign recovery.
+  require("./jobs/opsTick").register(agenda);
 
   await agenda.start();
   console.log(
