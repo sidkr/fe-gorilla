@@ -33,15 +33,15 @@ describe("ensureUniqueIndexes", () => {
     const report = await ensureUniqueIndexesOnDb(db, log);
     expect(report.contact_org_email_unique).toBe("created");
 
-    await db.collection("Contact").insertOne({ _p_organization: ORG, email: "a@x.com" });
+    await db.collection("Contact").insertOne({ _p_organization: ORG, email: "a@example.com" });
     // Same org + email → must be rejected by the unique index.
     await expect(
-      db.collection("Contact").insertOne({ _p_organization: ORG, email: "a@x.com" }),
+      db.collection("Contact").insertOne({ _p_organization: ORG, email: "a@example.com" }),
     ).rejects.toThrow(/E11000|duplicate key/i);
     // Different email is fine.
-    await db.collection("Contact").insertOne({ _p_organization: ORG, email: "b@x.com" });
+    await db.collection("Contact").insertOne({ _p_organization: ORG, email: "b@example.com" });
     // Same email, different org is fine (org is part of the key).
-    await db.collection("Contact").insertOne({ _p_organization: "Organization$org2", email: "a@x.com" });
+    await db.collection("Contact").insertOne({ _p_organization: "Organization$org2", email: "a@example.com" });
   });
 
   it("is idempotent on a second run (all exist, no throw)", async () => {
@@ -89,14 +89,14 @@ describe("ensureUniqueIndexes", () => {
       .collection("Suppression")
       .createIndex({ _p_organization: 1, email: 1 }, { name: "suppression_org_email_unique" });
     // Insert a (single) row — no dup yet.
-    await fresh.collection("Suppression").insertOne({ _p_organization: ORG, email: "s@x.com" });
+    await fresh.collection("Suppression").insertOne({ _p_organization: ORG, email: "s@example.com" });
 
     const report = await ensureUniqueIndexesOnDb(fresh, log);
     expect(report.suppression_org_email_unique).toBe("migrated");
 
     // Now unique: a duplicate is rejected.
     await expect(
-      fresh.collection("Suppression").insertOne({ _p_organization: ORG, email: "s@x.com" }),
+      fresh.collection("Suppression").insertOne({ _p_organization: ORG, email: "s@example.com" }),
     ).rejects.toThrow(/E11000|duplicate key/i);
   });
 
@@ -104,8 +104,8 @@ describe("ensureUniqueIndexes", () => {
     const dirty = client.db("dirty-test");
     // Two identical (org, email) contacts BEFORE the index exists.
     await dirty.collection("Contact").insertMany([
-      { _p_organization: ORG, email: "dup@x.com" },
-      { _p_organization: ORG, email: "dup@x.com" },
+      { _p_organization: ORG, email: "dup@example.com" },
+      { _p_organization: ORG, email: "dup@example.com" },
     ]);
     const localLogs: string[] = [];
     const report = await ensureUniqueIndexesOnDb(dirty, (m: string) => localLogs.push(m));

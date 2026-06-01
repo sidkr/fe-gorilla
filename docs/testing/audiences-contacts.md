@@ -115,7 +115,7 @@ Conventions for L2 steps: `signUp(company)` → `{ sessionToken, orgId }`;
 | C-01 | L2 | Add contact lowercases email + joins list | `addContact({audienceId, email:"Person@Example.com", firstName:"Pat"})` | `email:"person@example.com"`, `lists` contains listId; `List.contactCount === 1` | P0 |
 | C-02 | L2 | Add rejects invalid email | `addContact({audienceId, email:"not-an-email"})` | rejects OTHER_CAUSE | P0 |
 | C-03 | L2 | Add rejects missing email | `addContact({audienceId, email:""})` | rejects | P1 |
-| C-04 | L2 | Duplicate email → DUPLICATE_VALUE w/ contactId | add `dup@x.com`, add again | rejects `{code:137, contactId: firstId}` (UI "open contact") | P0 |
+| C-04 | L2 | Duplicate email → DUPLICATE_VALUE w/ contactId | add `dup@example.com`, add again | rejects `{code:137, contactId: firstId}` (UI "open contact") | P0 |
 | C-05 | L2 | Add to nonexistent / other-org list → not found | `addContact({audienceId:"bogus", ...})`; and B adds to A's list id | rejects OBJECT_NOT_FOUND | P0 |
 | C-06 | L2 | Revive soft-deleted contact instead of erroring | add, soft-delete, add same email again | succeeds (no 137); `deleted:false`; back on list | P1 |
 | C-07 | L2 | Rich std fields persist + round-trip | add with company/phone/city/country/timezone | all stored; reappear via `listContacts` | P1 |
@@ -253,7 +253,7 @@ date `joined`; text `nickname`.
 | T-04 | L2 | Registry isolated; same key reusable per org | A creates "OnlyForA"; B lists (absent) then creates same label | B's list excludes A's field; B can reuse key `onlyfora` (unique per-org) | P0 |
 | T-05 | L2 | B cannot edit/delete A's custom field | B `updateCustomField`/`deleteCustomField` with A's id | rejects OBJECT_NOT_FOUND | P1 |
 | T-06 | L2 | resolveAudienceRecipients scoped to org | B resolves A's list id | rejects OBJECT_NOT_FOUND | P1 |
-| T-07 | L2 | Email uniqueness is per-org, not global | A and B both add `same@x.com` | both succeed (independent rows); no 137 across orgs | P1 |
+| T-07 | L2 | Email uniqueness is per-org, not global | A and B both add `same@example.com` | both succeed (independent rows); no 137 across orgs | P1 |
 
 ### 3j. End-to-end (L4 — Playwright, `freshUser` fixture)
 

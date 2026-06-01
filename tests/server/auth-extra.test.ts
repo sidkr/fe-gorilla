@@ -109,7 +109,7 @@ describe("auth: signUpWithOrg / getMyOrg extra branches", () => {
 
     // only a username (no company, no name) → "<localpart>'s organization"
     const byUsername = await signUp({
-      username: "carl@x.com",
+      username: "carl@example.com",
       password: "hunter2hunter2",
     });
     expect(byUsername.orgName).toBe("carl's organization");

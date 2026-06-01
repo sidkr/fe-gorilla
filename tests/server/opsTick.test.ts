@@ -47,7 +47,7 @@ describe("opsTick", () => {
     const s = new (Parse.Object.extend("CampaignSend"))();
     s.set("organization", orgPointer());
     s.set("campaign", campaign);
-    s.set("email", `${Math.random().toString(36).slice(2)}@x.com`);
+    s.set("email", `${Math.random().toString(36).slice(2)}@example.com`);
     s.set("status", status);
     await s.save(null, MK);
     return s;

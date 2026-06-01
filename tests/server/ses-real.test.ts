@@ -110,35 +110,35 @@ describe("real SES adapter — SendEmailCommand shape", () => {
   it("normalizes array to/replyTo into address lists", async () => {
     const adapter = createRealAdapter();
     await adapter.sendEmail({
-      from: "from@x.com",
-      to: ["a@x.com", "b@x.com"],
-      replyTo: ["r1@x.com", "r2@x.com"],
+      from: "from@example.com",
+      to: ["a@example.com", "b@example.com"],
+      replyTo: ["r1@example.com", "r2@example.com"],
       subject: "s",
       html: "<p>h</p>",
     });
     const input = sent[0].input;
-    expect(input.Destination.ToAddresses).toEqual(["a@x.com", "b@x.com"]);
-    expect(input.ReplyToAddresses).toEqual(["r1@x.com", "r2@x.com"]);
+    expect(input.Destination.ToAddresses).toEqual(["a@example.com", "b@example.com"]);
+    expect(input.ReplyToAddresses).toEqual(["r1@example.com", "r2@example.com"]);
   });
 
   it("omits ConfigurationSetName when SES_CONFIGURATION_SET is unset", async () => {
     delete process.env.SES_CONFIGURATION_SET;
     const adapter = createRealAdapter();
-    await adapter.sendEmail({ from: "from@x.com", to: "a@x.com", subject: "s", html: "h" });
+    await adapter.sendEmail({ from: "from@example.com", to: "a@example.com", subject: "s", html: "h" });
     const input = sent[0].input;
     expect("ConfigurationSetName" in input).toBe(false);
   });
 
   it("omits Headers when none are provided", async () => {
     const adapter = createRealAdapter();
-    await adapter.sendEmail({ from: "from@x.com", to: "a@x.com", subject: "s", html: "h" });
+    await adapter.sendEmail({ from: "from@example.com", to: "a@example.com", subject: "s", html: "h" });
     const input = sent[0].input;
     expect("Headers" in input.Content.Simple).toBe(false);
   });
 
   it("leaves ReplyToAddresses undefined when no replyTo is given", async () => {
     const adapter = createRealAdapter();
-    await adapter.sendEmail({ from: "from@x.com", to: "a@x.com", subject: "s", html: "h" });
+    await adapter.sendEmail({ from: "from@example.com", to: "a@example.com", subject: "s", html: "h" });
     const input = sent[0].input;
     expect(input.ReplyToAddresses).toBeUndefined();
   });
@@ -150,7 +150,7 @@ describe("real SES adapter — SendEmailCommand shape", () => {
     delete process.env.AWS_SECRET_ACCESS_KEY;
     const adapter = createRealAdapter();
     await expect(
-      adapter.sendEmail({ from: "from@x.com", to: "a@x.com", subject: "s", html: "h" }),
+      adapter.sendEmail({ from: "from@example.com", to: "a@example.com", subject: "s", html: "h" }),
     ).resolves.toEqual({ messageId: "real-msg-123" });
   });
 

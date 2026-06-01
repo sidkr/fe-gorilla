@@ -49,12 +49,12 @@ describe("suppression management cloud functions", () => {
     const a = await signUp("SuppDupeCo");
     await Parse.Cloud.run(
       "addSuppressions",
-      { emails: "dupe@x.com" },
+      { emails: "dupe@example.com" },
       as(a.sessionToken),
     );
     const res = (await Parse.Cloud.run(
       "addSuppressions",
-      { emails: "dupe@x.com, fresh@x.com" },
+      { emails: "dupe@example.com, fresh@example.com" },
       as(a.sessionToken),
     )) as { added: number; skipped: number; total: number };
     expect(res.added).toBe(1);
@@ -93,9 +93,9 @@ describe("suppression management cloud functions", () => {
 
   it("removeSuppression deletes the row and writes an audit log entry", async () => {
     const a = await signUp("SuppRemoveCo");
-    await Parse.Cloud.run("addSuppressions", { emails: "gone@x.com" }, as(a.sessionToken));
+    await Parse.Cloud.run("addSuppressions", { emails: "gone@example.com" }, as(a.sessionToken));
     const list = (await Parse.Cloud.run("listSuppressions", {}, as(a.sessionToken))) as any;
-    const target = list.results.find((r: any) => r.email === "gone@x.com");
+    const target = list.results.find((r: any) => r.email === "gone@example.com");
     expect(target).toBeTruthy();
 
     const res = (await Parse.Cloud.run(
@@ -104,15 +104,15 @@ describe("suppression management cloud functions", () => {
       as(a.sessionToken),
     )) as { removed: boolean; email: string };
     expect(res.removed).toBe(true);
-    expect(res.email).toBe("gone@x.com");
+    expect(res.email).toBe("gone@example.com");
 
     // Gone from the list.
     const after = (await Parse.Cloud.run("listSuppressions", {}, as(a.sessionToken))) as any;
-    expect(after.results.find((r: any) => r.email === "gone@x.com")).toBeUndefined();
+    expect(after.results.find((r: any) => r.email === "gone@example.com")).toBeUndefined();
 
     // Audit row was written (master-key read, class auto-created on first save).
     const auditQ = new Parse.Query("SuppressionAuditLog");
-    auditQ.equalTo("email", "gone@x.com");
+    auditQ.equalTo("email", "gone@example.com");
     auditQ.equalTo("action", "remove");
     const audit = await auditQ.first({ useMasterKey: true });
     expect(audit).toBeTruthy();
