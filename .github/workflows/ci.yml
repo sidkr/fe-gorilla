@@ -4,9 +4,14 @@ name: CI
 # adapter, component tests) on every push and PR. Make this a REQUIRED check on
 # main so a regression can't merge silently.
 #
-# Playwright e2e is intentionally NOT here yet: it needs a running dev server +
-# a real Mongo (see playwright.config.ts). Add a separate, non-required e2e job
-# once the suite boots a throwaway stack of its own.
+# Mongo: Parse data runs on an in-memory Mongo per test file (mongodb-memory-
+# server), but the Agenda QUEUE connects separately to PARSE_DATABASE_URI
+# (default mongodb://localhost:27017/gorilla — see server/lib/agendaInstance.js).
+# Tests that enqueue (scheduleSend, pause/resume) need a real Mongo at 27017, the
+# same dependency CLAUDE.md documents for local dev. The service below provides it.
+#
+# Playwright e2e is intentionally NOT here yet: it needs a running dev server.
+# Add a separate, non-required e2e job once the suite boots a throwaway stack.
 
 on:
   push:
@@ -23,6 +28,18 @@ jobs:
     name: Unit + integration (vitest)
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    services:
+      # Backs the Agenda job queue (the enqueue path in scheduleSend / pause /
+      # resume). Parse itself uses an in-memory Mongo per test file.
+      mongo:
+        image: mongo:7
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.runCommand({ ping: 1 })'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
 
