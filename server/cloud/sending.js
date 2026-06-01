@@ -38,6 +38,50 @@ const { CAMPAIGN_FANOUT } = require("../lib/jobNames");
 const DEFAULT_FROM_NAME = "Gorilla";
 const DEFAULT_FROM_EMAIL = "hello@send.gorilla.email";
 
+// The shared sending domain every tenant may send from at MVP (DKIM/SPF/DMARC
+// are configured on it centrally). Sending from any OTHER domain requires the
+// org to have verified it under Settings → Domains, otherwise the mail fails
+// DKIM/DMARC alignment (hurting deliverability + enabling spoofing).
+const SHARED_SENDING_DOMAIN = DEFAULT_FROM_EMAIL.split("@")[1]; // send.gorilla.email
+
+// Pull the bare domain out of a From value, which may be either
+// `user@domain` or `Display Name <user@domain>`. Returns "" if unparseable.
+function fromEmailDomain(fromEmail) {
+  const s = String(fromEmail || "");
+  const angle = s.match(/<([^>]+)>/);
+  const addr = (angle ? angle[1] : s).trim();
+  const at = addr.lastIndexOf("@");
+  if (at < 0) return "";
+  return addr.slice(at + 1).trim().toLowerCase();
+}
+
+// SECURITY/DELIVERABILITY guard (LaunchReadiness §3): a campaign may send from
+// the shared domain freely; any custom domain must have a verified SendingDomain
+// row for this org. Throws OPERATION_FORBIDDEN otherwise. Synchronous at
+// schedule time so it covers both "now" and scheduled sends.
+async function assertSendableFromDomain(org, fromEmail) {
+  const domain = fromEmailDomain(fromEmail);
+  if (!domain) {
+    throw new Parse.Error(
+      Parse.Error.VALIDATION_ERROR,
+      "Set a valid from address before sending.",
+    );
+  }
+  if (domain === SHARED_SENDING_DOMAIN) return; // shared identity — always allowed
+
+  const q = new Parse.Query("SendingDomain");
+  q.equalTo("organization", org);
+  q.equalTo("domain", domain);
+  q.equalTo("verified", true);
+  const verified = await q.first({ useMasterKey: true });
+  if (!verified) {
+    throw new Parse.Error(
+      Parse.Error.OPERATION_FORBIDDEN,
+      `Verify ${domain} under Settings → Domains before sending from it (or use an @${SHARED_SENDING_DOMAIN} address).`,
+    );
+  }
+}
+
 // Cap on test-send recipients per call — a test send is for the author + a few
 // teammates, not a blast. Also a cheap abuse guard.
 const MAX_TEST_RECIPIENTS = 5;
@@ -248,6 +292,8 @@ Parse.Cloud.define("scheduleSend", async (request) => {
       "Set a from address before sending.",
     );
   }
+  // Block sending from an unverified custom domain (shared domain always OK).
+  await assertSendableFromDomain(org, campaign.get("fromEmail"));
 
   // ── audience validation ──
   const audienceId = campaign.get("audienceId");

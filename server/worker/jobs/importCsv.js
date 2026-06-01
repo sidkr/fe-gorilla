@@ -20,6 +20,7 @@
 const fs = require("fs");
 const Parse = require("parse/node");
 const { Readable } = require("stream");
+const { assertSafeImportPath } = require("../../lib/importPaths");
 
 // jobNames.js is locked (can't add IMPORT_CSV there in this lane). Import what
 // exists; define a local fallback constant so this worker still registers +
@@ -228,10 +229,12 @@ async function handle(data, deps = {}) {
   }
 
   // openStream lets tests inject CSV content without a temp file. Default: read
-  // the ImportJob.filePath off disk.
+  // the ImportJob.filePath off disk. Re-validate the path here (defense-in-depth:
+  // startContactImport already constrains it, but the worker must never stream an
+  // arbitrary path off disk under the master key). See server/lib/importPaths.js.
   const openStream =
     deps.openStream ||
-    ((job) => fs.createReadStream(job.get("filePath")));
+    ((job) => fs.createReadStream(assertSafeImportPath(job.get("filePath"))));
 
   const job = await new Parse.Query("ImportJob").get(importJobId, MK);
 

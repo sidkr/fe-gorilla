@@ -12,4 +12,7 @@ module.exports = {
   IMPORT_CSV: "import-csv",
   AUTOMATION_TICK: "automation-tick",
   INGEST_CONVERSION: "ingest-conversion",
+  // Periodic ops maintenance: writes the worker heartbeat + recovers campaigns
+  // stranded in "sending" (e.g. a worker crash that dropped a finalize).
+  OPS_TICK: "ops-tick",
 };

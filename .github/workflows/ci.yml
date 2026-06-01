@@ -1,0 +1,47 @@
+name: CI
+
+# The green gate. Runs the vitest suite (server cloud fns, worker jobs, SES
+# adapter, component tests) on every push and PR. Make this a REQUIRED check on
+# main so a regression can't merge silently.
+#
+# Playwright e2e is intentionally NOT here yet: it needs a running dev server +
+# a real Mongo (see playwright.config.ts). Add a separate, non-required e2e job
+# once the suite boots a throwaway stack of its own.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Cancel superseded runs on the same ref to save CI minutes.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Unit + integration (vitest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      # mongodb-memory-server downloads a Mongo binary on first run. Cache it so
+      # every CI run doesn't re-download (~hundreds of MB).
+      - name: Cache mongodb-memory-server binaries
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/mongodb-binaries
+          key: mongodb-binaries-${{ runner.os }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test

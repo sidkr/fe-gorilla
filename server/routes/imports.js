@@ -17,15 +17,17 @@
 // ─────────────────────────────────────────────────────────────────────────────
 const express = require("express");
 const fs = require("fs");
-const os = require("os");
 const path = require("path");
-const crypto = require("crypto");
 const Parse = require("parse/node");
 // verifySession runs a master-key _Session query, which needs the standalone
 // Node SDK initialized (appId + masterKey + serverURL). bootstrapSchemas already
 // does this at boot, but initialize here too so the route is self-sufficient and
 // order-independent — initParseClient() is idempotent (guarded internally).
 const { initParseClient } = require("../lib/parseClient");
+// Centralized safe-path minting/validation — see server/lib/importPaths.js.
+// The path we return here crosses the trust boundary, so it MUST come from
+// newImportPath() and is re-validated downstream before any disk read.
+const { newImportPath } = require("../lib/importPaths");
 
 const MAX_BYTES = 100 * 1024 * 1024; // ~100MB cap
 const PREVIEW_ROWS = 5;
@@ -113,8 +115,8 @@ function mount(app) {
       return res.status(400).json({ error: "Expected a multipart upload." });
     }
 
-    const token = crypto.randomBytes(16).toString("hex");
-    const filePath = path.join(os.tmpdir(), `import-${token}.csv`);
+    const filePath = newImportPath();
+    const token = path.basename(filePath).slice("import-".length, -".csv".length);
     let fileName = "";
     let tooBig = false;
     let sawFile = false;

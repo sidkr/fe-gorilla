@@ -295,6 +295,83 @@ describe("sending cloud functions", () => {
       expect(reloaded.get("status")).toBe("queued");
     });
 
+    // ── unverified-domain send guard (LaunchReadiness §3) ──
+    // Create a SendingDomain row for the org, verified or not, via master key.
+    async function seedSendingDomain(orgId: string, domain: string, verified: boolean) {
+      const orgPtr = new (Parse.Object.extend("Organization"))();
+      orgPtr.id = orgId;
+      const sd = new (Parse.Object.extend("SendingDomain"))();
+      sd.set("organization", orgPtr);
+      sd.set("domain", domain);
+      sd.set("verified", verified);
+      sd.set("status", verified ? "verified" : "pending");
+      await sd.save(null, { useMasterKey: true });
+    }
+
+    it("allows the shared sending domain without any SendingDomain row", async () => {
+      const a = await signUp("SchedShared");
+      const listId = await makeList(a.sessionToken, "Subs");
+      await addContact(a.sessionToken, listId, "one@example.com");
+      const base = await validBase(a.sessionToken, listId);
+      base.fromEmail = "promo@send.gorilla.email"; // shared domain
+      const c = await makeCampaign(a.sessionToken, base);
+      const res = (await Parse.Cloud.run(
+        "scheduleSend",
+        { campaignId: c.id, when: "now" },
+        as(a.sessionToken),
+      )) as { status: string };
+      expect(res.status).toBe("queued");
+    });
+
+    it("blocks sending from an unverified custom domain", async () => {
+      const a = await signUp("SchedUnverified");
+      const listId = await makeList(a.sessionToken, "Subs");
+      await addContact(a.sessionToken, listId, "one@example.com");
+      // A row exists but is NOT verified (also covers the no-row case implicitly).
+      await seedSendingDomain(a.orgId, "acme.co", false);
+      const base = await validBase(a.sessionToken, listId);
+      base.fromEmail = "Acme <news@acme.co>";
+      const c = await makeCampaign(a.sessionToken, base);
+      await expect(
+        Parse.Cloud.run("scheduleSend", { campaignId: c.id, when: "now" }, as(a.sessionToken)),
+      ).rejects.toThrow(/verify acme\.co under settings/i);
+
+      // And it did NOT flip status.
+      const reloaded = await new Parse.Query("Campaign").get(c.id, as(a.sessionToken));
+      expect(reloaded.get("status")).toBe("draft");
+    });
+
+    it("allows sending from a verified custom domain", async () => {
+      const a = await signUp("SchedVerified");
+      const listId = await makeList(a.sessionToken, "Subs");
+      await addContact(a.sessionToken, listId, "one@example.com");
+      await seedSendingDomain(a.orgId, "acme.co", true);
+      const base = await validBase(a.sessionToken, listId);
+      base.fromEmail = "Acme <news@acme.co>";
+      const c = await makeCampaign(a.sessionToken, base);
+      const res = (await Parse.Cloud.run(
+        "scheduleSend",
+        { campaignId: c.id, when: "now" },
+        as(a.sessionToken),
+      )) as { status: string };
+      expect(res.status).toBe("queued");
+    });
+
+    it("scopes domain verification to the caller's org (no cross-tenant trust)", async () => {
+      const a = await signUp("SchedOrgA");
+      const b = await signUp("SchedOrgB");
+      // Org B verifies acme.co; org A must NOT inherit that.
+      await seedSendingDomain(b.orgId, "acme.co", true);
+      const listId = await makeList(a.sessionToken, "Subs");
+      await addContact(a.sessionToken, listId, "one@example.com");
+      const base = await validBase(a.sessionToken, listId);
+      base.fromEmail = "news@acme.co";
+      const c = await makeCampaign(a.sessionToken, base);
+      await expect(
+        Parse.Cloud.run("scheduleSend", { campaignId: c.id, when: "now" }, as(a.sessionToken)),
+      ).rejects.toThrow(/verify acme\.co under settings/i);
+    });
+
     it("schedules a future send and sets scheduledAt", async () => {
       const a = await signUp("SchedFuture");
       const listId = await makeList(a.sessionToken, "Subs");

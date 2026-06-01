@@ -27,4 +27,66 @@ function optional(name, fallback) {
   return process.env[name] ?? fallback;
 }
 
-module.exports = { loadEnv, required, optional };
+// Hard-fail at boot (production only) if any configuration required for SAFE,
+// non-forgeable sending is missing. In dev/test we intentionally allow localhost
+// links + insecure dev defaults, so this is a no-op outside production.
+//
+// Mirrors the existing PARSE_MASTER_KEY guard but covers the whole set, with one
+// message listing everything that's missing. Call ONCE at process start — from
+// both the API server (server/index.js) and the worker (server/worker/index.js),
+// since the worker is what mints tracking/unsubscribe links and sends mail.
+// Pure check: given an env bag, return the list of missing required vars (with a
+// reason). Empty when not production or when everything is present. Pure +
+// side-effect-free so it's unit-testable without spawning a process.
+function missingProductionConfig(env) {
+  if (env.NODE_ENV !== "production") return [];
+
+  const missing = [];
+  const need = (name, why) => {
+    if (!env[name]) missing.push(`${name} — ${why}`);
+  };
+
+  need("PARSE_MASTER_KEY", "Parse master key");
+  if (!env.TRACKING_SECRET && !env.TRACKING_TOKEN_SECRET) {
+    missing.push(
+      "TRACKING_SECRET — HMAC secret for tracking/unsubscribe tokens; without it every token is forgeable",
+    );
+  }
+  need(
+    "PUBLIC_BASE_URL",
+    "public origin for tracking/unsubscribe links; without it emails ship unclickable localhost URLs",
+  );
+
+  // Real SES needs real credentials or every send throws.
+  if (String(env.AWS_SES_MODE || "").toLowerCase() === "real") {
+    need("AWS_REGION", "AWS region for SES");
+    need("AWS_ACCESS_KEY_ID", "AWS credentials for SES");
+    need("AWS_SECRET_ACCESS_KEY", "AWS credentials for SES");
+  }
+
+  return missing;
+}
+
+// Hard-fail at boot (production only) if any configuration required for SAFE,
+// non-forgeable sending is missing. No-op outside production. Call ONCE at
+// process start — from both the API server and the worker, since the worker is
+// what mints tracking/unsubscribe links and sends mail.
+function assertProductionConfig() {
+  loadEnv();
+  const missing = missingProductionConfig(process.env);
+  if (missing.length) {
+    console.error(
+      "FATAL: production startup blocked — required configuration is missing:\n  - " +
+        missing.join("\n  - "),
+    );
+    process.exit(1);
+  }
+}
+
+module.exports = {
+  loadEnv,
+  required,
+  optional,
+  assertProductionConfig,
+  missingProductionConfig,
+};
