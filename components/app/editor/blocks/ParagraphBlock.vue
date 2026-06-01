@@ -12,6 +12,10 @@ import { computed, nextTick, ref, watch } from "vue";
 import BrandColorPicker from "../BrandColorPicker.vue";
 import MergeTagPicker from "../MergeTagPicker.vue";
 import { insertAtCursor } from "~/composables/app/useMergeTags";
+import { plaintextEditableValue } from "~/composables/app/useEditable";
+
+// "plaintext-only" where supported (Chromium/Safari), "true" in Firefox.
+const editableMode = plaintextEditableValue();
 
 interface Props {
   mode: "render" | "inspect";
@@ -101,14 +105,20 @@ watch(
 
 <template>
   <div v-if="mode === 'render'" class="p-render" :style="styleVars">
+    <!-- Editable + display are separate elements; the editable one has NO
+         Vue-managed children so the imperative textContent write in the editable
+         watcher can't desync the VDOM. See HeadingBlock for the full rationale
+         (the old shared element corrupted the tree → next insert crashed). -->
     <p
+      v-if="editable"
       ref="editEl"
-      :class="['p-text', { 'p-text--editable': editable }]"
-      :contenteditable="editable ? 'plaintext-only' : 'false'"
+      class="p-text p-text--editable"
+      :contenteditable="editableMode"
       spellcheck="true"
       @input="onInput"
       @blur="onBlur"
-    ><template v-if="!editable">{{ blockProps.html }}</template></p>
+    />
+    <p v-else class="p-text">{{ blockProps.html }}</p>
   </div>
 
   <div v-else class="p-inspect">

@@ -1,8 +1,12 @@
 <script setup lang="ts">
-// BlockLibrary — left rail. Tiles are draggable; on dragstart we set
-// `application/x-gorilla-block` to the block type. EditorCanvas listens
-// for that mime on its drop zones. No DnD library — HTML5 native.
-import { blockTypesInOrder, registry } from "./blocks/registry";
+// BlockLibrary — left rail. Tiles are draggable (HTML5 native; on dragstart we
+// set `application/x-gorilla-block` to the block type, which EditorCanvas reads
+// on drop) AND clickable: a click/Enter emits `add` so a block can be inserted
+// without dragging. The Shell decides where (after the selection / before the
+// footer).
+import { blockTypesInOrder, registry, type BlockType } from "./blocks/registry";
+
+const emit = defineEmits<{ (e: "add", type: BlockType): void }>();
 
 function onDragStart(e: DragEvent, type: string) {
   if (!e.dataTransfer) return;
@@ -15,7 +19,7 @@ function onDragStart(e: DragEvent, type: string) {
   <aside class="lib">
     <div class="lib-head">
       <h2 class="lib-title">Blocks</h2>
-      <p class="lib-hint">Drag onto the canvas</p>
+      <p class="lib-hint">Drag onto the canvas, or click to add</p>
     </div>
     <ul class="lib-grid">
       <li
@@ -23,7 +27,14 @@ function onDragStart(e: DragEvent, type: string) {
         :key="type"
         class="lib-tile"
         draggable="true"
+        role="button"
+        tabindex="0"
+        :aria-label="`Add ${registry[type].label} block`"
+        :title="`Add ${registry[type].label}`"
         @dragstart="onDragStart($event, type)"
+        @click="emit('add', type)"
+        @keydown.enter.prevent="emit('add', type)"
+        @keydown.space.prevent="emit('add', type)"
       >
         <span class="lib-tile-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" width="20" height="20">

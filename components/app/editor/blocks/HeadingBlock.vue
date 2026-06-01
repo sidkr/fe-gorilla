@@ -12,6 +12,10 @@ import { computed, nextTick, ref, watch } from "vue";
 import BrandColorPicker from "../BrandColorPicker.vue";
 import MergeTagPicker from "../MergeTagPicker.vue";
 import { insertAtCursor } from "~/composables/app/useMergeTags";
+import { plaintextEditableValue } from "~/composables/app/useEditable";
+
+// "plaintext-only" where supported (Chromium/Safari), "true" in Firefox.
+const editableMode = plaintextEditableValue();
 
 interface Props {
   mode: "render" | "inspect";
@@ -129,43 +133,30 @@ watch(
 <template>
   <!-- RENDER -->
   <div v-if="mode === 'render'" class="heading-render" :style="styleVars">
-    <!-- We render the same element shape for all three levels and just
-         swap the wrapper tag. When NOT editable, Vue interpolates
-         {{ text }} so updates from the inspector flow into the DOM.
-         When editable, we suppress the interpolation and write the text
-         imperatively in the `editable` watcher; this prevents Vue from
-         replacing the text node on each keystroke (which would kill
-         the cursor). -->
-    <h1
-      v-if="blockProps.level === 1"
+    <!-- Editable and display are SEPARATE elements (`h${level}` swaps the tag
+         without duplicating per level). The editable element renders with NO
+         Vue-managed children, so the imperative `el.textContent = …` in the
+         editable watcher can't desync Vue's VDOM. Previously the editable
+         element kept a `<template v-if="!editable">` comment node that the
+         imperative write removed — corrupting the tree so the NEXT block insert
+         crashed with "Cannot read properties of null (reading 'insertBefore')".
+         The display element interpolates `{{ text }}` so inspector edits flow in. -->
+    <component
+      v-if="editable"
+      :is="`h${blockProps.level}`"
       ref="editEl"
-      :class="['heading-text', { 'heading-text--editable': editable }]"
-      :contenteditable="editable ? 'plaintext-only' : 'false'"
+      class="heading-text heading-text--editable"
+      :contenteditable="editableMode"
       spellcheck="true"
       @input="onInput"
       @blur="onBlur"
       @keydown="onKeydown"
-    ><template v-if="!editable">{{ blockProps.text }}</template></h1>
-    <h2
-      v-else-if="blockProps.level === 2"
-      ref="editEl"
-      :class="['heading-text', { 'heading-text--editable': editable }]"
-      :contenteditable="editable ? 'plaintext-only' : 'false'"
-      spellcheck="true"
-      @input="onInput"
-      @blur="onBlur"
-      @keydown="onKeydown"
-    ><template v-if="!editable">{{ blockProps.text }}</template></h2>
-    <h3
+    />
+    <component
       v-else
-      ref="editEl"
-      :class="['heading-text', { 'heading-text--editable': editable }]"
-      :contenteditable="editable ? 'plaintext-only' : 'false'"
-      spellcheck="true"
-      @input="onInput"
-      @blur="onBlur"
-      @keydown="onKeydown"
-    ><template v-if="!editable">{{ blockProps.text }}</template></h3>
+      :is="`h${blockProps.level}`"
+      class="heading-text"
+    >{{ blockProps.text }}</component>
   </div>
 
   <!-- INSPECT -->

@@ -70,9 +70,12 @@ const emit = defineEmits<{
   (e: "footer-duplicate-blocked"): void;
 }>();
 
-// Active drop-zone index for visual feedback. Distinct from `dragging`
-// (which is global) — this is which specific zone the pointer is over.
-const activeDropIndex = ref<number | null>(null);
+// The single gap index where a drop would land right now (drives the one
+// cursor-following insertion line). Null when not hovering the card mid-drag.
+const insertIndex = ref<number | null>(null);
+// Ref to the email card so we can read block geometry on dragover and decide
+// the nearest gap — the whole card is a drop target now, not 6px slivers.
+const cardEl = ref<HTMLElement | null>(null);
 
 // Per-block hover state (block id when the pointer is over a block).
 // Needed for Spacer + Divider visibility (canvas-polish §8) which can't
@@ -112,90 +115,74 @@ function onBlockMouseLeave(block: Block) {
   if (hoveredBlockId.value === block.id) hoveredBlockId.value = null;
 }
 
-// ── Drop-zone handlers ──────────────────────────────────────────────────
-// Footer constraint (Editor-phase1.md §6 → "Drag-drop constraint"):
-//   - the footer block cannot be dragged ABOVE any non-footer block
-//   - other blocks cannot be dropped AFTER the footer (footer stays last;
-//     enforced server-side by EditorShell.normalizeFooterPosition, but
-//     blocking the drop zone here makes the constraint visible).
-function isDropZoneAllowed(index: number, dataTransfer: DataTransfer): boolean {
-  const types = Array.from(dataTransfer.types);
-  const isMove = types.includes("application/x-gorilla-move");
-  const isNew = types.includes("application/x-gorilla-block");
+// ── Drop handling (whole-card target + cursor-following insertion line) ───
+// The entire email card is a drop target. On dragover we read block geometry
+// and pick the nearest gap (before the block whose vertical midpoint the cursor
+// is above), so dropping ANYWHERE on the email inserts at the closest slot —
+// not just on a 6px sliver. Footer stays last (Editor-phase1.md §6): new blocks
+// can't land at/after the footer; non-footer moves are clamped before it.
 
-  const fIdx = footerIndex.value;
-  // If there's no footer in the body, no constraints.
-  if (fIdx < 0) return isMove || isNew;
-
-  // For a NEW block insert: don't allow dropping at or after the footer.
-  // (footer is at fIdx; the drop slot directly after it is fIdx+1, also
-  // disallowed.)
-  if (isNew) return index <= fIdx;
-
-  // For a MOVE, we can't read the payload during dragover (browsers
-  // gate getData behind drop for cross-origin reasons); we permissively
-  // allow the zone here and validate in onDrop. The visual cost is the
-  // odd flicker on a disallowed reorder — acceptable.
-  if (isMove) return true;
-
-  return false;
+// Largest gap index a NEW block may target — just before the footer, or the end
+// when there's no footer.
+function maxNewIndex(): number {
+  const f = footerIndex.value;
+  return f < 0 ? props.body.blocks.length : f;
 }
 
-function onDropZoneOver(e: DragEvent, index: number) {
+// Nearest gap index for a cursor Y, from the rendered block rows.
+function computeInsertIndex(clientY: number): number {
+  const rows = cardEl.value
+    ? Array.from(cardEl.value.querySelectorAll<HTMLElement>(".block-row"))
+    : [];
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i].getBoundingClientRect();
+    if (clientY < r.top + r.height / 2) return i;
+  }
+  return rows.length;
+}
+
+function onCardDragOver(e: DragEvent) {
   if (!e.dataTransfer) return;
-  if (!isDropZoneAllowed(index, e.dataTransfer)) return;
-  e.preventDefault(); // required to allow drop
-  e.dataTransfer.dropEffect = Array.from(e.dataTransfer.types).includes(
-    "application/x-gorilla-move",
-  )
-    ? "move"
-    : "copy";
-  activeDropIndex.value = index;
+  const types = Array.from(e.dataTransfer.types);
+  const isNew = types.includes("application/x-gorilla-block");
+  const isMove = types.includes("application/x-gorilla-move");
+  if (!isNew && !isMove) return;
+  e.preventDefault(); // required to allow the drop
+  e.dataTransfer.dropEffect = isMove ? "move" : "copy";
+  let idx = computeInsertIndex(e.clientY);
+  if (isNew) idx = Math.min(idx, maxNewIndex());
+  insertIndex.value = idx;
 }
 
-function onDropZoneLeave(_e: DragEvent, index: number) {
-  if (activeDropIndex.value === index) activeDropIndex.value = null;
+function onCardDragLeave(e: DragEvent) {
+  // Only clear when the pointer truly leaves the card (not when crossing
+  // between child elements inside it).
+  const related = e.relatedTarget as Node | null;
+  if (!cardEl.value || !related || !cardEl.value.contains(related)) {
+    insertIndex.value = null;
+  }
 }
 
-function onDrop(e: DragEvent, index: number) {
+function onCardDrop(e: DragEvent) {
   if (!e.dataTransfer) return;
   e.preventDefault();
-  activeDropIndex.value = null;
+  const idx = insertIndex.value ?? computeInsertIndex(e.clientY);
+  insertIndex.value = null;
   emit("drag-end");
 
   const moveId = e.dataTransfer.getData("application/x-gorilla-move");
   if (moveId) {
-    // Footer constraint: don't allow non-footer blocks to be moved
-    // below the footer; don't allow the footer to be moved above any
-    // non-footer block.
-    const fIdx = footerIndex.value;
     const draggedIsFooter =
       props.body.blocks.find((b) => b.id === moveId)?.type === "footer";
-    if (fIdx >= 0) {
-      if (draggedIsFooter) {
-        // The footer needs to end up at the last slot; the Shell already
-        // normalizes, but reject obvious "above other blocks" drops.
-        const minAllowed = props.body.blocks.filter((b) => b.type !== "footer").length;
-        if (index < minAllowed) return;
-      } else {
-        // Non-footer block: cannot land past the footer position.
-        // Index === fIdx + 1 means "just after the footer"; treat the
-        // footer's original slot as a hard ceiling.
-        if (index > fIdx) return;
-      }
-    }
-    emit("move", { blockId: moveId, toIndex: index });
+    let to = idx;
+    // Non-footer blocks can't land past the footer; the Shell re-normalizes
+    // footer-last regardless, so this just avoids a visible flicker.
+    if (!draggedIsFooter && footerIndex.value >= 0) to = Math.min(to, footerIndex.value);
+    emit("move", { blockId: moveId, toIndex: to });
     return;
   }
-  const type = e.dataTransfer.getData(
-    "application/x-gorilla-block",
-  ) as BlockType;
-  if (type) {
-    // New block: never insert AT or AFTER the footer.
-    const fIdx = footerIndex.value;
-    if (fIdx >= 0 && index > fIdx) return;
-    emit("insert", { type, index });
-  }
+  const type = e.dataTransfer.getData("application/x-gorilla-block") as BlockType;
+  if (type) emit("insert", { type, index: Math.min(idx, maxNewIndex()) });
 }
 
 // Reorder drag — from the left-edge handle on every block (hover/selected).
@@ -270,40 +257,32 @@ const workspaceBg = computed(() => {
     @click="onWorkspaceClick"
   >
     <div
+      ref="cardEl"
       class="canvas-card"
-      :class="[`canvas-card--${previewWidth}`]"
-      :style="{ maxWidth: cardMaxWidth }"
+      :class="[`canvas-card--${previewWidth}`, { 'canvas-card--dropping': dragging }]"
       @click.stop
+      @dragover="onCardDragOver"
+      @drop="onCardDrop"
+      @dragleave="onCardDragLeave"
     >
       <!-- Inbox preview strip (canvas-polish §2). Sits inside the card,
            above any blocks. Bound to setupValues so live edits in the
            Setup popover update the preview without a save round-trip. -->
       <InboxPreviewStrip :values="setupValues" />
 
-      <!-- top drop zone -->
-      <div
-        :class="[
-          'drop-zone',
-          { 'drop-zone--visible': dragging, 'drop-zone--active': activeDropIndex === 0 },
-        ]"
-        @dragover="onDropZoneOver($event, 0)"
-        @dragleave="onDropZoneLeave($event, 0)"
-        @drop="onDrop($event, 0)"
-      >
-        <span class="drop-zone-band" aria-hidden="true"></span>
-        <span class="drop-zone-label">Drop here</span>
-      </div>
-
       <!-- TransitionGroup drives insertion/deletion animations (canvas-polish §6).
            `tag="div"` so the group keeps a flat container element; each
-           direct child <div class="block-row"> is the animated unit
-           (block + trailing drop-zone). -->
+           direct child <div class="block-row"> is the animated unit. The
+           whole card is the drop target; one insertion line marks where a
+           drop lands (driven by insertIndex from cursor geometry). -->
       <TransitionGroup name="block-list" tag="div" class="block-list">
         <div
           v-for="(block, i) in blocks"
           :key="block.id"
           class="block-row"
         >
+          <!-- insertion line before this block -->
+          <div v-if="dragging && insertIndex === i" class="insert-line" aria-hidden="true"><span></span></div>
           <div
             :class="[
               'block-wrap',
@@ -435,28 +414,22 @@ const workspaceBg = computed(() => {
               :block-props="block.props"
             />
           </div>
-
-          <!-- drop zone after each block -->
-          <div
-            :class="[
-              'drop-zone',
-              {
-                'drop-zone--visible': dragging,
-                'drop-zone--active': activeDropIndex === i + 1,
-              },
-            ]"
-            @dragover="onDropZoneOver($event, i + 1)"
-            @dragleave="onDropZoneLeave($event, i + 1)"
-            @drop="onDrop($event, i + 1)"
-          >
-            <span class="drop-zone-band" aria-hidden="true"></span>
-            <span class="drop-zone-label">Drop here</span>
-          </div>
         </div>
       </TransitionGroup>
 
-      <div v-if="blocks.length === 0" class="canvas-empty">
-        <p>Drag a block from the left rail to start.</p>
+      <!-- insertion line at the very end (e.g. moving a block below the last) -->
+      <div
+        v-if="dragging && insertIndex !== null && insertIndex >= blocks.length"
+        class="insert-line"
+        aria-hidden="true"
+      ><span></span></div>
+
+      <div
+        v-if="blocks.length === 0"
+        class="canvas-empty"
+        :class="{ 'canvas-empty--drop': dragging }"
+      >
+        <p>{{ dragging ? "Drop to add your first block" : "Drag a block from the left rail to start." }}</p>
       </div>
     </div>
   </div>
@@ -495,14 +468,23 @@ const workspaceBg = computed(() => {
 .canvas-card--mobile  { max-width: 380px; }
 
 .canvas-empty {
-  padding: var(--space-7) var(--space-5);
+  padding: var(--space-8) var(--space-5);
   text-align: center;
   color: var(--color-ink-dim);
   font-size: var(--text-sm);
+  border: 2px dashed transparent;
+  border-radius: var(--radius-lg);
+  transition: border-color var(--dur-base) var(--ease-out),
+    background var(--dur-base) var(--ease-out), color var(--dur-base) var(--ease-out);
+}
+/* While a drag is in progress the empty card reads as one big drop target. */
+.canvas-empty--drop {
+  border-color: var(--color-pop);
+  background: var(--color-pop-bg);
+  color: var(--color-pop-deep);
 }
 
-/* The TransitionGroup container — needed to host child transitions.
-   Display: contents so it doesn't interfere with the card's flow. */
+/* The TransitionGroup container — needed to host child transitions. */
 .block-list {
   position: relative;
   display: flex;
@@ -513,60 +495,37 @@ const workspaceBg = computed(() => {
   flex-direction: column;
 }
 
-/* ── Drop zones ───────────────────────────────────────────────────────
-   Idle (no drag in progress): zero-height, no pointer events. As soon
-   as a drag starts the `--visible` modifier expands the hit-target to
-   ~6px. Hovering a zone (--active) expands it again to ~24px and
-   surfaces the dashed band + "Drop here" label, while the block above/
-   below smoothly shifts via the height transition. */
-.drop-zone {
+/* ── Insertion line ───────────────────────────────────────────────────
+   A single coral line marking where a drop will land. The whole email card
+   is the drop target; onCardDragOver computes the nearest gap from cursor
+   geometry and sets insertIndex, which renders this line before that block
+   (height: 0 so it overlays the gap without shifting the layout). */
+.insert-line {
   position: relative;
   height: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  pointer-events: none;
-  transition: height var(--dur-base) var(--ease-out),
-    padding var(--dur-base) var(--ease-out);
 }
-.drop-zone--visible {
-  height: 6px;
-  pointer-events: auto;
-}
-.drop-zone--active {
-  height: 24px;
-}
-.drop-zone-band {
+.insert-line span {
   position: absolute;
   left: 0;
   right: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  height: 1px;
-  border-top: 1px dashed var(--color-pop);
-  opacity: 0;
-  transition: opacity var(--dur-fast) var(--ease-out);
+  top: -1px;
+  height: 2px;
+  background: var(--color-pop);
+  border-radius: var(--radius-pill);
 }
-.drop-zone--visible .drop-zone-band {
-  opacity: 0.5;
+.insert-line span::before {
+  content: "";
+  position: absolute;
+  left: -3px;
+  top: -2px;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--color-pop);
 }
-.drop-zone--active .drop-zone-band {
-  opacity: 1;
-}
-.drop-zone-label {
-  position: relative;
-  font-size: var(--text-xs);
-  color: var(--color-pop);
-  font-weight: 600;
-  background: var(--color-surface);
-  padding: 0 var(--space-2);
-  opacity: 0;
-  transition: opacity var(--dur-fast) var(--ease-out);
-  pointer-events: none;
-  font-family: var(--font-body);
-}
-.drop-zone--active .drop-zone-label {
-  opacity: 1;
+/* Subtle ring on the card while dragging so it reads as the active surface. */
+.canvas-card--dropping {
+  box-shadow: var(--shadow-md), 0 0 0 2px var(--color-pop-glow);
 }
 
 /* ── Block wrapper ───────────────────────────────────────────────────── */

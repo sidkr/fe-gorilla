@@ -266,6 +266,21 @@ function setBlockProps(
   markDirty();
 }
 
+// Click-to-add from the palette. Inserts right after the selected block (when
+// one is selected and it isn't the footer), otherwise just before the footer /
+// at the end. Keeps the footer last and selects the new block.
+function addBlockFromLibrary(type: BlockType) {
+  const blocks = body.value.blocks;
+  const footerIdx = blocks.findIndex((b) => b.type === "footer");
+  let index = footerIdx >= 0 ? footerIdx : blocks.length;
+  const sel = selectedBlockId.value;
+  if (sel) {
+    const si = blocks.findIndex((b) => b.id === sel);
+    if (si >= 0 && blocks[si].type !== "footer") index = Math.min(index, si + 1);
+  }
+  insertBlock(type, index);
+}
+
 function insertBlock(type: BlockType, index: number) {
   const def = registry[type];
   if (!def) return;
@@ -512,6 +527,20 @@ function onKeyDown(e: KeyboardEvent) {
     if (inFormField) return;
     e.preventDefault();
     redo();
+    return;
+  }
+
+  // Cmd/Ctrl+D — duplicate the selected block. Works while inline-editing a
+  // block too (it's a block-level action); skip only inside form inputs so it
+  // doesn't hijack the inspector's fields.
+  if (
+    (e.metaKey || e.ctrlKey) &&
+    e.key.toLowerCase() === "d" &&
+    !inFormField &&
+    selectedBlockId.value
+  ) {
+    e.preventDefault();
+    duplicateBlock(selectedBlockId.value);
     return;
   }
 
@@ -853,7 +882,7 @@ watch(
       @dragend.capture="dragging = false"
       @drop.capture="dragging = false"
     >
-      <BlockLibrary class="shell-left" />
+      <BlockLibrary class="shell-left" @add="addBlockFromLibrary" />
       <EditorCanvas
         class="shell-center"
         :body="body"
